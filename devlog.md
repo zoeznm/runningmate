@@ -1,5 +1,6 @@
 | 날짜 | ID | 작업 내용 | 상세 |
 |------|-----|----------|------|
+| 2026-06-12 | 004 | 원격 초기 커밋 병합 후 개인 레포 push 성공 | [상세](devlog/2026-06-12/004-remote-initial-merge-push-success.md) |
 | 2026-06-12 | 003 | 기능별 로컬 커밋 생성 및 개인 레포 push 인증 실패 기록 | [상세](devlog/2026-06-12/003-functional-commits-push-attempt.md) |
 | 2026-06-12 | 002 | Git 원격 저장소 개인 레포 URL 변경 | [상세](devlog/2026-06-12/002-git-origin-private-repo.md) |
 | 2026-06-12 | 001 | 개인 서버 ReviewOps 등록 조건 및 nginx 캡처 헤더 정리 | [상세](devlog/2026-06-12/001-reviewops-private-server-registration.md) |
