@@ -1,198 +1,195 @@
-# WIZ Sample Project
+# 러닝메이트
 
-WIZ 프레임워크 기반 샘플 프로젝트입니다.  
-게시판, 사용자 관리, 대시보드 등의 기본 기능을 **Struct 패턴**과 **Portal 패키지** 구조로 구현한 레퍼런스 애플리케이션입니다.
+러닝메이트는 개인 러닝 기록을 관리하고, 목표/챌린지/커뮤니티/AI 페이서 기능을 한 화면에서 사용할 수 있게 만든 WIZ 기반 웹 서비스입니다. 이미지 기록 업로드, 러닝 캘린더, 체중/훈련 분석, 친구/랭킹, 피드, AI 채팅, 개인 서버 운영을 함께 고려한 프로젝트입니다.
 
----
+이 저장소는 더 이상 WIZ 샘플 프로젝트가 아니라 러닝메이트 서비스 코드와 운영 문서를 담는 프로젝트입니다.
 
-## 데모 계정
+## 핵심 기능
 
-| 이메일 | 비밀번호 | 이름 | 역할 |
-|--------|----------|------|------|
-| admin@example.com | admin1234 | 관리자 | admin |
-| alice@example.com | alice1234 | Alice Kim | user |
-| bob@example.com | bob12345 | Bob Park | user |
-| carol@example.com | carol123 | Carol Lee | editor |
-| dave@example.com | dave1234 | Dave Choi | viewer |
+- 러닝 기록 업로드와 직접 입력
+  - 거리, 페이스, 시간, 심박, 케이던스, 고도, 칼로리, 일기, 사진/영상 관리
+  - 이미지 기반 기록 파싱과 사용자별 월간 파싱 한도
+- 대시보드와 캘린더
+  - 주간/월간 요약, 기록 달력, 날씨, 생리주기/컨디션 기록, 갤러리
+- 목표와 챌린지
+  - 월간 목표, 개인 목표, 그룹 챌린지, 초대코드, 진행률 관리
+- 커뮤니티
+  - 피드, 반응, 댓글, 친구코드, 팔로잉/팔로워, 전체/친구 랭킹
+- 계정과 보안
+  - 이메일 로그인, 회원가입, 비밀번호 재설정, Google/Naver OAuth, JWT/세션 보강
+  - 약관/개인정보처리방침 동의와 재동의
+- AI 페이서
+  - OpenAI 기반 채팅, 기록 분석, 페르소나 설정, 일/월 사용량 제한
+- 개인 서버 운영
+  - MySQL/MariaDB, 로컬 미디어 저장소, 서명 URL, ClamAV 스캔, 백업/복구, 헬스체크, 로그 알림
+- 모바일 배포 준비
+  - PWA 설정과 Capacitor iOS shell
 
----
+## 기술 스택
+
+| 영역 | 사용 기술 |
+| --- | --- |
+| 앱 프레임워크 | WIZ / Season Framework |
+| 프론트엔드 | Angular 18, TypeScript, Pug, SCSS, Tailwind CSS |
+| 백엔드 | Python, Flask 기반 WIZ route/controller |
+| 데이터 모델 | Peewee ORM, WIZ Struct 패턴 |
+| 운영 DB | MySQL 또는 MariaDB 권장 |
+| 파일 저장 | 개인 서버 로컬 디스크 경로 + 서명 URL + 백업 |
+| AI | OpenAI API |
+| 인증 | 이메일/비밀번호, JWT, Google/Naver OAuth |
+| 모바일 | Capacitor iOS |
+| 운영 | Nginx, healthcheck, log watch, backup scripts |
 
 ## 프로젝트 구조
 
-```
+```text
 src/
-├── app/                          # Angular Page/Layout/Component
-│   ├── layout.sidebar/           # 사이드바 레이아웃 (h-screen, 회색 배경, 스크롤)
-│   ├── component.nav.sidebar/    # 사이드바 네비게이션 컴포넌트
-│   ├── page.access/              # 로그인 페이지
-│   ├── page.dashboard/           # 대시보드 (통계 + 최근 게시물)
-│   ├── page.posts/               # 게시물 목록 (라우팅 전용 → post 패키지)
-│   ├── page.posts.item/          # 게시물 상세 (라우팅 전용 → post 패키지)
-│   ├── page.members/             # 멤버 관리
-│   └── page.mypage/              # 내 프로필 / 비밀번호 변경
-│
-├── controller/                   # 백엔드 전처리 (인증 체인)
-│   ├── base.py                   # 세션 초기화
-│   └── user.py                   # 로그인 검증 (base 상속)
-│
-├── model/                        # 프로젝트 고유 Model
-│   ├── struct.py                 # 루트 Struct (User + 패키지 동적 로드)
-│   ├── struct/
-│   │   └── user.py               # User Sub-Struct (인증, CRUD)
-│   └── db/
-│       └── user.py               # User DB Model (peewee)
-│
-└── portal/                       # 재사용 패키지
-    ├── season/                   # 코어 패키지 (ORM, 세션, Service)
-    └── post/                     # 게시물 패키지
-        ├── portal.json
-        ├── app/
-        │   ├── list/             # 게시물 목록 UI 컴포넌트
-        │   └── detail/           # 게시물 상세 UI 컴포넌트
-        └── model/
-            ├── struct.py         # Post Composite Struct
-            ├── struct/
-            │   ├── post.py       # Post Sub-Struct
-            │   └── comment.py    # Comment Sub-Struct
-            └── db/
-                ├── post.py       # Post DB Model
-                └── comment.py    # Comment DB Model
+├── app/                      # WIZ Source app: page, component, layout
+│   ├── page.access/          # 로그인/회원가입/비밀번호 재설정
+│   ├── page.dashboard/       # 러닝메이트 메인 앱 경험
+│   ├── page.members/         # 관리자 멤버 관리
+│   ├── page.mypage/          # 내 정보/탈퇴/계정 설정
+│   └── component.*/          # 로딩, 오류, 토스트, 네비게이션 등
+├── angular/                  # Angular build shell과 shared client utilities
+├── controller/               # WIZ controller: base/user/admin guard
+├── model/                    # 러닝메이트 도메인 모델, DB model, 보안/OAuth/helper
+├── route/                    # REST API endpoint
+├── assets/                   # 브랜드 이미지, 폰트, 오류 페이지
+└── portal/                   # WIZ portal packages
+
+docs/                         # 운영/보안/배포/AI/개인 서버 문서
+ops/                          # nginx 등 운영 설정 예시
+scripts/                      # 백업, 헬스체크, 로그 감시, secret 검증, migration
+ios/                          # Capacitor iOS shell
+devlog/                       # ReviewOps/Codex 작업 상세 로그
 ```
 
----
+현재 WIZ 프로젝트 기준 app 수:
 
-## 아키텍처 패턴
+- page 6개
+- component 7개
+- layout 2개
+- route 59개
+- portal package 2개
 
-### Struct 패턴
+## 실행과 빌드
 
-```
-api.py → wiz.model("struct") → src/model/struct.py (Root Struct)
-                                  ├── @property user → struct/user.py (Sub-Struct)
-                                  └── __getattr__ → wiz.model("portal/{name}/struct")
-                                                    └── portal/post/struct.py
-                                                        ├── @property post → Post Sub-Struct
-                                                        └── @property comment → Comment Sub-Struct
-```
+현재 WIZ 런타임 기준 실행 흐름:
 
-### 패키지 기반 컴포넌트
-
-Post 관련 UI는 `portal/post/app/`에 패키지 컴포넌트로 구현되어 있고,  
-`page.posts`와 `page.posts.item`은 라우팅 역할만 수행합니다:
-
-```pug
-//- page.posts/view.pug (라우팅 전용)
-wiz-portal-post-list
-
-//- page.posts.item/view.pug (라우팅 전용)
-wiz-portal-post-detail
+```bash
+cd /opt/app
+pip install -U season
+wiz service regist app 3000
+wiz service start app
 ```
 
-### 레이아웃 구조
+프로젝트 빌드:
 
-- **layout.sidebar**: `h-screen overflow-hidden` + 콘텐츠 영역 `h-full overflow-auto`
-- 모든 페이지가 회색(`#f4f5f5`) 배경 위에서 스크롤됩니다.
-- 각 페이지의 `nav.sticky` 헤더는 스크롤 영역 상단에 고정됩니다.
+```bash
+cd /opt/app
+wiz bundle --project=main
+```
 
----
+Angular 단독 점검:
 
-## 데이터베이스
+```bash
+cd /opt/app/project/main/src/angular
+npm install
+npm run build
+```
 
-| DB 파일 | namespace | 테이블 | 용도 |
-|---------|-----------|--------|------|
-| data/base.db | base | user | 사용자 관리 |
-| data/post.db | post | post, comment | 게시물/댓글 |
+운영 재시작 helper:
 
-**설정**: `config/database.py`에서 namespace별 SQLite 경로를 정의합니다.
+```bash
+cd /opt/app/project/main
+scripts/runningmate_restart_wiz_app.sh
+```
 
----
+## 환경변수와 secret
+
+예시 키 목록은 `.env.example`에 정리되어 있습니다. 실제 secret은 Git에 넣지 않고 `/opt/app/config/*.env` 또는 운영 환경변수로만 주입합니다.
+
+주요 범주:
+
+- 기본/세션/도메인: `WIZ_SECRET_KEY`, `RUNNINGMATE_PUBLIC_BASE_URL`, `RUNNINGMATE_ALLOWED_ORIGINS`
+- DB: `RUNNINGMATE_DB_TYPE`, `RUNNINGMATE_DB_HOST`, `RUNNINGMATE_DB_NAME`, `RUNNINGMATE_DB_USER`, `RUNNINGMATE_DB_PASSWORD`
+- 데이터/업로드: `RUNNINGMATE_DATA_DIR`, `RUNNINGMATE_UPLOAD_DIR`, `RUNNINGMATE_MEDIA_UPLOAD_DIR`, `RUNNINGMATE_FILE_URL_SECRET`
+- AI/OpenAI: `OPENAI_API_KEY`, `RUNNINGMATE_AI_PROVIDER`, `RUNNINGMATE_CHAT_MODEL`, `RUNNINGMATE_VISION_MODEL`, quota/rate limit 변수
+- OAuth: Google/Naver client id, secret, redirect URI
+- 메일: SendGrid 또는 SMTP 설정
+- 백업/운영: backup, rclone, healthcheck, log watch, restart command
+
+운영 secret 검증:
+
+```bash
+cd /opt/app/project/main
+python scripts/verify_runtime_secrets.py
+```
 
 ## 주요 API
 
-### 인증
-- `POST /wiz/api/page.access/login` — 이메일/비밀번호 로그인
+| 범주 | Endpoint 예시 |
+| --- | --- |
+| 인증 | `/api/auth/login`, `/api/auth/register`, `/api/auth/me`, `/api/auth/refresh`, `/api/auth/logout` |
+| OAuth | `/api/auth/oauth/google/start`, `/api/auth/oauth/naver/start` |
+| 러닝 기록 | `/api/runs`, `/api/runs/<run_id>`, `/api/runs/<run_id>/media` |
+| 미디어 | `/api/run-images/<path>`, `/api/run-media/<path>`, `/api/media/<media_id>` |
+| 커뮤니티 | `/api/feed`, `/api/follows/*`, `/api/friends/code`, `/api/ranking/weekly` |
+| 목표/챌린지 | `/api/goals/<year_month>`, `/api/challenges`, `/api/challenges/join` |
+| AI | `/api/chat`, `/api/parse-image`, `/api/ai-config` |
+| 분석 | `/api/stats/*`, `/api/training-load`, `/api/weather/monthly`, `/api/weights` |
+| 운영 | `/healthz`, `/sw.js`, `/manifest.json` |
 
-### 게시물 (portal/post 패키지)
-- `GET /wiz/api/portal.post.list/categories` — 카테고리 목록
-- `GET /wiz/api/portal.post.list/search` — 게시물 검색 (page, dump, text, category)
-- `GET /wiz/api/portal.post.detail/get` — 게시물 상세 (id)
-- `POST /wiz/api/portal.post.detail/save` — 게시물 저장/수정
-- `POST /wiz/api/portal.post.detail/delete` — 게시물 삭제
+## 개인 서버 배포
 
-### 멤버
-- `GET /wiz/api/page.members/list` — 멤버 목록 (text, role)
-- `POST /wiz/api/page.members/invite` — 멤버 초대
-- `POST /wiz/api/page.members/remove` — 멤버 삭제
+개인 서버 운영은 다음 기준으로 준비합니다.
 
-### 마이페이지
-- `GET /wiz/api/page.mypage/get` — 내 프로필 조회
-- `POST /wiz/api/page.mypage/update_profile` — 프로필 수정
-- `POST /wiz/api/page.mypage/change_password` — 비밀번호 변경
+- 앱 내부 포트: `3000`
+- 공개: Nginx 80/443 reverse proxy
+- 운영 DB: MySQL 또는 MariaDB
+- 미디어 저장소: `/opt/app/data/run_images`, `/opt/app/data/run_media`
+- 백업: `/opt/app/data/backups` + rclone/외부 저장소 권장
+- 헬스체크: `/healthz`
+- 로그 감시: `scripts/runningmate_log_watch.py`
 
-### 러닝메이트 AI 연결
-- 운영 배포는 `RUNNINGMATE_AI_PROVIDER=openai`로 설정하고, 운영 OpenAI API 프로젝트에서 발급한 키를 서버 환경 변수 `OPENAI_API_KEY`로 주입합니다.
-- `RUNNINGMATE_AI_PROVIDER=codex`는 개발/임시 점검 용도로만 사용합니다. 운영 서비스는 개인 Codex 로그인 상태에 의존하지 않아야 합니다.
-- 이미지 파싱은 OpenAI Responses API의 이미지 입력을 사용합니다.
-- 기본 모델은 `gpt-5.4-mini-2026-03-17`이며, `RUNNINGMATE_CHAT_MODEL`과 `RUNNINGMATE_VISION_MODEL`로 채팅/이미지 파싱 모델을 각각 변경할 수 있습니다.
-- 기본 이미지 상세도는 작은 텍스트 OCR 정확도를 위해 `RUNNINGMATE_IMAGE_DETAIL=high`를 사용합니다. 비용을 줄여야 하면 `low`로 낮출 수 있습니다.
-- `insufficient_quota` 오류는 API 크레딧 소진 또는 월 사용 한도 도달 상태입니다. Billing에서 크레딧을 충전하거나 한도를 올린 뒤 다시 시도해야 합니다.
-- AI를 전체 무료 무제한으로 개방하지 않기 위한 베타, 쿼터, 유료화 확장 설계는 `docs/ai-access-beta-quota-paid-design-2026-06-09.md`를 기준으로 합니다.
+Nginx 예시는 `ops/nginx-runningmate.conf.example`에 있습니다. 개인 서버를 ReviewOps에 등록하려면 `/api/`, `/auth/`, `/healthz`, `/sw.js`, `/manifest.json`, `/socket.io/`가 정적 SPA fallback이 아니라 WIZ 앱 upstream으로 가야 합니다.
 
-```bash
-install -m 600 /dev/null /opt/app/config/openai.env
-printf '%s\n' 'OPENAI_API_KEY=<server-injected-openai-api-key>' \
-  'RUNNINGMATE_AI_PROVIDER=openai' \
-  'RUNNINGMATE_CHAT_MODEL=gpt-5.4-mini-2026-03-17' \
-  'RUNNINGMATE_VISION_MODEL=gpt-5.4-mini-2026-03-17' \
-  'RUNNINGMATE_IMAGE_DETAIL=high' \
-  'RUNNINGMATE_AI_CHAT_DAILY_LIMIT=5' \
-  'RUNNINGMATE_AI_CHAT_MONTHLY_LIMIT=120' \
-  'RUNNINGMATE_AI_CHAT_ADMIN_DAILY_LIMIT=100' \
-  'RUNNINGMATE_AI_CHAT_ADMIN_MONTHLY_LIMIT=2000' \
-  'RUNNINGMATE_AI_CHAT_COOLDOWN_SECONDS=10' \
-  'RUNNINGMATE_AI_CHAT_RATE_WINDOW_SECONDS=60' \
-  'RUNNINGMATE_AI_CHAT_RATE_MAX_REQUESTS=6' \
-  'RUNNINGMATE_AI_IMAGE_PARSE_COOLDOWN_SECONDS=30' \
-  'RUNNINGMATE_AI_IMAGE_PARSE_RATE_WINDOW_SECONDS=300' \
-  'RUNNINGMATE_AI_IMAGE_PARSE_RATE_MAX_REQUESTS=5' \
-  'RUNNINGMATE_OPENAI_RETRY_MAX=2' \
-  'RUNNINGMATE_OPENAI_BACKOFF_BASE_SECONDS=0.8' \
-  'RUNNINGMATE_OPENAI_BACKOFF_MAX_SECONDS=8' \
-  'RUNNINGMATE_OPENAI_PROJECT_ID=<runningmate-prod-project-id>' \
-  'RUNNINGMATE_OPENAI_DAILY_BUDGET_USD=1' \
-  'RUNNINGMATE_OPENAI_MONTHLY_BUDGET_USD=30' \
-  'RUNNINGMATE_OPENAI_ALERT_THRESHOLDS=50,80,95,100' \
-  'RUNNINGMATE_CODEX_TIMEOUT=180' > /opt/app/config/openai.env
-wiz bundle --project=main
-wiz service restart app
-```
+## 배포 산출물 관리
 
-연결 상태는 `GET /api/ai-config` 또는 대시보드 업로드 탭에서 확인할 수 있습니다.
-OpenAI 사용량 점검은 Admin API 키를 런타임에만 주입한 뒤 `python scripts/check_openai_usage.py`로 확인합니다.
+`runningmate-deploy*.tar.gz`, split part, checksum, reassemble 안내 파일은 Git에 커밋하지 않습니다. 배포 기준 commit에 tag를 붙이고, 압축본과 checksum은 GitHub Release 또는 외부 artifact 저장소에 올립니다.
 
----
+자세한 기준은 `docs/deployment-artifact-management-2026-06-12.md`를 참고합니다.
 
-## iPhone 다운로드형 앱 배포
+## iOS shell
 
-홈 화면 추가(PWA)가 아니라 TestFlight/App Store에서 내려받는 앱으로 배포하려면 iOS 네이티브 패키지가 필요합니다.
-이 프로젝트에는 Capacitor 기반 iOS 래퍼가 추가되어 있으며, 앱은 `러닝메이트` 이름과 `net.seasonai.run.matomabo` 번들 ID를 사용합니다.
-
-현재 설정은 iOS 앱 shell 안에서 운영 서비스 URL을 엽니다.
+Capacitor 기반 iOS shell이 포함되어 있습니다.
 
 ```bash
+cd /opt/app/project/main
 npm install
 npm run ios:sync
 npm run ios:open
 ```
 
-`npm run ios:open` 이후 단계는 macOS의 Xcode에서 진행합니다.
+Linux 서버에서는 Xcode가 없어 `.ipa` 생성과 TestFlight/App Store 업로드를 완료할 수 없습니다. `npm run ios:open` 이후 서명, Archive, 업로드는 macOS Xcode에서 진행합니다.
 
-1. Xcode에서 Apple Developer Team을 선택합니다.
-2. Bundle Identifier가 `net.seasonai.run.matomabo`인지 확인합니다.
-3. 실제 iPhone 연결 후 Run으로 테스트합니다.
-4. `Product > Archive`로 아카이브를 만들고 TestFlight 또는 App Store Connect로 업로드합니다.
+## 운영 문서
 
-Linux 서버에서는 Xcode와 Apple 서명 도구가 없어 `.ipa` 생성과 App Store/TestFlight 업로드까지는 할 수 없습니다.
+| 문서 | 내용 |
+| --- | --- |
+| `docs/raspberry-pi-deployment-checklist-2026-06-11.md` | 라즈베리파이/개인 서버 배포 준비 체크리스트 |
+| `docs/private-server-storage-plan-2026-06-09.md` | 개인 서버 저장 구조 전환 계획 |
+| `docs/private-server-ops-alert-rollback-2026-06-09.md` | 로그/알림/장애 대응/롤백 절차 |
+| `docs/private-server-secret-inventory-2026-06-10.md` | secret 배치와 이전 전후 체크리스트 |
+| `docs/private-server-p2-security-plan-2026-06-10.md` | 보안 작업 계획 |
+| `docs/reviewops-private-server-registration-2026-06-12.md` | ReviewOps 개인 서버 등록 조건 |
+| `docs/deployment-artifact-management-2026-06-12.md` | 배포 압축 산출물 관리 기준 |
+| `docs/codex-runtime-flow.md` | 서비스 내부 AI/Codex 런타임 흐름 |
+| `docs/openai-production-ops-2026-06-09.md` | OpenAI 운영 정책과 과금 방어 |
 
-참고:
-- Apple Xcode 배포 안내: https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases/
-- App Store Connect 빌드 업로드 안내: https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/
+## Git 작업 원칙
+
+- 기능별로 커밋합니다.
+- 배포 산출물과 secret은 커밋하지 않습니다.
+- 작업 기록은 `devlog.md`와 `devlog/YYYY-MM-DD/`에 남깁니다.
+- 개인 서버 배포 기준 commit은 tag를 붙이고, release asset으로 압축본을 관리합니다.

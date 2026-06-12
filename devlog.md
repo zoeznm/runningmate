@@ -1,5 +1,6 @@
 | 날짜 | ID | 작업 내용 | 상세 |
 |------|-----|----------|------|
+| 2026-06-12 | 006 | README를 러닝메이트 프로젝트 기준으로 재구성 | [상세](devlog/2026-06-12/006-readme-runningmate-rewrite.md) |
 | 2026-06-12 | 005 | 배포 압축 산출물 Git 제외 및 관리 기준 문서화 | [상세](devlog/2026-06-12/005-deployment-artifact-management.md) |
 | 2026-06-12 | 004 | 원격 초기 커밋 병합 후 개인 레포 push 성공 | [상세](devlog/2026-06-12/004-remote-initial-merge-push-success.md) |
 | 2026-06-12 | 003 | 기능별 로컬 커밋 생성 및 개인 레포 push 인증 실패 기록 | [상세](devlog/2026-06-12/003-functional-commits-push-attempt.md) |
