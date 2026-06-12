@@ -1,0 +1,12 @@
+{
+    "id": "page.privacy",
+    "mode": "page",
+    "title": "/privacy",
+    "namespace": "privacy",
+    "category": "legal",
+    "viewuri": "/privacy",
+    "preview": "",
+    "controller": "base",
+    "layout": "layout.empty",
+    "template": "wiz-page-privacy()"
+}

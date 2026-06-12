@@ -1,0 +1,12 @@
+{
+    "id": "page.account.delete",
+    "mode": "page",
+    "title": "/account/delete",
+    "namespace": "account.delete",
+    "category": "legal",
+    "viewuri": "/account/delete",
+    "preview": "",
+    "controller": "base",
+    "layout": "layout.empty",
+    "template": "wiz-page-account-delete()"
+}

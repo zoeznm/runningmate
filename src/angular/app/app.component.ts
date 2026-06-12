@@ -44,15 +44,19 @@ export class AppComponent implements OnInit {
         enableProdMode();
         installAuthFetchInterceptor();
         await this.service.init(this);
-        if (!this.isPublicAuthPage() && !(await ensureAuthenticated())) {
+        const isPublicPage = this.isPublicPage();
+        if (!isPublicPage && !(await ensureAuthenticated())) {
             location.href = '/access';
             return;
         }
-        await this.checkAgreementRequirement();
+        if (!isPublicPage) {
+            await this.checkAgreementRequirement();
+        }
     }
 
-    private isPublicAuthPage(): boolean {
-        return location.pathname === '/access' || location.pathname.startsWith('/auth/');
+    private isPublicPage(): boolean {
+        const path = location.pathname.replace(/\/+$/, '') || '/';
+        return ['/access', '/privacy', '/terms', '/account/delete'].includes(path) || path.startsWith('/auth/');
     }
 
     public get reconsentReady() {

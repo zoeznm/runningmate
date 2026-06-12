@@ -1,0 +1,75 @@
+main(class="account-delete-page")
+    header(class="legal-header")
+        button(type="button", class="legal-back danger", aria-label="설정으로 돌아가기", title="뒤로", (click)="goBack()")
+            i(class="fa-solid fa-chevron-left", aria-hidden="true")
+        a(class="legal-brand", href="/dashboard", aria-label="Runningmate dashboard")
+            span(class="legal-brand-mark danger") R
+            span Runningmate
+        nav(class="legal-nav", aria-label="문서 메뉴")
+            a(href="/privacy") 개인정보처리방침
+            a(href="/terms") 이용약관
+            a(class="active danger", href="/account/delete") 계정 삭제
+
+    section(class="delete-hero")
+        p(class="legal-eyebrow") Account Deletion
+        h1 계정 삭제
+        p(class="legal-lead") 계정과 Runningmate 서비스 데이터를 삭제합니다. 삭제가 완료되면 되돌릴 수 없습니다.
+
+    section(*ngIf="loading", class="legal-state")
+        i(class="fa-solid fa-spinner", aria-hidden="true")
+        span 로그인 상태를 확인하는 중입니다.
+
+    section(*ngIf="!loading && !isAuthenticated", class="delete-panel")
+        div(class="delete-panel-icon")
+            i(class="fa-solid fa-right-to-bracket", aria-hidden="true")
+        h2 로그인이 필요합니다
+        p 계정 삭제는 본인 확인을 위해 로그인 후 진행할 수 있습니다. 로그인한 뒤 이 페이지로 돌아와 삭제 요청을 완료해주세요.
+        div(class="delete-actions")
+            button(type="button", class="delete-primary", (click)="goLogin()") 로그인하기
+            a(class="delete-secondary", href="/privacy") 개인정보처리방침
+
+    section(*ngIf="!loading && isAuthenticated && !accountDeleted", class="delete-panel wide")
+        div(class="delete-account-row")
+            div
+                span(class="delete-kicker") 삭제 대상 계정
+                strong {{userLabel}}
+            button(type="button", class="delete-secondary compact", (click)="goDashboard()") 대시보드
+
+        div(class="delete-warning")
+            h2 삭제되는 데이터
+            ul
+                li 회원 정보와 소셜 로그인 연결
+                li 러닝 기록, 목표, 휴식일, 챌린지 참여 정보
+                li 체중 기록과 프로필 공개 설정
+                li 업로드한 사진과 영상 파일
+                li AI 대화 기록과 사용량 기록
+                li 기기, 로그인, 보안 감사 정보
+            p 챌린지 무결성을 위해 일부 표시 정보는 탈퇴한 사용자로 익명화될 수 있습니다.
+
+        form(class="delete-form", (submit)="deleteAccount(); $event.preventDefault()")
+            label(class="delete-check")
+                input(type="checkbox", name="acknowledged", [(ngModel)]="acknowledged")
+                span 계정 삭제 후 복구할 수 없음을 확인했습니다.
+            label(class="delete-field")
+                span 확인 문구
+                input(type="text", name="confirmText", autocomplete="off", placeholder="삭제", [(ngModel)]="confirmText")
+                small 입력창에 삭제를 정확히 입력해야 합니다.
+            label(class="delete-field")
+                span 비밀번호 재입력
+                input(type="password", name="password", autocomplete="current-password", placeholder="선택 입력", [(ngModel)]="password")
+                small 비밀번호 계정은 추가 검증에 사용됩니다.
+            div(*ngIf="statusMessage", class="delete-status", [ngClass]="statusKind") {{statusMessage}}
+            div(class="delete-actions end")
+                button(type="submit", class="delete-danger", [disabled]="!canDelete")
+                    i(class="fa-solid", [ngClass]="deleting ? 'fa-spinner' : 'fa-trash-can'", aria-hidden="true")
+                    span {{deleting ? '삭제 중' : '계정 삭제'}}
+
+    section(*ngIf="accountDeleted", class="delete-panel complete")
+        div(class="delete-panel-icon success")
+            i(class="fa-solid fa-check", aria-hidden="true")
+        h2 계정 삭제 완료
+        p 계정과 연결된 데이터 삭제가 완료되었습니다. 로그인 화면으로 이동합니다.
+
+    footer(class="legal-footer")
+        span 계정 삭제와 개인정보 처리 기준은 개인정보처리방침에서 확인할 수 있습니다.
+        a(href="/privacy") 개인정보처리방침 보기

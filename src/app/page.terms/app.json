@@ -1,0 +1,12 @@
+{
+    "id": "page.terms",
+    "mode": "page",
+    "title": "/terms",
+    "namespace": "terms",
+    "category": "legal",
+    "viewuri": "/terms",
+    "preview": "",
+    "controller": "base",
+    "layout": "layout.empty",
+    "template": "wiz-page-terms()"
+}

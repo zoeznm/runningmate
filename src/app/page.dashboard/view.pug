@@ -966,6 +966,9 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
                             i(class="fa-solid fa-upload", aria-hidden="true")
                             span {{calendarUploadButtonText}}
+                        div(class="calendar-upload-note")
+                            i(class="fa-solid fa-circle-info", aria-hidden="true")
+                            span 모바일에서는 사진 보관함이나 파일 선택창이 열립니다. 사진 접근 권한을 묻는 경우 허용해야 업로드할 수 있습니다.
                         div(class="run-media-section calendar-draft-media-section")
                             div(class="run-media-head")
                                 div
@@ -2266,10 +2269,10 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             div(class="settings-dual-actions")
                                 button(type="button", (click)="backupSettings()") 백업
                                 button(type="button", (click)="settingsRestoreInput.click()") 복원
-                        button(type="button", class="settings-list-row danger", [disabled]="deletingAccount", (click)="openFullDataDelete()")
+                        button(type="button", class="settings-list-row danger", (click)="openLegalPage('/account/delete')")
                             div(class="settings-row-main")
-                                div(class="settings-row-title") 전체 데이터 삭제
-                                div(class="settings-row-sub") 확인 다이얼로그 필수
+                                div(class="settings-row-title") 계정 삭제
+                                div(class="settings-row-sub") 계정과 서비스 데이터 삭제 안내
                             div(class="settings-row-trail")
                                 i(class="fa-solid fa-chevron-right", aria-hidden="true")
 
@@ -2309,6 +2312,18 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                 section(class="settings-group")
                     div(class="settings-section-label") 정보
                     div(class="settings-list")
+                        button(type="button", class="settings-list-row", (click)="openLegalPage('/privacy')")
+                            div(class="settings-row-main")
+                                div(class="settings-row-title") 개인정보처리방침
+                                div(class="settings-row-sub") 처리하는 데이터와 보관 기준
+                            div(class="settings-row-trail")
+                                i(class="fa-solid fa-chevron-right", aria-hidden="true")
+                        button(type="button", class="settings-list-row", (click)="openLegalPage('/terms')")
+                            div(class="settings-row-main")
+                                div(class="settings-row-title") 이용약관
+                                div(class="settings-row-sub") 서비스 이용 조건과 책임 범위
+                            div(class="settings-row-trail")
+                                i(class="fa-solid fa-chevron-right", aria-hidden="true")
                         div(class="settings-list-row")
                             div(class="settings-row-main")
                                 div(class="settings-row-title") 앱 버전
@@ -2499,7 +2514,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     i(class="fa-solid fa-location-crosshairs", aria-hidden="true")
                 div(class="location-permission-main")
                     div(class="location-permission-title") 현재 위치로 날씨를 맞출까요?
-                    div(class="location-permission-body") 러닝 캘린더의 날씨 예보를 가까운 지역 기준으로 보여줘요.
+                    div(class="location-permission-body") 러닝 캘린더의 날씨 예보를 가까운 지역 기준으로 보여줘요. 권한은 브라우저 설정에서 다시 변경할 수 있어요.
                 div(class="location-permission-actions")
                     button(type="button", class="location-permission-secondary", [disabled]="isLocationPermissionPromptBusy", (click)="declineLocationPermission()") 나중에
                     button(type="button", class="location-permission-primary", [disabled]="isLocationPermissionPromptBusy", (click)="acceptLocationPermission()")

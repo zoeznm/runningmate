@@ -1,0 +1,35 @@
+main(class="legal-page")
+    header(class="legal-header")
+        button(type="button", class="legal-back", aria-label="설정으로 돌아가기", title="뒤로", (click)="goBack()")
+            i(class="fa-solid fa-chevron-left", aria-hidden="true")
+        a(class="legal-brand", href="/dashboard", aria-label="Runningmate dashboard")
+            span(class="legal-brand-mark") R
+            span Runningmate
+        nav(class="legal-nav", aria-label="문서 메뉴")
+            a(class="active", href="/privacy") 개인정보처리방침
+            a(href="/terms") 이용약관
+            a(href="/account/delete") 계정 삭제
+
+    section(class="legal-hero")
+        p(class="legal-eyebrow") Privacy Policy
+        h1 {{policy?.title || '개인정보처리방침'}}
+        p(class="legal-lead") Runningmate가 처리하는 회원 정보, 러닝 기록, 체중 기록, 사진과 영상, AI 대화 기록, 사용량 기록, 기기 및 로그인 정보를 확인할 수 있습니다.
+        div(*ngIf="policy", class="legal-meta") {{effectiveText}}
+
+    section(*ngIf="loading", class="legal-state")
+        i(class="fa-solid fa-spinner", aria-hidden="true")
+        span 문서를 불러오는 중입니다.
+
+    section(*ngIf="!loading && error", class="legal-state error")
+        i(class="fa-solid fa-circle-exclamation", aria-hidden="true")
+        span {{error}}
+        button(type="button", (click)="loadPolicy()") 다시 시도
+
+    article(*ngIf="!loading && policy", class="legal-document")
+        section(*ngFor="let section of sections", class="legal-section")
+            h2 {{section.title}}
+            p {{section.body}}
+
+    footer(class="legal-footer")
+        span 문의: 서비스 내 고객지원 또는 운영자 연락 채널
+        a(href="/terms") 이용약관 보기

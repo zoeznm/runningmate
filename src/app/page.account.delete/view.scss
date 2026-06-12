@@ -1,0 +1,586 @@
+:host {
+    display: block;
+    min-height: 100dvh;
+    background: #f7faf8;
+    color: #132018;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.legal-page,
+.account-delete-page {
+    min-height: 100dvh;
+    padding: 0 20px 48px;
+}
+
+.legal-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 18px 0;
+    background: rgba(247, 250, 248, 0.92);
+    backdrop-filter: blur(12px);
+}
+
+.legal-brand,
+.legal-nav a,
+.legal-footer a,
+.delete-secondary {
+    color: inherit;
+    text-decoration: none;
+}
+
+.legal-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.legal-brand-mark {
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #1f7a4d;
+    color: #fff;
+    font-weight: 900;
+}
+
+.legal-brand-mark.danger {
+    background: #b42318;
+}
+
+.legal-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.legal-nav a {
+    min-height: 34px;
+    border: 1px solid #d8e4dc;
+    border-radius: 8px;
+    padding: 8px 11px;
+    background: #fff;
+    color: #51635a;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.legal-nav a.active {
+    border-color: #1f7a4d;
+    color: #145c39;
+}
+
+.legal-nav a.danger.active {
+    border-color: #d92d20;
+    color: #b42318;
+}
+
+.legal-hero,
+.delete-hero,
+.legal-document,
+.legal-state,
+.delete-panel,
+.legal-footer {
+    max-width: 920px;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.legal-hero,
+.delete-hero {
+    padding: 54px 0 24px;
+}
+
+.legal-eyebrow,
+.delete-kicker {
+    margin: 0 0 10px;
+    color: #1f7a4d;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.legal-hero h1,
+.delete-hero h1 {
+    margin: 0;
+    color: #0f1f17;
+    font-size: 34px;
+    font-weight: 900;
+    line-height: 1.15;
+    letter-spacing: 0;
+}
+
+.legal-lead {
+    max-width: 720px;
+    margin: 16px 0 0;
+    color: #53665b;
+    font-size: 16px;
+    line-height: 1.7;
+}
+
+.legal-meta {
+    display: inline-flex;
+    margin-top: 18px;
+    border: 1px solid #d8e4dc;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    color: #53665b;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.legal-document,
+.delete-panel {
+    border: 1px solid #d8e4dc;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 18px 50px rgba(23, 45, 33, 0.08);
+}
+
+.legal-section {
+    padding: 24px 28px;
+    border-bottom: 1px solid #edf2ef;
+}
+
+.legal-section:last-child {
+    border-bottom: 0;
+}
+
+.legal-section h2,
+.delete-panel h2 {
+    margin: 0;
+    color: #132018;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.35;
+}
+
+.legal-section p,
+.delete-panel p,
+.delete-warning li,
+.delete-field small {
+    color: #53665b;
+    font-size: 14px;
+    line-height: 1.75;
+}
+
+.legal-section p {
+    margin: 10px 0 0;
+    white-space: pre-line;
+}
+
+.legal-state {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #d8e4dc;
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+    color: #53665b;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.legal-state.error {
+    border-color: #fecdca;
+    color: #b42318;
+}
+
+.legal-state button {
+    margin-left: auto;
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #1f7a4d;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.legal-footer {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 0 0;
+    color: #6b7d72;
+    font-size: 13px;
+}
+
+.legal-footer a {
+    font-weight: 800;
+    color: #145c39;
+}
+
+.delete-panel {
+    padding: 28px;
+}
+
+.delete-panel.wide {
+    display: grid;
+    gap: 22px;
+}
+
+.delete-panel-icon {
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: #fee4e2;
+    color: #b42318;
+    font-size: 18px;
+}
+
+.delete-panel-icon.success {
+    background: #dcfae6;
+    color: #067647;
+}
+
+.delete-account-row,
+.delete-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.delete-account-row strong {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #132018;
+    font-size: 17px;
+}
+
+.delete-warning {
+    border: 1px solid #fecdca;
+    border-radius: 8px;
+    padding: 18px;
+    background: #fff6f5;
+}
+
+.delete-warning ul {
+    display: grid;
+    gap: 8px;
+    margin: 14px 0;
+    padding-left: 20px;
+}
+
+.delete-form {
+    display: grid;
+    gap: 16px;
+}
+
+.delete-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: #132018;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.5;
+}
+
+.delete-check input {
+    margin-top: 2px;
+}
+
+.delete-field {
+    display: grid;
+    gap: 7px;
+}
+
+.delete-field span {
+    color: #132018;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+.delete-field input {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    border: 1px solid #d8e4dc;
+    border-radius: 8px;
+    padding: 0 12px;
+    color: #132018;
+    font-size: 15px;
+    outline: none;
+}
+
+.delete-field input:focus {
+    border-color: #d92d20;
+    box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.12);
+}
+
+.delete-status {
+    border-radius: 8px;
+    padding: 11px 12px;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.5;
+}
+
+.delete-status.info {
+    background: #eff8ff;
+    color: #175cd3;
+}
+
+.delete-status.success {
+    background: #dcfae6;
+    color: #067647;
+}
+
+.delete-status.error {
+    background: #fee4e2;
+    color: #b42318;
+}
+
+.delete-actions.end {
+    justify-content: flex-end;
+}
+
+.delete-primary,
+.delete-danger,
+.delete-secondary {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 8px;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.delete-primary {
+    border: 0;
+    background: #1f7a4d;
+    color: #fff;
+}
+
+.delete-danger {
+    border: 0;
+    background: #d92d20;
+    color: #fff;
+}
+
+.delete-danger:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.delete-secondary {
+    border: 1px solid #d8e4dc;
+    background: #fff;
+    color: #53665b;
+}
+
+.delete-secondary.compact {
+    min-height: 36px;
+    padding: 0 11px;
+    font-size: 13px;
+}
+
+.delete-panel.complete {
+    text-align: center;
+}
+
+@media (max-width: 640px) {
+    .legal-page,
+    .account-delete-page {
+        padding: 0 14px 34px;
+    }
+
+    .legal-header,
+    .legal-footer,
+    .delete-account-row,
+    .delete-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .legal-nav {
+        justify-content: flex-start;
+    }
+
+    .legal-nav a {
+        flex: 1 1 auto;
+        text-align: center;
+    }
+
+    .legal-hero,
+    .delete-hero {
+        padding-top: 34px;
+    }
+
+    .legal-hero h1,
+    .delete-hero h1 {
+        font-size: 28px;
+    }
+
+    .legal-lead {
+        font-size: 15px;
+    }
+
+    .legal-section,
+    .delete-panel {
+        padding: 20px;
+    }
+
+    .delete-actions.end {
+        align-items: stretch;
+    }
+}
+
+:host {
+    background: #07110c;
+    color: #eef8f0;
+}
+
+.legal-page,
+.account-delete-page {
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 0 14px 34px;
+    background: #0d1712;
+}
+
+.legal-header {
+    flex-wrap: wrap;
+    max-width: none;
+    gap: 10px;
+    padding: 14px 0 10px;
+    background: rgba(13, 23, 18, 0.94);
+}
+
+.legal-back {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border: 0.5px solid rgba(145, 184, 160, 0.22);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #eef8f0;
+    cursor: pointer;
+}
+
+.legal-back.danger {
+    color: #fecaca;
+}
+
+.legal-brand {
+    flex: 1 1 auto;
+    color: #eef8f0;
+}
+
+.legal-nav {
+    order: 3;
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+}
+
+.legal-nav a {
+    flex: 1 0 auto;
+    border-color: rgba(145, 184, 160, 0.18);
+    background: rgba(255, 255, 255, 0.055);
+    color: #9fb0a7;
+    text-align: center;
+}
+
+.legal-nav a.active {
+    border-color: rgba(116, 245, 106, 0.36);
+    background: rgba(116, 245, 106, 0.11);
+    color: #b8ffad;
+}
+
+.legal-nav a.danger.active {
+    border-color: rgba(248, 113, 113, 0.4);
+    background: rgba(248, 113, 113, 0.12);
+    color: #fecaca;
+}
+
+.legal-hero,
+.delete-hero,
+.legal-document,
+.legal-state,
+.delete-panel,
+.legal-footer {
+    max-width: none;
+}
+
+.legal-hero,
+.delete-hero {
+    padding: 28px 0 18px;
+}
+
+.legal-hero h1,
+.delete-hero h1 {
+    color: #f8fff9;
+    font-size: 28px;
+}
+
+.legal-lead,
+.legal-section p,
+.delete-panel p,
+.delete-warning li,
+.delete-field small,
+.legal-footer {
+    color: #a9b8ae;
+}
+
+.legal-meta,
+.legal-document,
+.delete-panel,
+.legal-state {
+    border-color: rgba(145, 184, 160, 0.18);
+    background: rgba(255, 255, 255, 0.055);
+    box-shadow: none;
+}
+
+.legal-section {
+    border-color: rgba(145, 184, 160, 0.12);
+}
+
+.legal-section h2,
+.delete-panel h2,
+.delete-account-row strong,
+.delete-field span,
+.delete-check {
+    color: #f8fff9;
+}
+
+.delete-warning {
+    border-color: rgba(248, 113, 113, 0.32);
+    background: rgba(248, 113, 113, 0.1);
+}
+
+.delete-secondary,
+.delete-field input {
+    border-color: rgba(145, 184, 160, 0.2);
+    background: rgba(255, 255, 255, 0.055);
+    color: #eef8f0;
+}

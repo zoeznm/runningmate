@@ -2108,17 +2108,17 @@ export class Component implements AfterViewInit, OnDestroy {
         if (this.isRestDate(this.selectedCalendarDate)) return '휴식일 해제 후 기록을 업로드할 수 있어.';
         if (!this.canUploadSelectedCalendarDate) return '미래 날짜는 지나간 뒤 업로드할 수 있어.';
 
-        return `${this.selectedCalendarDateText} 기록으로 저장돼.`;
+        return '운동 앱 캡처 이미지를 선택하면 날짜, 거리, 페이스를 읽어 저장해.';
     }
 
     public get calendarUploadButtonText(): string {
         if (this.isUploading) return '처리 중';
-        return this.canUploadSelectedCalendarDate ? '기록 업로드' : '업로드 불가';
+        return this.canUploadSelectedCalendarDate ? '캡처 이미지 업로드' : '업로드 불가';
     }
 
     public get calendarMediaDraftText(): string {
         if (this.calendarMediaDraftFiles.length) return `${this.calendarMediaDraftFiles.length}개 선택됨`;
-        return '러닝 중 찍은 풍경을 남겨줘.';
+        return '기록 저장 후 함께 보관할 사진이나 영상을 선택해줘.';
     }
 
     public get calendarMediaDraftButtonText(): string {
@@ -3112,10 +3112,13 @@ export class Component implements AfterViewInit, OnDestroy {
         reader.readAsText(file);
     }
 
+    public openLegalPage(path: string): void {
+        if (!path || !path.startsWith('/')) return;
+        window.location.href = path;
+    }
+
     public openFullDataDelete(): void {
-        const confirmed = window.confirm('전체 데이터 삭제를 진행할까요? 계정과 서버 데이터 삭제 확인 단계로 이어집니다.');
-        if (!confirmed) return;
-        this.openAccountDelete();
+        this.openLegalPage('/account/delete');
     }
 
     public openAccountDelete(): void {
