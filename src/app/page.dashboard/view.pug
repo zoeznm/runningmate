@@ -2269,13 +2269,6 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             div(class="settings-dual-actions")
                                 button(type="button", (click)="backupSettings()") 백업
                                 button(type="button", (click)="settingsRestoreInput.click()") 복원
-                        button(type="button", class="settings-list-row danger", (click)="openLegalPage('/account/delete')")
-                            div(class="settings-row-main")
-                                div(class="settings-row-title") 계정 삭제
-                                div(class="settings-row-sub") 계정과 서비스 데이터 삭제 안내
-                            div(class="settings-row-trail")
-                                i(class="fa-solid fa-chevron-right", aria-hidden="true")
-
                 section(*ngIf="deleteStep > 0 || accountDeleted", class="account-delete-panel settings-delete-confirm")
                     div(class="account-delete-top")
                         div
@@ -2312,6 +2305,14 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                 section(class="settings-group")
                     div(class="settings-section-label") 정보
                     div(class="settings-list")
+                        div(class="settings-list-row")
+                            div(class="settings-row-main")
+                                div(class="settings-row-title") 앱 버전
+                            span(class="settings-row-value") {{appVersion}}
+
+                section(class="settings-group")
+                    div(class="settings-section-label") 약관 및 계정
+                    div(class="settings-list")
                         button(type="button", class="settings-list-row", (click)="openLegalPage('/privacy')")
                             div(class="settings-row-main")
                                 div(class="settings-row-title") 개인정보처리방침
@@ -2324,10 +2325,12 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 div(class="settings-row-sub") 서비스 이용 조건과 책임 범위
                             div(class="settings-row-trail")
                                 i(class="fa-solid fa-chevron-right", aria-hidden="true")
-                        div(class="settings-list-row")
+                        button(type="button", class="settings-list-row danger", (click)="openLegalPage('/account/delete')")
                             div(class="settings-row-main")
-                                div(class="settings-row-title") 앱 버전
-                            span(class="settings-row-value") {{appVersion}}
+                                div(class="settings-row-title") 계정 삭제
+                                div(class="settings-row-sub") 계정과 서비스 데이터 삭제 안내
+                            div(class="settings-row-trail")
+                                i(class="fa-solid fa-chevron-right", aria-hidden="true")
 
                 section(class="settings-group")
                     div(class="settings-section-label") 로그아웃

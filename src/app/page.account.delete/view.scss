@@ -584,3 +584,229 @@
     background: rgba(255, 255, 255, 0.055);
     color: #eef8f0;
 }
+
+.legal-page,
+.account-delete-page {
+    --legal-bg: #0d1712;
+    --legal-surface: rgba(255, 255, 255, 0.055);
+    --legal-surface-strong: rgba(255, 255, 255, 0.08);
+    --legal-line: rgba(145, 184, 160, 0.18);
+    --legal-line-soft: rgba(145, 184, 160, 0.12);
+    --legal-text: #f8fff9;
+    --legal-muted: #a9b8ae;
+    --legal-primary: #74f56a;
+    --legal-danger: #f87171;
+    width: 100%;
+    max-width: 430px;
+    min-height: 100dvh;
+    box-sizing: border-box;
+    margin: 0 auto;
+    padding: 0 14px calc(92px + env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+    background: var(--legal-bg);
+    box-shadow: 0 0 0 100vmax var(--legal-bg);
+    color: var(--legal-text);
+}
+
+.legal-page.light-screen,
+.account-delete-page.light-screen {
+    --legal-bg: #f7faf8;
+    --legal-surface: #ffffff;
+    --legal-surface-strong: #f0f5f2;
+    --legal-line: #d8e4dc;
+    --legal-line-soft: #e8efeb;
+    --legal-text: #132018;
+    --legal-muted: #53665b;
+    --legal-primary: #1b7f65;
+    --legal-danger: #d92d20;
+}
+
+.legal-nav {
+    display: none !important;
+}
+
+.legal-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    max-width: none;
+    min-height: 60px;
+    margin: 0;
+    padding: calc(14px + env(safe-area-inset-top, 0px)) 0 10px;
+    background: color-mix(in srgb, var(--legal-bg) 94%, transparent);
+    backdrop-filter: blur(12px);
+}
+
+.legal-back {
+    display: inline-flex;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 0.5px solid var(--legal-line);
+    border-radius: 14px;
+    background: var(--legal-surface-strong);
+    color: var(--legal-text);
+    cursor: pointer;
+    font-size: 18px;
+}
+
+.legal-back.danger {
+    color: var(--legal-danger);
+}
+
+.legal-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--legal-text);
+    font-size: 15px;
+    font-weight: 900;
+}
+
+.legal-brand-mark {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--legal-primary);
+    color: #07100a;
+}
+
+.legal-brand-mark.danger {
+    background: var(--legal-danger);
+    color: #fff;
+}
+
+.legal-hero,
+.delete-hero,
+.legal-document,
+.legal-state,
+.delete-panel,
+.legal-footer {
+    max-width: none;
+}
+
+.legal-hero,
+.delete-hero {
+    padding: 24px 0 18px;
+}
+
+.legal-eyebrow,
+.delete-kicker {
+    color: var(--legal-primary);
+}
+
+.legal-hero h1,
+.delete-hero h1 {
+    color: var(--legal-text);
+    font-size: 27px;
+}
+
+.legal-lead {
+    color: var(--legal-muted);
+    font-size: 15px;
+}
+
+.legal-meta,
+.legal-document,
+.delete-panel,
+.legal-state {
+    border-color: var(--legal-line);
+    background: var(--legal-surface);
+    color: var(--legal-muted);
+    box-shadow: none;
+}
+
+.legal-section {
+    border-color: var(--legal-line-soft);
+    padding: 20px 18px;
+}
+
+.legal-section h2,
+.delete-panel h2,
+.delete-account-row strong,
+.delete-field span,
+.delete-check {
+    color: var(--legal-text);
+}
+
+.legal-section p,
+.delete-panel p,
+.delete-warning li,
+.delete-field small,
+.legal-footer {
+    color: var(--legal-muted);
+}
+
+.delete-warning {
+    border-color: color-mix(in srgb, var(--legal-danger) 34%, transparent);
+    background: color-mix(in srgb, var(--legal-danger) 12%, transparent);
+}
+
+.delete-secondary,
+.delete-field input {
+    border-color: var(--legal-line);
+    background: var(--legal-surface-strong);
+    color: var(--legal-text);
+}
+
+.legal-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 50%;
+    z-index: 35;
+    display: flex;
+    width: min(430px, 100vw);
+    transform: translateX(-50%);
+    border-top: 0.5px solid var(--legal-line);
+    background: color-mix(in srgb, var(--legal-bg) 96%, transparent);
+    padding: 8px env(safe-area-inset-right, 0px) calc(10px + env(safe-area-inset-bottom, 0px)) env(safe-area-inset-left, 0px);
+    backdrop-filter: blur(14px);
+}
+
+.legal-bottom-item {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 54px;
+    color: var(--legal-muted);
+    text-decoration: none;
+    font-size: 10.5px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.legal-bottom-item i {
+    display: flex;
+    width: 34px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 18px;
+}
+
+.legal-bottom-item.active {
+    color: var(--legal-primary);
+}
+
+.legal-bottom-item.active i {
+    background: color-mix(in srgb, var(--legal-primary) 18%, transparent);
+}
+
+.legal-bottom-item:focus-visible,
+.legal-back:focus-visible {
+    outline: 2px solid var(--legal-primary);
+    outline-offset: 2px;
+}

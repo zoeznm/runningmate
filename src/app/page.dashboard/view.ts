@@ -1485,6 +1485,7 @@ export class Component implements AfterViewInit, OnDestroy {
         private readonly toast: ToastService
     ) {
         this.loadAppSettings();
+        this.applyInitialScreenFromLocation();
         this.startSystemThemeListener();
         this.refreshDerivedState();
     }
@@ -1605,6 +1606,14 @@ export class Component implements AfterViewInit, OnDestroy {
         feed: ['feed', 'friends', 'ranking', 'profile'],
         chat: ['chat', 'ai-settings'],
         settings: ['settings']
+    };
+    private readonly routeScreenMap: Record<string, ScreenKey> = {
+        home: 'home',
+        calendar: 'calendar',
+        goals: 'goals',
+        feed: 'feed',
+        chat: 'chat',
+        settings: 'settings'
     };
 
     public get phoneClass(): string {
@@ -2694,6 +2703,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public setScreen(screen: ScreenKey): void {
         this.activeScreen = screen;
+        this.updateRouteScreen(screen);
         if (screen === 'feed' || screen === 'friends' || screen === 'ranking' || screen === 'profile') {
             void this.loadCommunityNotifications(false);
         }
@@ -2720,6 +2730,20 @@ export class Component implements AfterViewInit, OnDestroy {
             this.isProfileEditOpen = false;
             void this.loadFriendLists(false);
         }
+    }
+
+    private applyInitialScreenFromLocation(): void {
+        if (typeof window === 'undefined') return;
+        const screen = this.routeScreenMap[new URLSearchParams(window.location.search).get('screen') || ''];
+        if (screen) this.activeScreen = screen;
+    }
+
+    private updateRouteScreen(screen: ScreenKey): void {
+        if (typeof window === 'undefined') return;
+        if (!Object.values(this.routeScreenMap).includes(screen)) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('screen', screen);
+        window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
     }
 
     public openProfileSettings(): void {

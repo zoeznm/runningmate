@@ -14,14 +14,19 @@ interface PolicyDocument {
     sections: PolicySection[];
 }
 
+type ThemeMode = 'dark' | 'light' | 'system';
+
 export class Component implements OnInit {
     public loading: boolean = true;
     public error: string = '';
+    public isDark: boolean = true;
     public policy: PolicyDocument | null = null;
+    private readonly appSettingsStorageKey: string = 'runningmate-settings-v1';
 
     constructor(public service: Service) { }
 
     public async ngOnInit(): Promise<void> {
+        this.applyThemeMode();
         await this.service.init(null as any);
         await this.loadPolicy();
     }
@@ -64,5 +69,24 @@ export class Component implements OnInit {
             return;
         }
         location.href = '/dashboard';
+    }
+
+    private applyThemeMode(): void {
+        let mode: ThemeMode = 'dark';
+
+        try {
+            const raw = window.localStorage?.getItem(this.appSettingsStorageKey) || '';
+            const parsed = raw ? JSON.parse(raw) : {};
+            const themeMode = parsed?.themeMode;
+            if (themeMode === 'dark' || themeMode === 'light' || themeMode === 'system') {
+                mode = themeMode;
+            }
+        } catch {
+            mode = 'dark';
+        }
+
+        this.isDark = mode === 'system'
+            ? Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+            : mode !== 'light';
     }
 }

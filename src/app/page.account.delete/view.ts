@@ -4,9 +4,11 @@ import { jsonRequest } from 'src/app/shared/api';
 import { authenticatedUser, clearAuthTokens, ensureAuthenticated } from 'src/app/shared/auth';
 
 type StatusKind = 'info' | 'success' | 'error';
+type ThemeMode = 'dark' | 'light' | 'system';
 
 export class Component implements OnInit {
     public loading: boolean = true;
+    public isDark: boolean = true;
     public user: any = null;
     public confirmText: string = '';
     public password: string = '';
@@ -15,10 +17,12 @@ export class Component implements OnInit {
     public accountDeleted: boolean = false;
     public statusMessage: string = '';
     public statusKind: StatusKind = 'info';
+    private readonly appSettingsStorageKey: string = 'runningmate-settings-v1';
 
     constructor(public service: Service) { }
 
     public async ngOnInit(): Promise<void> {
+        this.applyThemeMode();
         await this.service.init(null as any);
         await this.loadAuthState();
     }
@@ -109,5 +113,24 @@ export class Component implements OnInit {
     private setStatus(message: string, kind: StatusKind): void {
         this.statusMessage = message;
         this.statusKind = kind;
+    }
+
+    private applyThemeMode(): void {
+        let mode: ThemeMode = 'dark';
+
+        try {
+            const raw = window.localStorage?.getItem(this.appSettingsStorageKey) || '';
+            const parsed = raw ? JSON.parse(raw) : {};
+            const themeMode = parsed?.themeMode;
+            if (themeMode === 'dark' || themeMode === 'light' || themeMode === 'system') {
+                mode = themeMode;
+            }
+        } catch {
+            mode = 'dark';
+        }
+
+        this.isDark = mode === 'system'
+            ? Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+            : mode !== 'light';
     }
 }
