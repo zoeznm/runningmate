@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.oauth.google.callback",
+    "title": "/api/auth/oauth/google/callback",
+    "route": "/api/auth/oauth/google/callback",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

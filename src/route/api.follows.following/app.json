@@ -1,0 +1,8 @@
+{
+    "id": "api.follows.following",
+    "title": "/api/follows/following",
+    "route": "/api/follows/following",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

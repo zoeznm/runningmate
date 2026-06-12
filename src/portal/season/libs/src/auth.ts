@@ -15,16 +15,19 @@ export default class Auth {
 
     public async init() {
         try {
-            let { code, data } = await this.request.post('/auth/check');
-            let { status, session } = data;
-            this.verified = session.verified;
-            this.loading = true;
+            const result: any = await this.request.post('/auth/check', {}, { timeout: 10000 });
+            const code = Number(result?.code || 0);
+            const data = result?.data || {};
+            const { status, session = {} } = data;
+            this.verified = session.verified || null;
+            this.timestamp = new Date().getTime();
             if (code != 200)
                 return this;
-            this.timestamp = new Date().getTime();
             this.session = session;
             this.status = status;
         } catch (e) {
+            this.timestamp = new Date().getTime();
+        } finally {
             this.loading = true;
         }
         return this;

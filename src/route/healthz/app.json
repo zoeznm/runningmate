@@ -1,0 +1,8 @@
+{
+    "id": "healthz",
+    "title": "/healthz",
+    "route": "/healthz",
+    "category": "",
+    "viewuri": "",
+    "controller": ""
+}

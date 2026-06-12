@@ -1,0 +1,8 @@
+{
+    "id": "api.ranking.weekly",
+    "title": "/api/ranking/weekly",
+    "route": "/api/ranking/weekly",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

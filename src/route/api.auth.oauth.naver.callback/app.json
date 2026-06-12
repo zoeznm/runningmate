@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.oauth.naver.callback",
+    "title": "/api/auth/oauth/naver/callback",
+    "route": "/api/auth/oauth/naver/callback",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

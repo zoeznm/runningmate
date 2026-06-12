@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.register",
+    "title": "/api/auth/register",
+    "route": "/api/auth/register",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

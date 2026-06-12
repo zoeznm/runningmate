@@ -1,0 +1,8 @@
+{
+    "id": "api.weights.detail",
+    "title": "/api/weights/<date>",
+    "route": "/api/weights/<date>",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

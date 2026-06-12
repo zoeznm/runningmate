@@ -1,0 +1,8 @@
+{
+    "id": "api.stats.weekly",
+    "title": "/api/stats/weekly",
+    "route": "/api/stats/weekly",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

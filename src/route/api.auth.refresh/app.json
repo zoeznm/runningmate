@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.refresh",
+    "title": "/api/auth/refresh",
+    "route": "/api/auth/refresh",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

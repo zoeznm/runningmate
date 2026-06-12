@@ -1,0 +1,8 @@
+{
+    "id": "api.weather.monthly",
+    "title": "/api/weather/monthly",
+    "route": "/api/weather/monthly",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

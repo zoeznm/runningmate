@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.logout",
+    "title": "/api/auth/logout",
+    "route": "/api/auth/logout",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

@@ -1,0 +1,8 @@
+{
+    "id": "api.run-media",
+    "title": "/api/run-media/<path:filename>",
+    "route": "/api/run-media/<path:filename>",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

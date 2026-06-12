@@ -1,0 +1,8 @@
+{
+    "id": "api.journals",
+    "title": "/api/journals",
+    "route": "/api/journals",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

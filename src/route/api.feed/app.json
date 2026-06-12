@@ -1,0 +1,8 @@
+{
+    "id": "api.feed",
+    "title": "/api/feed",
+    "route": "/api/feed",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

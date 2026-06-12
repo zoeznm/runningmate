@@ -1,0 +1,8 @@
+{
+    "id": "api.profile",
+    "title": "/api/profile",
+    "route": "/api/profile",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

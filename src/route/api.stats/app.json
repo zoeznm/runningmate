@@ -1,0 +1,8 @@
+{
+    "id": "api.stats",
+    "title": "/api/stats",
+    "route": "/api/stats",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

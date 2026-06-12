@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.oauth.callback",
+    "title": "/api/auth/oauth/callback",
+    "route": "/api/auth/oauth/callback",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

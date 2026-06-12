@@ -1,0 +1,8 @@
+{
+    "id": "api.media",
+    "title": "/api/media/<media_id>",
+    "route": "/api/media/<media_id>",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

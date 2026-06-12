@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.reset-password",
+    "title": "/api/auth/reset-password",
+    "route": "/api/auth/reset-password",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

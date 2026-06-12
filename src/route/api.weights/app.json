@@ -1,0 +1,8 @@
+{
+    "id": "api.weights",
+    "title": "/api/weights",
+    "route": "/api/weights",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

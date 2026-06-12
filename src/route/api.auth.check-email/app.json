@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.check-email",
+    "title": "/api/auth/check-email",
+    "route": "/api/auth/check-email",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

@@ -1,0 +1,8 @@
+{
+    "id": "api.badges",
+    "title": "/api/badges",
+    "route": "/api/badges",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

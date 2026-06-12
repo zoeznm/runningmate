@@ -1,0 +1,8 @@
+{
+    "id": "api.stats.monthly",
+    "title": "/api/stats/monthly",
+    "route": "/api/stats/monthly",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.oauth.google.start",
+    "title": "/api/auth/oauth/google/start",
+    "route": "/api/auth/oauth/google/start",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

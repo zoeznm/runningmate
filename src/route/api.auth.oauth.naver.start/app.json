@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.oauth.naver.start",
+    "title": "/api/auth/oauth/naver/start",
+    "route": "/api/auth/oauth/naver/start",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

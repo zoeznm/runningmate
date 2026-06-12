@@ -1,0 +1,8 @@
+{
+    "id": "api.challenges.join",
+    "title": "/api/challenges/join",
+    "route": "/api/challenges/join",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

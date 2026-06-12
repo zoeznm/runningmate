@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.password",
+    "title": "/api/auth/password",
+    "route": "/api/auth/password",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

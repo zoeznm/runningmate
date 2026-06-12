@@ -1,0 +1,8 @@
+{
+    "id": "api.cycles",
+    "title": "/api/cycles",
+    "route": "/api/cycles",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

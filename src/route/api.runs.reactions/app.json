@@ -1,0 +1,8 @@
+{
+    "id": "api.runs.reactions",
+    "title": "/api/runs/<run_id>/reactions",
+    "route": "/api/runs/<run_id>/reactions",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

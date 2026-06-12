@@ -1,0 +1,8 @@
+{
+    "id": "api.training-load",
+    "title": "/api/training-load",
+    "route": "/api/training-load",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

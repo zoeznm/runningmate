@@ -1,0 +1,8 @@
+{
+    "id": "api.chat",
+    "title": "/api/chat",
+    "route": "/api/chat",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

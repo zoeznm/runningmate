@@ -1,0 +1,8 @@
+{
+    "id": "api.notifications",
+    "title": "/api/notifications",
+    "route": "/api/notifications",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

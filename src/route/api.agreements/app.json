@@ -1,0 +1,8 @@
+{
+    "id": "api.agreements",
+    "title": "/api/agreements",
+    "route": "/api/agreements",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

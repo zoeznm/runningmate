@@ -1,0 +1,8 @@
+{
+    "id": "api.users.search",
+    "title": "/api/users/search",
+    "route": "/api/users/search",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

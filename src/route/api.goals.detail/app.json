@@ -1,0 +1,8 @@
+{
+    "id": "api.goals.detail",
+    "title": "/api/goals/<year_month>",
+    "route": "/api/goals/<year_month>",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

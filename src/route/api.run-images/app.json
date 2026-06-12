@@ -1,0 +1,8 @@
+{
+    "id": "api.run-images",
+    "title": "/api/run-images/<path:filename>",
+    "route": "/api/run-images/<path:filename>",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

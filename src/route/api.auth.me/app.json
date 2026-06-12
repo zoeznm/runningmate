@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.me",
+    "title": "/api/auth/me",
+    "route": "/api/auth/me",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

@@ -1,0 +1,8 @@
+{
+    "id": "api.parse-image",
+    "title": "/api/parse-image",
+    "route": "/api/parse-image",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

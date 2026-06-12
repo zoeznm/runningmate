@@ -19,11 +19,16 @@ def update_profile():
 
     name = wiz.request.query("name", "")
     mobile = wiz.request.query("mobile", "")
+    is_public = wiz.request.query("is_public", None)
 
     if not name:
         wiz.response.status(400, message="이름을 입력해주세요.")
 
-    struct.user.update_profile(user_id, name=name, mobile=mobile)
+    fields = dict(name=name, mobile=mobile)
+    if is_public is not None:
+        fields["is_public"] = str(is_public).strip().lower() in ("1", "true", "yes", "y", "on")
+
+    struct.user.update_profile(user_id, **fields)
 
     # 세션도 갱신
     session.set(name=name)
@@ -43,8 +48,10 @@ def change_password():
     if not new_password:
         wiz.response.status(400, message="새 비밀번호를 입력해주세요.")
 
-    result = struct.user.change_password(user_id, current_password, new_password)
-    if not result:
-        wiz.response.status(400, message="현재 비밀번호가 올바르지 않습니다.")
+    ok, message, _meta = struct.user.change_password_with_policy(user_id, current_password, new_password)
+    if not ok:
+        wiz.response.status(400, message=message or "비밀번호 변경에 실패했습니다.")
+
+    session.set(password_changed_at=struct.user.password_session_version(user_id))
 
     wiz.response.status(200)

@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.check-username",
+    "title": "/api/auth/check-username",
+    "route": "/api/auth/check-username",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}
