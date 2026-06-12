@@ -1,10 +1,6 @@
 <div align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="src/assets/brand/logo-white.svg" />
-    <img src="src/assets/brand/logo-black.svg" width="260" alt="RunningMate" />
-  </picture>
 
-  <h1>러닝메이트</h1>
+  <h1>RunningMate</h1>
 
   <p>
     <strong>러닝 기록, AI 페이서, 커뮤니티, 개인 서버 운영까지 한 번에 가져가는 WIZ 기반 러닝 플랫폼</strong>
