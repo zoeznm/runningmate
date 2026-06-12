@@ -1,0 +1,5 @@
+section(class="empty-state-panel")
+    i(*ngIf="icon", class="fa-solid empty-state-icon", [ngClass]="icon", aria-hidden="true")
+    div(class="empty-state-title") {{title}}
+    div(*ngIf="description", class="empty-state-description") {{description}}
+    button(*ngIf="actionLabel", type="button", class="empty-state-action", (click)="handleAction()") {{actionLabel}}

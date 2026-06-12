@@ -5,7 +5,7 @@
     "namespace": "dashboard",
     "viewuri": "/dashboard",
     "category": "",
-    "controller": "user",
-    "layout": "layout.sidebar",
+    "controller": "base",
+    "layout": "layout.empty",
     "template": "wiz-page-dashboard()"
 }

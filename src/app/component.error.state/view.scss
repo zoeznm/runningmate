@@ -1,0 +1,59 @@
+:host {
+    display: block;
+}
+
+.error-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    min-height: 180px;
+    border: 0.5px solid var(--line, rgba(255, 255, 255, 0.08));
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface, #1e1e30) 92%, transparent);
+    padding: 26px 18px;
+    color: var(--text, #e8e8f0);
+    text-align: center;
+}
+
+.error-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    margin-bottom: 12px;
+    border-radius: 999px;
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    font-size: 18px;
+}
+
+.error-state-message {
+    max-width: 260px;
+    color: var(--text, #e8e8f0);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
+.error-state-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    gap: 7px;
+    margin-top: 16px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--primary, #a0a8d0);
+    padding: 0 16px;
+    color: #12121c;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 900;
+}
+
+:host-context(.light-screen) .error-state-action {
+    color: #ffffff;
+}

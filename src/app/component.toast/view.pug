@@ -1,0 +1,9 @@
+div(class="toast-stack", aria-live="polite", aria-atomic="true")
+    div(
+        *ngFor="let item of toast.toasts",
+        class="global-toast",
+        [ngClass]="item.type")
+        i(class="fa-solid", [ngClass]="item.type === 'success' ? 'fa-circle-check' : item.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info'", aria-hidden="true")
+        span {{item.message}}
+        button(type="button", aria-label="알림 닫기", (click)="dismiss(item.id)")
+            i(class="fa-solid fa-xmark", aria-hidden="true")

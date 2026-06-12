@@ -1,0 +1,10 @@
+{
+    "mode": "component",
+    "id": "component.loading.fullscreen",
+    "title": "loading.fullscreen",
+    "namespace": "loading.fullscreen",
+    "viewuri": "",
+    "category": "",
+    "controller": "",
+    "template": "wiz-component-loading-fullscreen([publicmessage]=\"\", [publicdetail]=\"\")"
+}

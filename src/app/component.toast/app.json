@@ -1,0 +1,10 @@
+{
+    "mode": "component",
+    "id": "component.toast",
+    "title": "toast",
+    "namespace": "toast",
+    "viewuri": "",
+    "category": "",
+    "controller": "",
+    "template": "wiz-component-toast()"
+}

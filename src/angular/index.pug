@@ -1,39 +1,228 @@
 doctype html
-html(lang="en")
+html(lang="ko")
     head
         meta(charset="utf-8")
-        title SEASON Cloud Services
+        title 러닝메이트
         base(href="/")
         
-        meta(name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0')
+        meta(name='viewport' content='width=device-width, initial-scale=1, viewport-fit=cover')
         meta(http-equiv='X-UA-Compatible' content='ie=edge')
 
         // pwa config
-        meta(name='msapplication-TileColor' content='#6C8DF6')
-        meta(name='theme-color' content='#6C8DF6')
-        meta(name='apple-mobile-web-app-status-bar-style' content='black')
+        meta(name='application-name' content='러닝메이트')
+        meta(name='msapplication-TileColor' content='#12121c')
+        meta(name='theme-color' content='#12121c')
         meta(name='apple-mobile-web-app-capable' content='yes')
-        meta(name='apple-mobile-web-app-title' content='SEASON Cloud Services')
+        meta(name='apple-mobile-web-app-title' content='러닝메이트')
+        meta(name='apple-mobile-web-app-status-bar-style' content='black-translucent')
         meta(name='mobile-web-app-capable' content='yes')
         meta(name='HandheldFriendly' content='True')
         meta(name='MobileOptimized' content='320')
-        link(rel="shortcut icon", href="/assets/brand/icon.ico")
+        meta(name='format-detection' content='telephone=no')
+        link(rel="shortcut icon", href="/favicon.ico")
 
-        link(rel="apple-touch-icon" sizes="72x72" href="/assets/brand/icon.ico")
-        link(rel="apple-touch-icon" sizes="114x114" href="/assets/brand/icon.ico")
-        link(rel="apple-touch-icon" href="/assets/brand/icon.ico")
+        link(rel="icon" type="image/png" sizes="192x192" href="/assets/brand/icon-192.png?v=rm-run-icon-20260522")
+        link(rel="icon" type="image/png" sizes="512x512" href="/assets/brand/icon-512.png?v=rm-run-icon-20260522")
+        link(rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png?v=rm-run-icon-20260522")
 
-        link(rel="icon" sizes="72x72" href="/assets/brand/icon.ico")
-        link(rel="icon" sizes="114x114" href="/assets/brand/icon.ico")
-        link(rel="icon" sizes="192x192" href="/assets/brand/icon.ico")
-        link(rel="icon" sizes="57x57" href="/assets/brand/icon.ico")
+        link(rel="icon" sizes="72x72" href="/favicon.ico")
 
         link(rel="manifest" href="/manifest.json")
 
         script(type="text/javascript").
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js', {scope: '/'}).then((reg) => {});
+            (function () {
+                var background = "#12121c";
+                var text = "#e8e8f0";
+
+                try {
+                    var rawSettings = window.localStorage && window.localStorage.getItem("runningmate-settings-v1");
+                    var settings = rawSettings ? JSON.parse(rawSettings) : {};
+                    var themeMode = settings && settings.themeMode;
+                    var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+                    var useLight = themeMode === "light" || (themeMode === "system" && prefersLight);
+
+                    if (useLight) {
+                        background = "#f7f7f9";
+                        text = "#1a1a2e";
+                    }
+                } catch (error) {}
+
+                document.documentElement.style.setProperty("--app-shell-bg", background);
+                document.documentElement.style.setProperty("--app-shell-text", text);
+                document.documentElement.style.background = background;
+
+                var themeMeta = document.querySelector("meta[name='theme-color']");
+                if (themeMeta) {
+                    themeMeta.setAttribute("content", background);
+                }
+            })();
+
+        style.
+            html,
+            body,
+            app-root {
+                width: 100%;
+                height: 100%;
+                min-height: 100%;
+                margin: 0;
+                background: var(--app-shell-bg, #12121c);
+                color: var(--app-shell-text, #e8e8f0);
+                overflow: hidden;
+                display: block;
+            }
+
+            app-root {
+                overflow: auto;
+            }
+
+            html.is-dashboard-page,
+            html.is-dashboard-page body,
+            body.is-dashboard-page,
+            html.is-dashboard-page app-root,
+            body.is-dashboard-page app-root {
+                background: var(--dashboard-screen-bg, #12121c);
+            }
+
+            @supports (height: 100dvh) {
+                html,
+                body,
+                app-root {
+                    height: 100dvh;
+                    min-height: 100dvh;
+                }
+            }
+
+            .app-shell-loader {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                width: 100%;
+                min-height: 100vh;
+                min-height: 100dvh;
+                gap: 10px;
+                padding: 24px;
+                background: var(--app-shell-bg, #12121c);
+                color: var(--app-shell-text, #e8e8f0);
+                font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                text-align: center;
+            }
+
+            .app-shell-loader-mark {
+                display: grid;
+                place-items: center;
+                width: 48px;
+                height: 48px;
+                border-radius: 18px;
+                background: #10201a;
+                color: #78d6b3;
+                font-size: 16px;
+                font-weight: 900;
+                line-height: 1;
+                box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+            }
+
+            .app-shell-loader-title {
+                margin-top: 2px;
+                font-size: 16px;
+                font-weight: 900;
+                line-height: 1.3;
+            }
+
+            .app-shell-loader-detail {
+                min-height: 17px;
+                color: color-mix(in srgb, var(--app-shell-text, #e8e8f0) 62%, transparent);
+                font-size: 12px;
+                font-weight: 700;
+                line-height: 1.4;
+            }
+
+            .app-shell-loader-bar {
+                position: relative;
+                width: 148px;
+                height: 5px;
+                overflow: hidden;
+                border-radius: 999px;
+                background: color-mix(in srgb, var(--app-shell-text, #e8e8f0) 12%, transparent);
+            }
+
+            .app-shell-loader-bar::after {
+                content: "";
+                position: absolute;
+                inset: 0 auto 0 0;
+                width: 44%;
+                border-radius: inherit;
+                background: #78d6b3;
+                animation: app-shell-loader-slide 1.1s ease-in-out infinite;
+            }
+
+            @keyframes app-shell-loader-slide {
+                0% {
+                    transform: translateX(-105%);
+                }
+                100% {
+                    transform: translateX(230%);
+                }
+            }
+
+        script(type="text/javascript").
+            if ("serviceWorker" in navigator) {
+                const refreshVersion = "rm-login-json-response-20260611";
+                const refreshKey = `runningmate-sw-refresh-${refreshVersion}`;
+                const hadController = Boolean(navigator.serviceWorker.controller);
+                let refreshing = false;
+                const refreshMarked = () => {
+                    try {
+                        return sessionStorage.getItem(refreshKey) === "1";
+                    } catch (error) {
+                        return refreshing;
+                    }
+                };
+                const markRefreshed = () => {
+                    try {
+                        sessionStorage.setItem(refreshKey, "1");
+                    } catch (error) {}
+                };
+
+                navigator.serviceWorker.addEventListener("controllerchange", () => {
+                    if (!hadController || refreshing || refreshMarked()) {
+                        return;
+                    }
+                    refreshing = true;
+                    markRefreshed();
+                    window.location.reload();
+                });
+
+                window.addEventListener("load", () => {
+                    navigator.serviceWorker.register("/sw.js", {scope: "/", updateViaCache: "none"})
+                        .then((registration) => {
+                            registration.update().catch(() => {});
+
+                            if (registration.waiting) {
+                                registration.waiting.postMessage({type: "SKIP_WAITING"});
+                            }
+
+                            registration.addEventListener("updatefound", () => {
+                                const worker = registration.installing;
+                                if (!worker) {
+                                    return;
+                                }
+
+                                worker.addEventListener("statechange", () => {
+                                    if (worker.state === "installed" && navigator.serviceWorker.controller) {
+                                        worker.postMessage({type: "SKIP_WAITING"});
+                                    }
+                                });
+                            });
+                        })
+                        .catch(() => {});
+                });
             }
 
     body
         app-root
+            div(class="app-shell-loader", role="status", aria-live="polite")
+                div(class="app-shell-loader-mark", aria-hidden="true") RM
+                div(class="app-shell-loader-title") 러닝메이트
+                div(class="app-shell-loader-detail") 앱을 불러오는 중
+                div(class="app-shell-loader-bar", aria-hidden="true")

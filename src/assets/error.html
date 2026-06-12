@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#05070c">
+  <title>러닝메이트 안내</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --app-bg: #05070c;
+      --screen: #f8fafc;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #64748b;
+      --soft: #e5edf6;
+      --brand: #74f56a;
+      --brand-strong: #1f8f3d;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      color: var(--text);
+      background: var(--app-bg);
+    }
+
+    .app-screen {
+      width: min(100%, 430px);
+      min-height: min(820px, calc(100vh - 40px));
+      min-height: min(820px, calc(100dvh - 40px));
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 28px;
+      background: var(--screen);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: calc(24px + env(safe-area-inset-top, 0px)) 24px 28px;
+      color: #ffffff;
+      background:
+        linear-gradient(145deg, rgba(116, 245, 106, 0.18), rgba(116, 245, 106, 0) 42%),
+        linear-gradient(180deg, #121826 0%, #07100c 100%);
+    }
+
+    .brand-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 36px;
+      margin-bottom: 48px;
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .brand-row img {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .status-mark {
+      width: 86px;
+      height: 86px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 22px;
+      border-radius: 28px;
+      background: rgba(116, 245, 106, 0.16);
+    }
+
+    .status-mark::before {
+      content: "";
+      width: 42px;
+      height: 42px;
+      border: 10px solid rgba(116, 245, 106, 0.34);
+      border-top-color: var(--brand);
+      border-radius: 50%;
+    }
+
+    .status-label {
+      margin: 0 0 12px;
+      color: var(--brand);
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.35;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 330px;
+      color: #ffffff;
+      font-size: 34px;
+      font-weight: 900;
+      line-height: 1.16;
+      letter-spacing: 0;
+      word-break: keep-all;
+    }
+
+    .message {
+      margin: 18px 0 0;
+      max-width: 340px;
+      color: rgba(255, 255, 255, 0.76);
+      font-size: 16px;
+      line-height: 1.72;
+      word-break: keep-all;
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      background: var(--screen);
+    }
+
+    .note {
+      margin: 0;
+      padding: 18px;
+      border: 1px solid var(--soft);
+      border-radius: 18px;
+      color: #334155;
+      background: var(--surface);
+      font-size: 15px;
+      line-height: 1.68;
+      word-break: keep-all;
+    }
+
+    .note strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #111827;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .actions {
+      display: grid;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 24px;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    .button {
+      min-height: 54px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 18px;
+      border: 1px solid transparent;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .button:focus-visible {
+      outline: 3px solid rgba(116, 245, 106, 0.48);
+      outline-offset: 3px;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+    }
+
+    .button-primary {
+      color: #07100a;
+      background: var(--brand);
+      box-shadow: 0 16px 34px rgba(31, 143, 61, 0.24);
+    }
+
+    .button-secondary {
+      color: #1f2937;
+      background: #ffffff;
+      border-color: #dbe4ef;
+    }
+
+    @media (max-width: 520px) {
+      body {
+        display: block;
+        padding: 0;
+        background: var(--screen);
+      }
+
+      .app-screen {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .hero {
+        padding-right: 22px;
+        padding-left: 22px;
+      }
+
+      .content {
+        padding-right: 22px;
+        padding-left: 22px;
+      }
+    }
+
+    @media (max-width: 360px) {
+      h1 {
+        font-size: 30px;
+      }
+
+      .message {
+        font-size: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-screen" aria-labelledby="error-title">
+    <section class="hero">
+      <div class="brand-row">
+        <img src="/assets/brand/icon-192.png" alt="" aria-hidden="true">
+        <span>러닝메이트</span>
+      </div>
+      <div class="status-mark" aria-hidden="true"></div>
+      <p class="status-label" id="status-label">잠시 연결 대기 중</p>
+      <h1 id="error-title">앱을 다시 준비하고 있어요</h1>
+      <p class="message" id="error-message">화면을 바로 열지 못했어요. 기록은 그대로 보관되어 있으니 잠시 후 다시 시도해주세요.</p>
+    </section>
+
+    <section class="content">
+      <p class="note" id="error-hint">
+        <strong>이렇게 해보세요</strong>
+        인터넷 연결을 확인한 뒤 다시 시도해주세요. 같은 화면이 반복되면 앱을 닫았다가 다시 열어주세요.
+      </p>
+      <div class="actions" aria-label="오류 페이지 작업">
+        <button class="button button-primary" type="button" id="retry-button">다시 시도</button>
+        <a class="button button-secondary" href="/" id="home-button">홈으로 가기</a>
+      </div>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var messages = {
+        "404": {
+          label: "화면을 찾을 수 없어요",
+          title: "앱 화면을 찾을 수 없어요",
+          message: "주소가 바뀌었거나 지금은 열 수 없는 화면이에요. 홈으로 돌아가 다시 시작해주세요.",
+          hint: "홈으로 이동한 뒤 원하는 메뉴를 다시 선택해주세요."
+        },
+        "500": {
+          label: "문제가 생겼어요",
+          title: "앱에 문제가 생겼어요",
+          message: "요청을 처리하지 못했어요. 기록은 그대로 보관되어 있으니 잠시 후 다시 시도해주세요.",
+          hint: "같은 화면이 반복되면 앱을 닫았다가 다시 열어주세요."
+        },
+        "502": {
+          label: "연결이 불안정해요",
+          title: "앱과 연결이 끊겼어요",
+          message: "러닝메이트가 다시 연결되는 중이에요. 잠시 후 다시 시도해주세요.",
+          hint: "인터넷 연결을 확인한 뒤 다시 시도해주세요."
+        },
+        "503": {
+          label: "잠시 연결 대기 중",
+          title: "앱을 다시 준비하고 있어요",
+          message: "화면을 바로 열지 못했어요. 기록은 그대로 보관되어 있으니 잠시 후 다시 시도해주세요.",
+          hint: "조금만 기다렸다가 다시 시도해주세요. 같은 화면이 반복되면 앱을 닫았다가 다시 열어주세요."
+        },
+        "504": {
+          label: "응답이 늦어지고 있어요",
+          title: "연결 시간이 길어지고 있어요",
+          message: "앱이 응답을 기다리고 있어요. 네트워크 상태를 확인한 뒤 다시 시도해주세요.",
+          hint: "와이파이 또는 데이터 연결을 바꾼 뒤 다시 시도해볼 수 있어요."
+        }
+      };
+
+      var params = new URLSearchParams(window.location.search);
+      var hashCode = window.location.hash.replace(/^#/, "");
+      var rawCode = params.get("code") || params.get("status") || hashCode || "503";
+      var code = String(rawCode).match(/\d{3}/);
+      code = code && messages[code[0]] ? code[0] : "503";
+
+      var state = messages[code];
+      document.title = "러닝메이트 - " + state.label;
+      document.getElementById("status-label").textContent = state.label;
+      document.getElementById("error-title").textContent = state.title;
+      document.getElementById("error-message").textContent = state.message;
+      document.getElementById("error-hint").innerHTML = "<strong>이렇게 해보세요</strong>" + state.hint;
+
+      document.getElementById("retry-button").addEventListener("click", function () {
+        var retryUrl = params.get("from") || params.get("returnUrl");
+        if (retryUrl && retryUrl.charAt(0) === "/") {
+          window.location.href = retryUrl;
+          return;
+        }
+        window.location.reload();
+      });
+    })();
+  </script>
+</body>
+</html>

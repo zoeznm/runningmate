@@ -57,6 +57,11 @@
                                 "glob": "**/*",
                                 "input": "node_modules/monaco-editor/min-maps/vs",
                                 "output": "/min-maps/vs"
+                            },
+                            {
+                                "glob": "**/error.html",
+                                "input": "src/assets",
+                                "output": "/"
                             }
                         ],
                         "styles": [

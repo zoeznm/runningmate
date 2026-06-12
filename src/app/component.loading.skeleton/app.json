@@ -1,0 +1,10 @@
+{
+    "mode": "component",
+    "id": "component.loading.skeleton",
+    "title": "loading.skeleton",
+    "namespace": "loading.skeleton",
+    "viewuri": "",
+    "category": "",
+    "controller": "",
+    "template": "wiz-component-loading-skeleton([publictype]=\"\", [publicrows]=\"\")"
+}

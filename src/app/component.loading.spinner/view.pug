@@ -1,0 +1,7 @@
+span(
+    class="inline-loading-spinner",
+    [ngClass]="[size || 'md', className || '']",
+    role="status",
+    [attr.aria-label]="label || '로딩 중'")
+    span(class="inline-loading-spinner-dot", aria-hidden="true")
+    span(class="sr-only") {{label || '로딩 중'}}

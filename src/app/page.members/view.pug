@@ -33,9 +33,12 @@ div(class="max-w-5xl pt-4 px-8 mb-6")
 
     //- Members Grid
     ng-container(*ngIf="loading")
-        div(class="text-center py-12 text-[13px] text-gray-400") 로딩 중...
+        wiz-component-loading-skeleton(type="list", rows="3")
 
-    ng-container(*ngIf="!loading")
+    ng-container(*ngIf="!loading && errorMessage")
+        wiz-component-error-state([message]="errorMessage", [onRetry]="retryLoad")
+
+    ng-container(*ngIf="!loading && !errorMessage")
         div(*ngIf="members.length === 0", class="text-center py-12 text-[13px] text-gray-400") 멤버가 없습니다.
 
         div(class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4", *ngIf="members.length > 0")
@@ -89,4 +92,7 @@ div(*ngIf="showInviteModal", class="fixed inset-0 z-50 flex items-center justify
                 class="inline-flex items-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-[13px] font-medium text-gray-700 shadow-sm hover:bg-gray-50") 취소
             button(
                 (click)="invite()",
-                class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-indigo-500") 초대
+                [disabled]="inviting",
+                class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60")
+                wiz-component-loading-spinner(*ngIf="inviting", size="sm", label="초대 중")
+                span {{inviting ? '초대 중' : '초대'}}

@@ -1,20 +1,171 @@
-import { OnInit } from '@angular/core';
+import { ChangeDetectorRef, OnDestroy, OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
+import { apiFetch, jsonRequest } from 'src/app/shared/api';
+import { authenticatedUser, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
 
-export class Component implements OnInit {
-    constructor(public service: Service) { }
+export class Component implements OnInit, OnDestroy {
+    constructor(public service: Service, public ref: ChangeDetectorRef) { }
 
     public view: string = 'login';
+    public signupStep: number = 1;
+    public policies: any = {
+        terms: null,
+        privacy: null
+    };
+    public activePolicy: string = '';
 
     public data: any = {
-        email: '',
-        password: ''
+        username: '',
+        password: '',
+        autoLogin: false
     };
+    public forgotData: any = {
+        email: ''
+    };
+    public resetData: any = {
+        token: '',
+        newPassword: '',
+        confirmPassword: ''
+    };
+    public signupData: any = {
+        username: '',
+        email: '',
+        password: '',
+        confirm_password: '',
+        name: '',
+        gender: ''
+    };
+    public genderOptions: Array<{ id: string; label: string }> = [
+        { id: 'female', label: '여자' },
+        { id: 'male', label: '남자' }
+    ];
+    public agreements: any = {
+        terms: false,
+        privacy: false,
+        age: false,
+        marketing: false
+    };
+    public allAgreementsChecked: boolean = false;
+    private readonly agreementKeys: string[] = ['terms', 'privacy', 'age', 'marketing'];
+    private readonly requiredAgreementKeys: string[] = ['terms', 'privacy', 'age'];
+    public identityStatus: any = {
+        username: { state: 'idle', message: '' },
+        email: { state: 'idle', message: '' }
+    };
+    public identityTimers: any = {
+        username: null,
+        email: null
+    };
+    public identitySeq: any = {
+        username: 0,
+        email: 0
+    };
+    public isSessionChecking: boolean = true;
+    public isLoginLoading: boolean = false;
+    public isSignupLoading: boolean = false;
+    public isForgotLoading: boolean = false;
+    public isResetLoading: boolean = false;
+    private readonly accessViewportProperty: string = '--access-visual-height';
+    private readonly accessViewportClass: string = 'is-access-page';
+    private readonly updateAccessViewportHeight = () => this.syncAccessViewportHeight();
+    private themeMeta: HTMLMetaElement | null = null;
+    private previousThemeColor: string = '';
+    private appRootElement: HTMLElement | null = null;
+    private previousRootBackground: string = '';
+    private previousBodyBackground: string = '';
+    private previousAppRootBackground: string = '';
+    private readonly sessionBootstrapTimeoutMs: number = 10000;
 
     public async ngOnInit() {
-        await this.service.init();
-        let check = await this.service.auth.check();
-        if (check) return location.href = "/";
+        this.installAccessViewportSync();
+        const resetToken = this.resetTokenFromUrl();
+        const socialError = this.socialErrorFromUrl();
+        if (resetToken) {
+            this.resetData.token = resetToken;
+            this.view = 'reset';
+            this.isSessionChecking = false;
+        }
+        if (!resetToken && this.forwardOAuthReturn()) return;
+
+        await this.withTimeout(this.service.init(null as any), this.sessionBootstrapTimeoutMs).catch(() => null);
+        if (!resetToken) {
+            if (await this.resumeAuthenticatedSession()) return;
+            this.isSessionChecking = false;
+            await this.safeRender();
+        }
+        if (socialError && !resetToken) {
+            await this.alert(this.socialErrorMessage(socialError), 'error');
+            this.clearSocialErrorFromUrl();
+        }
+        await this.loadPolicies().catch(() => null);
+    }
+
+    public ngOnDestroy() {
+        this.uninstallAccessViewportSync();
+    }
+
+    private installAccessViewportSync() {
+        document.documentElement.classList.add(this.accessViewportClass);
+        document.body?.classList.add(this.accessViewportClass);
+        this.themeMeta = document.querySelector('meta[name="theme-color"]');
+        this.previousThemeColor = this.themeMeta?.getAttribute('content') || '';
+        this.themeMeta?.setAttribute('content', '#05070c');
+        this.appRootElement = document.querySelector('app-root');
+        this.previousRootBackground = document.documentElement.style.background;
+        this.previousBodyBackground = document.body?.style.background || '';
+        this.previousAppRootBackground = this.appRootElement?.style.background || '';
+        document.documentElement.style.background = '#05070c';
+        if (document.body) document.body.style.background = '#05070c';
+        if (this.appRootElement) this.appRootElement.style.background = '#05070c';
+        this.syncAccessViewportHeight();
+        window.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
+        window.addEventListener('orientationchange', this.updateAccessViewportHeight, { passive: true });
+        window.visualViewport?.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
+        window.visualViewport?.addEventListener('scroll', this.updateAccessViewportHeight, { passive: true });
+        window.setTimeout(this.updateAccessViewportHeight, 250);
+    }
+
+    private uninstallAccessViewportSync() {
+        window.removeEventListener('resize', this.updateAccessViewportHeight);
+        window.removeEventListener('orientationchange', this.updateAccessViewportHeight);
+        window.visualViewport?.removeEventListener('resize', this.updateAccessViewportHeight);
+        window.visualViewport?.removeEventListener('scroll', this.updateAccessViewportHeight);
+        document.documentElement.classList.remove(this.accessViewportClass);
+        document.body?.classList.remove(this.accessViewportClass);
+        document.documentElement.style.removeProperty(this.accessViewportProperty);
+        document.body?.style.removeProperty(this.accessViewportProperty);
+        if (this.themeMeta && this.previousThemeColor) {
+            this.themeMeta.setAttribute('content', this.previousThemeColor);
+        }
+        document.documentElement.style.background = this.previousRootBackground;
+        if (document.body) document.body.style.background = this.previousBodyBackground;
+        if (this.appRootElement) this.appRootElement.style.background = this.previousAppRootBackground;
+    }
+
+    private syncAccessViewportHeight() {
+        const height = Math.ceil(Math.max(
+            window.visualViewport?.height || 0,
+            window.innerHeight || 0,
+            document.documentElement.clientHeight || 0
+        ));
+        if (!height) return;
+
+        const value = `${height}px`;
+        document.documentElement.style.setProperty(this.accessViewportProperty, value);
+        document.body?.style.setProperty(this.accessViewportProperty, value);
+    }
+
+    public async loadPolicies() {
+        const result = await apiFetch<any>('/api/agreements');
+        if (!result.success) {
+            this.policies.terms = null;
+            this.policies.privacy = null;
+            return;
+        }
+
+        const current = result.data?.current || {};
+        this.policies.terms = current.terms || null;
+        this.policies.privacy = current.privacy || null;
     }
 
     public async alert(message: string, status: string = 'error') {
@@ -28,10 +179,263 @@ export class Component implements OnInit {
         });
     }
 
+    private async withTimeout<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
+        let timeoutId = 0;
+        const timeout = new Promise<never>((_, reject) => {
+            timeoutId = window.setTimeout(() => reject(new Error('auth_bootstrap_timeout')), timeoutMs);
+        });
+
+        try {
+            return await Promise.race([work, timeout]);
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    }
+
+    private async safeRender() {
+        try {
+            await this.service.render();
+        } catch {
+            this.refreshAgreementControls();
+        }
+    }
+
+    private async resumeAuthenticatedSession() {
+        const tokenUser = await this.withTimeout(
+            authenticatedUser(),
+            this.sessionBootstrapTimeoutMs
+        ).catch(() => null);
+        const refreshed = tokenUser
+            ? false
+            : await this.withTimeout(refreshAuthTokens(), this.sessionBootstrapTimeoutMs).catch(() => false);
+        if (!tokenUser && !refreshed) return false;
+
+        this.goDashboard();
+        return true;
+    }
+
+    public async confirmAuthSession(payload: any, autoLogin: boolean) {
+        saveAuthTokens(payload, autoLogin);
+        return Boolean(await this.withTimeout(
+            authenticatedUser(),
+            this.sessionBootstrapTimeoutMs
+        ).catch(() => null));
+    }
+
+    public goDashboard() {
+        try {
+            this.service.href("/dashboard");
+        } catch {
+            location.replace("/dashboard");
+        }
+    }
+
+    public normalizeUsername(value: any) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    public normalizeEmail(value: any) {
+        return String(value || '').trim().toLowerCase();
+    }
+
+    public validateIdentity(type: string, value: any) {
+        if (type === 'username') {
+            const username = this.normalizeUsername(value);
+            if (!username) return '';
+            if (!/^[a-z0-9_]{3,30}$/.test(username)) return '3~30자, 영문/숫자/언더스코어만';
+            const reserved = [
+                'admin', 'administrator', 'root', 'api', 'auth', 'login', 'logout',
+                'signup', 'register', 'system', 'support', 'help', 'user', 'users',
+                'me', 'profile', 'settings', 'dashboard', 'null', 'undefined', 'test'
+            ];
+            if (reserved.includes(username)) return '사용할 수 없는 아이디야';
+            return '';
+        }
+
+        const email = this.normalizeEmail(value);
+        if (!email) return '';
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return '올바른 이메일 형식이 아니야';
+        return '';
+    }
+
+    public resetTokenFromUrl() {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('reset_token') || params.get('token') || '';
+    }
+
+    public oauthReturnUrl() {
+        const params = new URLSearchParams(location.search || '');
+        const state = params.get('state') || '';
+        const hasOAuthResult = params.has('code') || params.has('error');
+        if (!state || !hasOAuthResult) return '';
+
+        const next = new URLSearchParams();
+        ['code', 'state', 'error', 'error_description'].forEach((key) => {
+            const value = params.get(key);
+            if (value) next.set(key, value);
+        });
+        return `/api/auth/oauth/callback?${next.toString()}`;
+    }
+
+    public forwardOAuthReturn() {
+        const target = this.oauthReturnUrl();
+        if (!target) return false;
+        location.replace(target);
+        return true;
+    }
+
+    public socialErrorFromUrl() {
+        const params = new URLSearchParams(location.search || '');
+        return params.get('social_error') || '';
+    }
+
+    public socialErrorMessage(code: string) {
+        const normalized = String(code || '').trim();
+        const messages: any = {
+            access_denied: '소셜 로그인 권한이 승인되지 않았습니다.',
+            social_config_missing: '소셜 로그인 설정을 확인해주세요.',
+            social_provider_invalid: '지원하지 않는 소셜 로그인입니다.',
+            social_state_invalid: '소셜 로그인 요청이 만료되었습니다. 다시 시도해주세요.',
+            social_token_failed: '소셜 인증 토큰을 확인하지 못했습니다.',
+            social_profile_failed: '소셜 계정 정보를 불러오지 못했습니다.',
+            social_profile_missing: '소셜 계정 식별 정보를 확인하지 못했습니다.',
+            google_email_not_verified: '인증된 구글 이메일 계정만 사용할 수 있습니다.',
+            social_login_failed: '소셜 회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.'
+        };
+        return messages[normalized] || '소셜 회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    }
+
+    public clearSocialErrorFromUrl() {
+        try {
+            const url = new URL(location.href);
+            url.searchParams.delete('social_error');
+            history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+        } catch { }
+    }
+
+    public get pageTitle() {
+        if (this.view === 'signupOptions') return '회원가입';
+        if (this.view === 'signup') return '이메일로 회원가입';
+        if (this.view === 'forgot') return '비밀번호 찾기';
+        if (this.view === 'forgotSent') return '메일을 확인해주세요';
+        if (this.view === 'reset') return '비밀번호 재설정';
+        return '로그인';
+    }
+
+    public get pageDescription() {
+        if (this.view === 'signupOptions') return '원하는 방식으로 러닝메이트를 시작하세요.';
+        if (this.view === 'signup') return '아이디와 이메일을 확인하고 바로 시작하세요.';
+        if (this.view === 'forgot') return '가입한 이메일로 재설정 링크를 보내드립니다.';
+        if (this.view === 'forgotSent') return '메일함에서 비밀번호 재설정 링크를 확인해주세요.';
+        if (this.view === 'reset') return '새 비밀번호를 8자 이상으로 입력해주세요.';
+        return '아이디 또는 이메일로 러닝 기록에 로그인하세요.';
+    }
+
+    public statusClass(status: any) {
+        if (status?.state === 'available') return 'status-good';
+        if (['duplicate', 'invalid', 'error'].includes(status?.state)) return 'status-bad';
+        return 'status-muted';
+    }
+
+    public get usernameStatus() {
+        return this.identityStatus.username;
+    }
+
+    public get emailStatus() {
+        return this.identityStatus.email;
+    }
+
+    public get usernameChecksReady() {
+        return this.usernameStatus.state === 'available';
+    }
+
+    public get emailChecksReady() {
+        return this.emailStatus.state === 'available';
+    }
+
+    public get identityChecksReady() {
+        return this.usernameChecksReady && this.emailChecksReady;
+    }
+
+    public setIdentityStatus(type: string, state: string, message: string = '') {
+        this.identityStatus = {
+            ...this.identityStatus,
+            [type]: { state, message }
+        };
+    }
+
+    public scheduleIdentityCheck(type: string) {
+        const value = type === 'username'
+            ? this.normalizeUsername(this.signupData.username)
+            : this.normalizeEmail(this.signupData.email);
+        this.identitySeq[type] += 1;
+        clearTimeout(this.identityTimers[type]);
+
+        if (!value) {
+            this.setIdentityStatus(type, 'idle', '');
+            return;
+        }
+
+        const invalidMessage = this.validateIdentity(type, value);
+        if (invalidMessage) {
+            this.setIdentityStatus(type, 'invalid', invalidMessage);
+            return;
+        }
+
+        const seq = this.identitySeq[type];
+        this.setIdentityStatus(type, 'checking', '확인 중');
+        this.identityTimers[type] = setTimeout(() => this.checkIdentity(type, seq), 500);
+    }
+
+    public async checkIdentity(type: string, seq: number) {
+        const value = type === 'username'
+            ? this.normalizeUsername(this.signupData.username)
+            : this.normalizeEmail(this.signupData.email);
+        const invalidMessage = this.validateIdentity(type, value);
+
+        if (this.identitySeq[type] !== seq) return;
+        if (!value) {
+            this.setIdentityStatus(type, 'idle', '');
+            return;
+        }
+        if (invalidMessage) {
+            this.setIdentityStatus(type, 'invalid', invalidMessage);
+            return;
+        }
+
+        const param = type === 'username' ? 'username' : 'email';
+        const result = await apiFetch<any>(`/api/auth/check-${param}?${param}=${encodeURIComponent(value)}`);
+        if (this.identitySeq[type] !== seq) return;
+
+        if (!result.success) {
+            if (this.identitySeq[type] !== seq) return;
+            this.setIdentityStatus(type, 'error', result.error?.message || '확인에 실패했어');
+            return;
+        }
+
+        const raw = result.raw as any;
+        const available = !!raw?.available || !!result.data?.available;
+        const availableMessage = type === 'username' ? '사용 가능한 아이디야' : '사용 가능한 이메일이야';
+        const duplicateMessage = type === 'username' ? '이미 사용 중인 아이디야' : '이미 사용 중인 이메일이야';
+        this.setIdentityStatus(type, available ? 'available' : 'duplicate', result.message || raw?.message || (available ? availableMessage : duplicateMessage));
+    }
+
+    public onUsernameInput(value: any) {
+        this.signupData.username = this.normalizeUsername(value);
+        this.scheduleIdentityCheck('username');
+    }
+
+    public onEmailInput(value: any) {
+        this.signupData.email = this.normalizeEmail(value);
+        this.scheduleIdentityCheck('email');
+    }
+
     public async login() {
+        if (this.isLoginLoading) return;
         let user = JSON.parse(JSON.stringify(this.data));
-        if (!user.email) {
-            await this.alert("이메일을 입력해주세요.");
+        user.username = this.normalizeUsername(user.username);
+        if (!user.username) {
+            await this.alert("아이디 또는 이메일을 입력해주세요.");
             return;
         }
         if (!user.password) {
@@ -41,13 +445,326 @@ export class Component implements OnInit {
 
         // user.password = this.service.auth.hash(user.password);
 
-        let { code, data } = await wiz.call("login", user);
+        this.isLoginLoading = true;
+        await this.service.render();
 
-        if (code == 200) {
-            location.href = "/";
-            await this.service.render();
+        const result = await jsonRequest<any>('/api/auth/login', 'POST', {
+            username: user.username,
+            password: user.password,
+            auto_login: !!user.autoLogin
+        }, { retries: 0 });
+        this.isLoginLoading = false;
+
+        if (result.success) {
+            const authReady = await this.confirmAuthSession((result.data || result.raw) as any, !!user.autoLogin);
+            if (!authReady) {
+                await this.alert("로그인 세션을 확인하지 못했습니다. 다시 로그인해주세요.", 'error');
+                await this.service.render();
+                return;
+            }
+            this.goDashboard();
+            return;
         } else {
-            await this.alert(data.message || "로그인에 실패했습니다.", 'error');
+            await this.alert(result.error?.message || "로그인에 실패했습니다.", 'error');
         }
+        await this.service.render();
+    }
+
+    public async showLogin() {
+        this.view = 'login';
+        this.signupStep = 1;
+        this.resetData.newPassword = '';
+        this.resetData.confirmPassword = '';
+        await this.service.render();
+    }
+
+    public async showSignup() {
+        this.view = 'signupOptions';
+        this.signupStep = 1;
+        await this.service.render();
+    }
+
+    public async showEmailSignup() {
+        this.view = 'signup';
+        this.signupStep = 1;
+        await this.service.render();
+    }
+
+    public startSocialSignup(provider: string) {
+        const normalized = String(provider || '').trim().toLowerCase();
+        if (!['naver', 'google'].includes(normalized)) return;
+        const url = `/api/auth/oauth/${normalized}/start`;
+        try {
+            const opened = window.open(url, '_top');
+            if (opened) return;
+        } catch { }
+        location.href = url;
+    }
+
+    public async showForgotPassword() {
+        this.view = 'forgot';
+        this.forgotData.email = this.normalizeEmail(this.forgotData.email);
+        await this.service.render();
+    }
+
+    public async forgotPassword() {
+        if (this.isForgotLoading) return;
+        const email = this.normalizeEmail(this.forgotData.email);
+        const emailError = this.validateIdentity('email', email);
+
+        if (!email) {
+            await this.alert("이메일을 입력해주세요.");
+            return;
+        }
+        if (emailError) {
+            await this.alert(emailError);
+            return;
+        }
+
+        this.isForgotLoading = true;
+        await this.service.render();
+
+        const result = await jsonRequest('/api/auth/forgot-password', 'POST', { email });
+        this.isForgotLoading = false;
+        if (!result.success) {
+            await this.alert(result.error?.message || "메일 발송 요청에 실패했습니다.");
+            await this.service.render();
+            return;
+        }
+
+        this.forgotData.email = email;
+        this.view = 'forgotSent';
+        await this.service.render();
+    }
+
+    public async resetPassword() {
+        if (this.isResetLoading) return;
+
+        const token = String(this.resetData.token || '').trim();
+        const newPassword = String(this.resetData.newPassword || '');
+        const confirmPassword = String(this.resetData.confirmPassword || '');
+
+        if (!token) {
+            await this.alert("재설정 토큰이 필요합니다.");
+            return;
+        }
+        if (!newPassword) {
+            await this.alert("새 비밀번호를 입력해주세요.");
+            return;
+        }
+        if (newPassword.length < 8) {
+            await this.alert("비밀번호는 8자 이상이어야 합니다.");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            await this.alert("비밀번호가 일치하지 않습니다.");
+            return;
+        }
+
+        this.isResetLoading = true;
+        await this.service.render();
+
+        const result = await jsonRequest('/api/auth/reset-password', 'POST', { token, newPassword });
+        this.isResetLoading = false;
+
+        if (!result.success) {
+            await this.alert(result.error?.message || result.message || "비밀번호 재설정에 실패했습니다.");
+            await this.service.render();
+            return;
+        }
+
+        this.resetData.token = '';
+        this.resetData.newPassword = '';
+        this.resetData.confirmPassword = '';
+        history.replaceState(null, '', '/access');
+        await this.alert(result.message || "비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해주세요.", 'success');
+        await this.showLogin();
+        await this.service.render();
+    }
+
+    public get allAgreed() {
+        return this.agreementKeys.every((key) => !!this.agreements[key]);
+    }
+
+    public get someAgreed() {
+        return this.agreementKeys.some((key) => !!this.agreements[key]);
+    }
+
+    public get requiredAgreed() {
+        return this.requiredAgreementKeys.every((key) => !!this.agreements[key]);
+    }
+
+    public get signupReady() {
+        return this.requiredAgreed && this.identityChecksReady && this.signupGenderSelected;
+    }
+
+    public get signupGenderSelected() {
+        return this.signupData.gender === 'female' || this.signupData.gender === 'male';
+    }
+
+    public selectSignupGender(gender: string) {
+        this.signupData.gender = gender === 'male' ? 'male' : 'female';
+    }
+
+    public setAllAgreements(value: any) {
+        const checked = this.checkedValue(value);
+        this.agreements = this.agreementKeys.reduce((next: any, key) => {
+            next[key] = checked;
+            return next;
+        }, {});
+        this.allAgreementsChecked = checked;
+        this.refreshAgreementControls();
+    }
+
+    public setSignupAgreement(key: string, value: any) {
+        if (!this.agreementKeys.includes(key)) return;
+        this.agreements = {
+            ...this.agreements,
+            [key]: this.checkedValue(value)
+        };
+        this.allAgreementsChecked = this.allAgreed;
+        this.refreshAgreementControls();
+    }
+
+    private checkedValue(value: any) {
+        if (typeof value === 'boolean') return value;
+        return !!value?.target?.checked;
+    }
+
+    private refreshAgreementControls() {
+        try {
+            this.ref.detectChanges();
+        } catch {
+            window.setTimeout(() => {
+                try {
+                    this.ref.detectChanges();
+                } catch { }
+            }, 0);
+        }
+    }
+
+    public async nextSignupStep() {
+        this.signupData.username = this.normalizeUsername(this.signupData.username);
+        this.signupData.email = this.normalizeEmail(this.signupData.email);
+        const usernameError = this.validateIdentity('username', this.signupData.username);
+        const emailError = this.validateIdentity('email', this.signupData.email);
+
+        if (!this.signupData.username) {
+            await this.alert("아이디를 입력해주세요.");
+            return;
+        }
+        if (usernameError) {
+            await this.alert(usernameError);
+            return;
+        }
+        if (this.usernameStatus.state === 'checking') {
+            await this.alert("중복확인 중입니다. 잠시만 기다려주세요.");
+            return;
+        }
+        if (!this.usernameChecksReady) {
+            await this.alert(this.usernameStatus.message || "아이디 중복확인을 완료해주세요.");
+            return;
+        }
+        if (!this.signupData.email) {
+            await this.alert("이메일을 입력해주세요.");
+            return;
+        }
+        if (emailError) {
+            await this.alert(emailError);
+            return;
+        }
+        if (this.emailStatus.state === 'checking') {
+            await this.alert("이메일 중복확인 중입니다. 잠시만 기다려주세요.");
+            return;
+        }
+        if (!this.emailChecksReady) {
+            await this.alert(this.emailStatus.message || "이메일 중복확인을 완료해주세요.");
+            return;
+        }
+        if (!this.signupData.name) {
+            await this.alert("이름을 입력해주세요.");
+            return;
+        }
+        if (!this.signupGenderSelected) {
+            await this.alert("성별을 선택해주세요.");
+            return;
+        }
+        if (!this.signupData.password) {
+            await this.alert("비밀번호를 입력해주세요.");
+            return;
+        }
+        if (this.signupData.password.length < 8) {
+            await this.alert("비밀번호는 8자 이상이어야 합니다.");
+            return;
+        }
+        if (this.signupData.password !== this.signupData.confirm_password) {
+            await this.alert("비밀번호가 일치하지 않습니다.");
+            return;
+        }
+        this.signupStep = 2;
+        await this.service.render();
+    }
+
+    public async signup() {
+        if (this.isSignupLoading) return;
+        this.signupData.username = this.normalizeUsername(this.signupData.username);
+        this.signupData.email = this.normalizeEmail(this.signupData.email);
+        if (!this.identityChecksReady) {
+            await this.alert("아이디와 이메일 중복확인을 완료해주세요.");
+            return;
+        }
+        if (!this.requiredAgreed) {
+            await this.alert("필수 동의 항목을 모두 체크해주세요.");
+            return;
+        }
+
+        const payload = {
+            username: this.signupData.username,
+            email: this.signupData.email,
+            password: this.signupData.password,
+            confirm_password: this.signupData.confirm_password,
+            name: this.signupData.name,
+            gender: this.signupData.gender,
+            terms_agreed: this.agreements.terms,
+            privacy_agreed: this.agreements.privacy,
+            age_confirmed: this.agreements.age,
+            marketing_optin: this.agreements.marketing,
+            terms_version: this.policies.terms?.version || '',
+            privacy_version: this.policies.privacy?.version || '',
+            agreed_at: new Date().toISOString()
+        };
+
+        this.isSignupLoading = true;
+        await this.service.render();
+
+        const result = await jsonRequest<any>('/api/auth/register', 'POST', payload, { retries: 0 });
+        this.isSignupLoading = false;
+        if (result.success) {
+            const authReady = await this.confirmAuthSession((result.data || result.raw) as any, true);
+            if (!authReady) {
+                await this.alert("가입은 완료됐지만 로그인 세션을 확인하지 못했습니다. 로그인해주세요.", 'error');
+                await this.service.render();
+                return;
+            }
+            this.goDashboard();
+            return;
+        }
+        await this.alert(result.error?.message || "회원가입에 실패했습니다.");
+        await this.service.render();
+    }
+
+    public openPolicy(type: string) {
+        this.activePolicy = type;
+        this.refreshAgreementControls();
+    }
+
+    public closePolicy() {
+        this.activePolicy = '';
+        this.refreshAgreementControls();
+    }
+
+    public activePolicyData() {
+        if (!this.activePolicy) return null;
+        return this.policies[this.activePolicy] || null;
     }
 }

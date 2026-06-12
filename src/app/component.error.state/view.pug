@@ -1,0 +1,7 @@
+section(class="error-state", role="alert")
+    div(class="error-state-icon", aria-hidden="true")
+        i(class="fa-solid fa-triangle-exclamation")
+    div(class="error-state-message") {{message || '잠깐 문제가 생겼어. 다시 시도해줘'}}
+    button(*ngIf="onRetry", type="button", class="error-state-action", (click)="retry()")
+        i(class="fa-solid fa-rotate-right", aria-hidden="true")
+        span {{retryLabel || '다시 시도'}}

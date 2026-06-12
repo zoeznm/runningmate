@@ -1,0 +1,66 @@
+:host {
+    display: block;
+}
+
+.empty-state-panel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    min-height: 156px;
+    margin: 12px 0;
+    border: 0.5px solid var(--line);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.035);
+    padding: 28px 18px;
+    text-align: center;
+}
+
+:host-context(.light-screen) .empty-state-panel {
+    background: rgba(0, 0, 0, 0.025);
+}
+
+.empty-state-icon {
+    margin-bottom: 14px;
+    color: #666;
+    font-size: 38px;
+    line-height: 1;
+}
+
+.empty-state-title {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.empty-state-description {
+    max-width: 240px;
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.empty-state-action {
+    min-height: 38px;
+    margin-top: 16px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--primary);
+    padding: 0 18px;
+    color: #12121c;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+:host-context(.light-screen) .empty-state-action {
+    color: #ffffff;
+}
+
+.empty-state-action:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}

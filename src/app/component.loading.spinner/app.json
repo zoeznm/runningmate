@@ -1,0 +1,10 @@
+{
+    "mode": "component",
+    "id": "component.loading.spinner",
+    "title": "loading.spinner",
+    "namespace": "loading.spinner",
+    "viewuri": "",
+    "category": "",
+    "controller": "",
+    "template": "wiz-component-loading-spinner([publiclabel]=\"\", [publicsize]=\"\", [publicclassName]=\"\")"
+}

@@ -1,0 +1,7 @@
+div(class="fullscreen-loader", role="status", aria-live="polite")
+    div(class="fullscreen-loader-panel")
+        wiz-component-loading-spinner(size="lg", label="초기 데이터 로딩")
+        div(class="fullscreen-loader-message") {{message || '초기 데이터를 불러오는 중'}}
+        div(*ngIf="detail", class="fullscreen-loader-detail") {{detail}}
+        div(class="fullscreen-loader-bar", aria-hidden="true")
+            span

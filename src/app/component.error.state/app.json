@@ -1,0 +1,10 @@
+{
+    "mode": "component",
+    "id": "component.error.state",
+    "title": "error.state",
+    "namespace": "error.state",
+    "viewuri": "",
+    "category": "",
+    "controller": "",
+    "template": "wiz-component-error-state([publicmessage]=\"\", [publicretryLabel]=\"\", [publiconRetry?]=\"\")"
+}
