@@ -127,3 +127,72 @@ wiz-portal-post-detail
 - `GET /wiz/api/page.mypage/get` — 내 프로필 조회
 - `POST /wiz/api/page.mypage/update_profile` — 프로필 수정
 - `POST /wiz/api/page.mypage/change_password` — 비밀번호 변경
+
+### 러닝메이트 AI 연결
+- 운영 배포는 `RUNNINGMATE_AI_PROVIDER=openai`로 설정하고, 운영 OpenAI API 프로젝트에서 발급한 키를 서버 환경 변수 `OPENAI_API_KEY`로 주입합니다.
+- `RUNNINGMATE_AI_PROVIDER=codex`는 개발/임시 점검 용도로만 사용합니다. 운영 서비스는 개인 Codex 로그인 상태에 의존하지 않아야 합니다.
+- 이미지 파싱은 OpenAI Responses API의 이미지 입력을 사용합니다.
+- 기본 모델은 `gpt-5.4-mini-2026-03-17`이며, `RUNNINGMATE_CHAT_MODEL`과 `RUNNINGMATE_VISION_MODEL`로 채팅/이미지 파싱 모델을 각각 변경할 수 있습니다.
+- 기본 이미지 상세도는 작은 텍스트 OCR 정확도를 위해 `RUNNINGMATE_IMAGE_DETAIL=high`를 사용합니다. 비용을 줄여야 하면 `low`로 낮출 수 있습니다.
+- `insufficient_quota` 오류는 API 크레딧 소진 또는 월 사용 한도 도달 상태입니다. Billing에서 크레딧을 충전하거나 한도를 올린 뒤 다시 시도해야 합니다.
+- AI를 전체 무료 무제한으로 개방하지 않기 위한 베타, 쿼터, 유료화 확장 설계는 `docs/ai-access-beta-quota-paid-design-2026-06-09.md`를 기준으로 합니다.
+
+```bash
+install -m 600 /dev/null /opt/app/config/openai.env
+printf '%s\n' 'OPENAI_API_KEY=<server-injected-openai-api-key>' \
+  'RUNNINGMATE_AI_PROVIDER=openai' \
+  'RUNNINGMATE_CHAT_MODEL=gpt-5.4-mini-2026-03-17' \
+  'RUNNINGMATE_VISION_MODEL=gpt-5.4-mini-2026-03-17' \
+  'RUNNINGMATE_IMAGE_DETAIL=high' \
+  'RUNNINGMATE_AI_CHAT_DAILY_LIMIT=5' \
+  'RUNNINGMATE_AI_CHAT_MONTHLY_LIMIT=120' \
+  'RUNNINGMATE_AI_CHAT_ADMIN_DAILY_LIMIT=100' \
+  'RUNNINGMATE_AI_CHAT_ADMIN_MONTHLY_LIMIT=2000' \
+  'RUNNINGMATE_AI_CHAT_COOLDOWN_SECONDS=10' \
+  'RUNNINGMATE_AI_CHAT_RATE_WINDOW_SECONDS=60' \
+  'RUNNINGMATE_AI_CHAT_RATE_MAX_REQUESTS=6' \
+  'RUNNINGMATE_AI_IMAGE_PARSE_COOLDOWN_SECONDS=30' \
+  'RUNNINGMATE_AI_IMAGE_PARSE_RATE_WINDOW_SECONDS=300' \
+  'RUNNINGMATE_AI_IMAGE_PARSE_RATE_MAX_REQUESTS=5' \
+  'RUNNINGMATE_OPENAI_RETRY_MAX=2' \
+  'RUNNINGMATE_OPENAI_BACKOFF_BASE_SECONDS=0.8' \
+  'RUNNINGMATE_OPENAI_BACKOFF_MAX_SECONDS=8' \
+  'RUNNINGMATE_OPENAI_PROJECT_ID=<runningmate-prod-project-id>' \
+  'RUNNINGMATE_OPENAI_DAILY_BUDGET_USD=1' \
+  'RUNNINGMATE_OPENAI_MONTHLY_BUDGET_USD=30' \
+  'RUNNINGMATE_OPENAI_ALERT_THRESHOLDS=50,80,95,100' \
+  'RUNNINGMATE_CODEX_TIMEOUT=180' > /opt/app/config/openai.env
+wiz bundle --project=main
+wiz service restart app
+```
+
+연결 상태는 `GET /api/ai-config` 또는 대시보드 업로드 탭에서 확인할 수 있습니다.
+OpenAI 사용량 점검은 Admin API 키를 런타임에만 주입한 뒤 `python scripts/check_openai_usage.py`로 확인합니다.
+
+---
+
+## iPhone 다운로드형 앱 배포
+
+홈 화면 추가(PWA)가 아니라 TestFlight/App Store에서 내려받는 앱으로 배포하려면 iOS 네이티브 패키지가 필요합니다.
+이 프로젝트에는 Capacitor 기반 iOS 래퍼가 추가되어 있으며, 앱은 `러닝메이트` 이름과 `net.seasonai.run.matomabo` 번들 ID를 사용합니다.
+
+현재 설정은 iOS 앱 shell 안에서 운영 서비스 URL을 엽니다.
+
+```bash
+npm install
+npm run ios:sync
+npm run ios:open
+```
+
+`npm run ios:open` 이후 단계는 macOS의 Xcode에서 진행합니다.
+
+1. Xcode에서 Apple Developer Team을 선택합니다.
+2. Bundle Identifier가 `net.seasonai.run.matomabo`인지 확인합니다.
+3. 실제 iPhone 연결 후 Run으로 테스트합니다.
+4. `Product > Archive`로 아카이브를 만들고 TestFlight 또는 App Store Connect로 업로드합니다.
+
+Linux 서버에서는 Xcode와 Apple 서명 도구가 없어 `.ipa` 생성과 App Store/TestFlight 업로드까지는 할 수 없습니다.
+
+참고:
+- Apple Xcode 배포 안내: https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases/
+- App Store Connect 빌드 업로드 안내: https://developer.apple.com/help/app-store-connect/manage-builds/upload-builds/

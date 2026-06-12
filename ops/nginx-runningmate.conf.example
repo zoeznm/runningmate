@@ -1,0 +1,111 @@
+limit_req_zone $binary_remote_addr zone=runningmate_api:10m rate=10r/s;
+
+upstream runningmate_app {
+    server 127.0.0.1:<app-port>;
+}
+
+server {
+    listen 80;
+    server_name <production-domain>;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name <production-domain>;
+
+    ssl_certificate /etc/letsencrypt/live/<production-domain>/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/<production-domain>/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "same-origin" always;
+    # ReviewOps iframe capture note:
+    # X-Frame-Options SAMEORIGIN blocks third-party embedding. If ReviewOps
+    # requires iframe capture for a private server, omit X-Frame-Options on
+    # that temporary vhost and send a narrow CSP instead:
+    # add_header Content-Security-Policy "frame-ancestors 'self' https://<reviewops-origin>" always;
+    # Keep the origin exact and restore SAMEORIGIN after the review window.
+    add_header X-Frame-Options "SAMEORIGIN" always;
+
+    client_max_body_size 64m;
+
+    # Keep API/session/PWA endpoints on the WIZ app.
+    # If these fall through to a static SPA root, the browser receives index.html
+    # and login fails with "응답을 읽지 못했어".
+    location ^~ /api/ {
+        proxy_pass http://runningmate_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        limit_req zone=runningmate_api burst=30 nodelay;
+    }
+
+    location ^~ /auth/ {
+        proxy_pass http://runningmate_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        limit_req zone=runningmate_api burst=30 nodelay;
+    }
+
+    location = /sw.js {
+        proxy_pass http://runningmate_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+    }
+
+    location = /manifest.json {
+        proxy_pass http://runningmate_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+
+    location /socket.io/ {
+        proxy_pass http://runningmate_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location / {
+        proxy_pass http://runningmate_app;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
