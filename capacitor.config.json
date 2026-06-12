@@ -1,0 +1,12 @@
+{
+  "appId": "net.seasonai.run.matomabo",
+  "appName": "러닝메이트",
+  "webDir": "bundle/www",
+  "server": {
+    "url": "https://matomabo.run.seasonai.net/dashboard",
+    "cleartext": false
+  },
+  "ios": {
+    "contentInset": "automatic"
+  }
+}

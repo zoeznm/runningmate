@@ -1,5 +1,17 @@
 {
+  "scripts": {
+    "migrate:assign-admin": "python scripts/migrate_assign_admin.py",
+    "migrate:assign-admin:rollback": "python scripts/migrate_assign_admin.py --rollback",
+    "ios:add": "cap add ios",
+    "ios:sync": "cap sync ios",
+    "ios:open": "cap open ios"
+  },
   "dependencies": {
     "@angular/cli": "^18.2.5"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/ios": "^8.3.4"
   }
 }
