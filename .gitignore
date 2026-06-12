@@ -7,6 +7,13 @@ node_modules/
 /test/
 package-lock.json
 
+# Deployment archives and release artifacts
+runningmate-deploy*.tar.gz
+runningmate-deploy*.tar.gz.part-*
+runningmate-deploy*.parts.sha256
+runningmate-deploy*.sha256
+runningmate-deploy*.reassemble.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
