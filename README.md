@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="src/assets/brand/icon-512.png" width="180" alt="RunningMate app icon" />
 
   <h1>RunningMate</h1>
 
@@ -11,7 +12,7 @@
   </p>
 
   <p>
-    <img alt="WIZ" src="https://img.shields.io/badge/WIZ-Season_Framework-111827?style=for-the-badge" />
+    <img alt="RunningMate" src="https://img.shields.io/badge/RunningMate-Private_Running_OS-7CFF86?style=for-the-badge" />
     <img alt="Angular" src="https://img.shields.io/badge/Angular_18-TypeScript-DD0031?style=for-the-badge&amp;logo=angular&amp;logoColor=white" />
     <img alt="Python" src="https://img.shields.io/badge/Python-Flask_Routes-3776AB?style=for-the-badge&amp;logo=python&amp;logoColor=white" />
     <img alt="OpenAI" src="https://img.shields.io/badge/OpenAI-AI_Pacer-412991?style=for-the-badge&amp;logo=openai&amp;logoColor=white" />

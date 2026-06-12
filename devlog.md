@@ -1,5 +1,6 @@
 | 날짜 | ID | 작업 내용 | 상세 |
 |------|-----|----------|------|
+| 2026-06-12 | 008 | README 상단 시즌 로고 제거 및 러닝메이트 아이콘 적용 | [상세](devlog/2026-06-12/008-readme-brand-logo-swap.md) |
 | 2026-06-12 | 007 | README를 고밀도 프로젝트 쇼케이스 스타일로 개선 | [상세](devlog/2026-06-12/007-readme-showcase-polish.md) |
 | 2026-06-12 | 006 | README를 러닝메이트 프로젝트 기준으로 재구성 | [상세](devlog/2026-06-12/006-readme-runningmate-rewrite.md) |
 | 2026-06-12 | 005 | 배포 압축 산출물 Git 제외 및 관리 기준 문서화 | [상세](devlog/2026-06-12/005-deployment-artifact-management.md) |
