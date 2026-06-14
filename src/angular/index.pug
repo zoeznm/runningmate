@@ -5,7 +5,7 @@ html(lang="ko")
         title 러닝메이트
         base(href="/")
         
-        meta(name='viewport' content='width=device-width, initial-scale=1, viewport-fit=cover')
+        meta(name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover')
         meta(http-equiv='X-UA-Compatible' content='ie=edge')
 
         // pwa config
@@ -167,7 +167,7 @@ html(lang="ko")
 
         script(type="text/javascript").
             if ("serviceWorker" in navigator) {
-                const refreshVersion = "rm-login-json-response-20260611";
+                const refreshVersion = "rm-ios-input-zoom-cache-20260614";
                 const refreshKey = `runningmate-sw-refresh-${refreshVersion}`;
                 const hadController = Boolean(navigator.serviceWorker.controller);
                 let refreshing = false;
