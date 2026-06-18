@@ -261,6 +261,8 @@ npm run ios:open
 
 Linux 서버에서는 Xcode가 없어 `.ipa` 생성과 TestFlight/App Store 업로드를 완료할 수 없습니다. `npm run ios:open` 이후 서명, Archive, 업로드는 macOS Xcode에서 진행합니다.
 
+App Store 첫 배포 순서와 남은 준비물은 `docs/app-store-release-checklist-2026-06-17.md`를 따릅니다.
+
 ## 문서 허브
 
 | 문서 | 내용 |
@@ -272,6 +274,8 @@ Linux 서버에서는 Xcode가 없어 `.ipa` 생성과 TestFlight/App Store 업�
 | `docs/private-server-p2-security-plan-2026-06-10.md` | 보안 작업 계획 |
 | `docs/reviewops-private-server-registration-2026-06-12.md` | ReviewOps 개인 서버 등록 조건 |
 | `docs/deployment-artifact-management-2026-06-12.md` | 배포 압축 산출물 관리 기준 |
+| `docs/app-store-release-checklist-2026-06-17.md` | iOS App Store 첫 배포 순서와 남은 준비물 |
+| `docs/ios-initial-loading-troubleshooting-2026-06-18.md` | iOS 실기기 초기 로딩 멈춤 점검과 수정 내역 |
 | `docs/codex-runtime-flow.md` | 서비스 내부 AI/Codex 런타임 흐름 |
 | `docs/openai-production-ops-2026-06-09.md` | OpenAI 운영 정책과 과금 방어 |
 

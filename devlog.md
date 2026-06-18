@@ -1,5 +1,38 @@
 | 날짜 | ID | 작업 내용 | 상세 |
 |------|-----|----------|------|
+| 2026-06-18 | 011 | Mac 프로젝트 Git 최신화 명령 및 한계 문서화 | [상세](devlog/2026-06-18/011-ios-mac-git-pull-source-refresh.md) |
+| 2026-06-18 | 010 | Mac Desktop 프로젝트 소스 최신화 필요 조건 문서화 | [상세](devlog/2026-06-18/010-ios-mac-source-refresh.md) |
+| 2026-06-18 | 009 | iOS sync/clean/delete와 소스 최신화 범위 구분 문서화 | [상세](devlog/2026-06-18/009-ios-sync-clean-source-refresh-scope.md) |
+| 2026-06-18 | 008 | iOS BridgeViewController에서 원격 serverURL 강제 차단 | [상세](devlog/2026-06-18/008-ios-bridge-local-bundle-force.md) |
+| 2026-06-18 | 007 | iOS 원격 server.url 잔존 방지 및 네이티브 설정 추적 | [상세](devlog/2026-06-18/007-ios-native-capacitor-config-guard.md) |
+| 2026-06-18 | 006 | iOS 네이티브 앱 아이콘 최신 브랜드 아이콘으로 교체 | [상세](devlog/2026-06-18/006-ios-native-app-icon-update.md) |
+| 2026-06-18 | 005 | iOS 앱 삭제 재설치 필요 사유 및 절차 정리 | [상세](devlog/2026-06-18/005-ios-delete-reinstall-guide.md) |
+| 2026-06-18 | 004 | iOS 원격 server.url 제거 및 내부 번들 시작 전환 | [상세](devlog/2026-06-18/004-ios-local-bundle-start.md) |
+| 2026-06-18 | 003 | iOS 앱 시작 URL 및 401 인증 정리 보강 | [상세](devlog/2026-06-18/003-ios-auth-startup-redirect.md) |
+| 2026-06-18 | 002 | iOS 날씨 초기 로딩 무한 대기 방어 | [상세](devlog/2026-06-18/002-ios-weather-loading-timeout.md) |
+| 2026-06-18 | 001 | iOS 실기기 초기 로딩 무한 대기 방어 및 API base 보정 | [상세](devlog/2026-06-18/001-ios-initial-loading-api-base.md) |
+| 2026-06-17 | 021 | App ID 생성 이후 Xcode/TestFlight/App Review 진행 순서 보강 | [상세](devlog/2026-06-17/021-after-app-id-next-steps.md) |
+| 2026-06-17 | 020 | App Store capability 범위 및 iOS 개인정보 목적 문구 정리 | [상세](devlog/2026-06-17/020-ios-capabilities-privacy-strings.md) |
+| 2026-06-17 | 019 | Bundle ID 확정안 및 외부 접속/개발자 계정 상태 반영 | [상세](devlog/2026-06-17/019-bundle-id-decision.md) |
+| 2026-06-17 | 018 | iOS 앱스토어 첫 배포 순서 문서화 및 운영 도메인 반영 | [상세](devlog/2026-06-17/018-app-store-release-checklist.md) |
+| 2026-06-17 | 017 | 갤러리 일기 달력 빈 날짜 클릭 표시 보강 | [상세](devlog/2026-06-17/017-journal-empty-day-click-affordance.md) |
+| 2026-06-17 | 016 | 갤러리 일기 달력 빈 날짜 선택 안내 보강 | [상세](devlog/2026-06-17/016-journal-gallery-empty-day-selection.md) |
+| 2026-06-17 | 015 | 일기탭 날짜 메모 표시 및 사진 저장 경로 확인 | [상세](devlog/2026-06-17/015-journal-gallery-day-notes-media-check.md) |
+| 2026-06-17 | 014 | 기록 업로드 일기 저장 버튼 추가 | [상세](devlog/2026-06-17/014-calendar-upload-journal-save.md) |
+| 2026-06-17 | 013 | 네이버/구글 소셜 회원가입 버튼 숨김 처리 | [상세](devlog/2026-06-17/013-hide-social-auth-buttons.md) |
+| 2026-06-16 | 012 | support 메일 주소 생성 방식 문서화 | [상세](devlog/2026-06-16/012-support-mail-routing-setup.md) |
+| 2026-06-16 | 011 | 앱 발신 이메일 생성 위치 설명 보강 | [상세](devlog/2026-06-16/011-mail-address-ownership-clarification.md) |
+| 2026-06-15 | 010 | 앱 메일 발신 도메인 등록 가이드 추가 | [상세](devlog/2026-06-15/010-mail-sender-domain-setup.md) |
+| 2026-06-15 | 009 | 운영 OAuth 설정 파일 확인 및 권한 보정 | [상세](devlog/2026-06-15/009-oauth-env-runtime-check.md) |
+| 2026-06-15 | 008 | 운영 도메인 OAuth redirect URI 예시 추가 | [상세](devlog/2026-06-15/008-oauth-production-redirect-template.md) |
+| 2026-06-15 | 007 | 소셜 OAuth 운영 설정 누락 진단 및 헬스체크 보강 | [상세](devlog/2026-06-15/007-social-oauth-runtime-config-diagnosis.md) |
+| 2026-06-15 | 006 | 하단 메뉴바 버튼 위치 2px 추가 하향 | [상세](devlog/2026-06-15/006-dashboard-bottom-nav-lower-6.md) |
+| 2026-06-15 | 005 | 하단 메뉴바 바닥 밀착 강제 조정 | [상세](devlog/2026-06-15/005-dashboard-bottom-nav-floor.md) |
+| 2026-06-15 | 004 | 하단 메뉴바 기본 패딩 및 safe-area 체감 위치 재조정 | [상세](devlog/2026-06-15/004-dashboard-bottom-nav-visible-lower.md) |
+| 2026-06-15 | 003 | 모바일 하단 메뉴바 안전영역 추가 여백 축소 | [상세](devlog/2026-06-15/003-dashboard-mobile-bottom-nav-tight.md) |
+| 2026-06-15 | 002 | 모바일 하단 메뉴바 업로드 중 고정 처리 | [상세](devlog/2026-06-15/002-dashboard-mobile-fixed-bottom-nav.md) |
+| 2026-06-15 | 001 | 기록 업로드 XHR 인증 헤더 및 세션 재확인 보강 | [상세](devlog/2026-06-15/001-upload-xhr-auth-header.md) |
+| 2026-06-14 | 002 | 로그인 화면 모바일 앱 쉘 스타일 적용 | [상세](devlog/2026-06-14/002-access-login-app-shell.md) |
 | 2026-06-14 | 001 | 로그인 입력 포커스 확대 방지 및 모바일 PWA 캐시 갱신 보강 | [상세](devlog/2026-06-14/001-access-input-zoom-cache-refresh.md) |
 | 2026-06-12 | 022 | 법적 페이지 앱 쉘/하단 메뉴/테마 대응 및 설정 묶음 순서 보정 | [상세](devlog/2026-06-12/022-legal-pages-app-shell-settings-order.md) |
 | 2026-06-12 | 021 | 설정 화면 약관/개인정보/계정삭제 진입 및 공개 페이지 앱형 톤 보정 | [상세](devlog/2026-06-12/021-settings-legal-entry-app-tone.md) |
