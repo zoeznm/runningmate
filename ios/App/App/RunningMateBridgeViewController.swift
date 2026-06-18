@@ -1,7 +1,10 @@
 import Foundation
 import Capacitor
+import UIKit
 
 class RunningMateBridgeViewController: CAPBridgeViewController {
+    private let appBackgroundColor = UIColor(red: 18.0 / 255.0, green: 18.0 / 255.0, blue: 28.0 / 255.0, alpha: 1.0)
+
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
 
@@ -15,6 +18,20 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
         }
 
         return descriptor
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+
+        view.backgroundColor = appBackgroundColor
+        webView?.isOpaque = false
+        webView?.backgroundColor = appBackgroundColor
+        webView?.scrollView.backgroundColor = appBackgroundColor
+        setNeedsStatusBarAppearanceUpdate()
+    }
+
+    override var preferredStatusBarStyle: UIStatusBarStyle {
+        .lightContent
     }
 
     override func capacitorDidLoad() {
