@@ -151,7 +151,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
                     "date": self.dateKey(workout.startDate),
                     "startDate": self.isoString(workout.startDate),
                     "endDate": self.isoString(workout.endDate),
-                    "distance_km": self.round(distanceKm, places: 2),
+                    "distance_km": self.rounded(distanceKm, places: 2),
                     "duration": self.durationText(durationSeconds),
                     "durationSeconds": Int(round(durationSeconds)),
                     "avg_pace": distanceKm > 0 ? self.paceText(durationSeconds / distanceKm) : "-",
@@ -257,7 +257,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
         return String(format: "%d'%02d\"", total / 60, total % 60)
     }
 
-    private func round(_ value: Double, places: Int) -> Double {
+    private func rounded(_ value: Double, places: Int) -> Double {
         let power = pow(10.0, Double(places))
         return (value * power).rounded() / power
     }
