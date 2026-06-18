@@ -3,7 +3,8 @@
     "migrate:assign-admin": "python scripts/migrate_assign_admin.py",
     "migrate:assign-admin:rollback": "python scripts/migrate_assign_admin.py --rollback",
     "ios:add": "cap add ios",
-    "ios:sync": "cap sync ios",
+    "ios:sync": "cap sync ios && node scripts/verify_ios_capacitor_config.mjs",
+    "ios:verify-config": "node scripts/verify_ios_capacitor_config.mjs",
     "ios:open": "cap open ios"
   },
   "dependencies": {
