@@ -1,0 +1,8 @@
+{
+    "id": "api.dashboard.bootstrap",
+    "title": "/api/dashboard/bootstrap",
+    "route": "/api/dashboard/bootstrap",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

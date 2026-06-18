@@ -1,3 +1,5 @@
+import { isRunningMateApiUrl, resolveApiUrl } from 'src/app/shared/api-base';
+
 export interface AuthTokenPayload {
     access_token?: string;
     refresh_token?: string;
@@ -65,8 +67,8 @@ function authStorage(): Storage | null {
 
 function shouldAttachAuth(url: string): boolean {
     try {
-        const parsed = new URL(url, window.location.origin);
-        if (parsed.origin !== window.location.origin) return false;
+        const parsed = new URL(resolveApiUrl(url), window.location.origin);
+        if (!isRunningMateApiUrl(url)) return false;
         if (!parsed.pathname.startsWith('/api/')) return false;
         return ![
             '/api/auth/login',
@@ -92,6 +94,11 @@ function requestUrl(input: RequestInfo | URL): string {
     return String(input);
 }
 
+function requestInput(input: RequestInfo | URL): RequestInfo | URL {
+    if (input instanceof Request) return input;
+    return resolveApiUrl(String(input));
+}
+
 async function fetchWithTimeout(
     fetcher: typeof window.fetch,
     input: RequestInfo | URL,
@@ -102,7 +109,7 @@ async function fetchWithTimeout(
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-        return await fetcher(input, {
+        return await fetcher(requestInput(input), {
             credentials: 'same-origin',
             ...init,
             signal: init.signal || controller.signal
@@ -167,6 +174,22 @@ export function clearAuthTokens(): void {
     memoryAutoLogin = false;
 }
 
+function isAccessPath(): boolean {
+    if (typeof window === 'undefined') return true;
+    const path = window.location.pathname.replace(/\/+$/, '') || '/';
+    return path === '/access';
+}
+
+export function redirectToAccess(): void {
+    if (typeof window === 'undefined' || isAccessPath()) return;
+    window.location.replace('/access');
+}
+
+export function handleAuthFailure(redirect: boolean = true): void {
+    clearAuthTokens();
+    if (redirect) redirectToAccess();
+}
+
 export function authHeaderForUrl(url: string): Record<string, string> {
     if (!shouldAttachAuth(url)) return {};
     const token = getAccessToken();
@@ -215,29 +238,34 @@ export async function refreshAuthTokens(): Promise<boolean> {
 
 async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}, retry: boolean = true): Promise<Response> {
     const fetcher = nativeFetch || window.fetch.bind(window);
-    const url = requestUrl(input);
+    const resolvedInput = requestInput(input);
+    const url = requestUrl(resolvedInput);
     const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
     const token = shouldAttachAuth(url) ? getAccessToken() : '';
     if (token && !headers.has('Authorization')) {
         headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const response = await fetcher(input, {
+    const response = await fetcher(resolvedInput, {
         ...init,
         credentials: init.credentials || 'same-origin',
         headers
     });
 
     if (response.status !== 401 || !retry || !shouldAttachAuth(url)) {
+        if (response.status === 401 && shouldAttachAuth(url)) {
+            handleAuthFailure();
+        }
         return response;
     }
 
     const refreshed = await refreshAuthTokens();
     if (!refreshed) {
+        handleAuthFailure();
         return response;
     }
 
-    return fetchWithAuth(input, init, false);
+    return fetchWithAuth(resolvedInput, init, false);
 }
 
 export function installAuthFetchInterceptor(): void {
@@ -256,7 +284,10 @@ export async function authenticatedUser(): Promise<unknown | null> {
         .catch(() => null);
     if (!response) return null;
     const payload = await response.json().catch(() => null);
-    if (!response.ok) return null;
+    if (!response.ok) {
+        if (response.status === 401) handleAuthFailure();
+        return null;
+    }
     if (payload?.success) return payload.data || null;
     if (payload?.data?.success) return payload.data.data || null;
     if (payload?.code === 200 && payload?.data && !('success' in payload.data)) return payload.data;

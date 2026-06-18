@@ -1,4 +1,5 @@
-import { authHeaderForUrl, getRefreshToken, isAuthProtectedUrl, refreshAuthTokens } from 'src/app/shared/auth';
+import { authHeaderForUrl, getRefreshToken, handleAuthFailure, isAuthProtectedUrl, refreshAuthTokens } from 'src/app/shared/auth';
+import { resolveApiUrl } from 'src/app/shared/api-base';
 
 export type ApiErrorKind = 'network' | 'parse' | 'server' | 'timeout' | 'client' | 'unknown';
 
@@ -93,6 +94,33 @@ function textResponseMessage(text: string): string {
         .slice(0, 240);
 }
 
+function looksLikeHtmlResponse(response: Response, text: string): boolean {
+    const contentType = response.headers.get('content-type') || '';
+    const sample = String(text || '').trim().slice(0, 120).toLowerCase();
+    return contentType.includes('text/html')
+        || sample.startsWith('<!doctype html')
+        || sample.startsWith('<html')
+        || sample.includes('<body');
+}
+
+function nonJsonPayload(response: Response, text: string, error: unknown): ApiResult {
+    const isHtml = looksLikeHtmlResponse(response, text);
+    const fallback = textResponseMessage(text);
+    return {
+        success: false,
+        message: isHtml
+            ? '서버가 API 응답 대신 화면 HTML을 반환했습니다. 배포 라우팅을 확인해주세요.'
+            : '서버 응답 형식이 올바르지 않습니다. 다시 시도해주세요.',
+        data: {
+            response_status: response.status,
+            content_type: response.headers.get('content-type') || '',
+            body_preview: fallback,
+            parse_error: error instanceof Error ? error.message : String(error || '')
+        },
+        raw: text
+    };
+}
+
 function failureResult<T>(payload: unknown, status?: number): ApiResult<T> {
     const kind = failureKind(status);
     return {
@@ -121,23 +149,24 @@ async function readPayload(response: Response): Promise<unknown> {
                 raw: text
             };
         }
-        throw standardApiError('parse', { details: error });
+        return nonJsonPayload(response, text, error);
     }
 }
 
 async function fetchOnce<T>(url: string, options: ApiFetchOptions, authRetried: boolean = false): Promise<ApiResult<T>> {
+    const requestUrl = resolveApiUrl(url);
     const timeoutMs = options.timeoutMs ?? 20000;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
     const { retries, retryDelayMs, timeoutMs: _timeoutMs, signal, ...requestOptions } = options;
-    const isProtected = isAuthProtectedUrl(url);
+    const isProtected = isAuthProtectedUrl(requestUrl);
 
     try {
-        const response = await fetch(url, {
+        const response = await fetch(requestUrl, {
             cache: 'no-store',
             ...requestOptions,
             headers: {
-                ...authHeaderForUrl(url),
+                ...authHeaderForUrl(requestUrl),
                 ...(requestOptions.headers || {})
             },
             signal: signal || controller.signal
@@ -145,6 +174,9 @@ async function fetchOnce<T>(url: string, options: ApiFetchOptions, authRetried: 
         if (response.status === 401 && isProtected && !authRetried && getRefreshToken() && await refreshAuthTokens()) {
             window.clearTimeout(timeout);
             return fetchOnce<T>(url, options, true);
+        }
+        if (response.status === 401 && isProtected) {
+            handleAuthFailure();
         }
         const payload = await readPayload(response).catch((error) => {
             if (isApiError(error)) throw error;

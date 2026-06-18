@@ -9,7 +9,7 @@ wiz.response.json({
     "short_name": "러닝메이트",
     "description": "러닝 기록을 모바일 홈 화면에서 앱처럼 확인합니다.",
     "lang": "ko-KR",
-    "start_url": "/dashboard",
+    "start_url": "/access",
     "scope": "/",
     "display": "standalone",
     "display_override": ["standalone", "minimal-ui"],

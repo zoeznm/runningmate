@@ -1,4 +1,4 @@
-const INDEX_PAGE = "dashboard";
+const INDEX_PAGE = "access";
 
 import { URLPattern } from "urlpattern-polyfill";
 import { NgModule } from '@angular/core';

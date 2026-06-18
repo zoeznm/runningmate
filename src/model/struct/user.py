@@ -101,7 +101,11 @@ class User:
         if not user_id:
             return True
 
-        expected = self.password_session_version(user_id)
+        user = self.db.get(id=user_id)
+        if user is None:
+            return False
+
+        expected = self._format_datetime(user.get("password_changed_at"))
         if not expected:
             return True
         return str(session_data.get("password_changed_at") or "") == expected
@@ -457,7 +461,7 @@ class User:
             **relation,
         }
 
-    def authenticate(self, email, password):
+    def authenticate_with_reason(self, email, password):
         """아이디 또는 이메일/비밀번호 인증
 
         Args:
@@ -465,16 +469,28 @@ class User:
             password: 평문 비밀번호
 
         Returns:
-            dict (사용자 정보) 또는 None (인증 실패)
+            (dict (사용자 정보), reason) 또는 (None, 실패 사유)
         """
         user = self.get_by_identifier(email, include_password=True)
         if user is None:
-            return None
-        if not self._check_password(password, self._password_hash(user)):
-            return None
+            return None, "user_not_found"
+
+        password_hash = self._password_hash(user)
+        if not self._check_password(password, password_hash):
+            normalized_password = password.strip() if isinstance(password, str) else password
+            if normalized_password == password or not self._check_password(normalized_password, password_hash):
+                return None, "password_mismatch"
+            reason = "trimmed_password"
+        else:
+            reason = ""
+
         # 비밀번호 필드 제거 후 반환
         user.pop('password', None)
         user.pop('password_hash', None)
+        return user, reason
+
+    def authenticate(self, email, password):
+        user, _reason = self.authenticate_with_reason(email, password)
         return user
 
     def get(self, id=None):

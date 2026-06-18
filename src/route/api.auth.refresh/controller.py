@@ -46,6 +46,7 @@ try:
     refresh_token = payload.get("refresh_token") or payload.get("refreshToken") or ""
     tokens, error = auth.refresh(refresh_token)
     if error:
+        session.clear()
         _response(401, {"success": False, "message": "다시 로그인해주세요.", "code": error})
 
     session.set(**auth.session_payload(tokens.get("user")))

@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { Service } from '@wiz/libs/portal/season/service';
 import { TranslateService } from '@ngx-translate/core';
 import { apiFetch, jsonRequest } from 'src/app/shared/api';
-import { ensureAuthenticated, installAuthFetchInterceptor } from 'src/app/shared/auth';
+import { ensureAuthenticated, installAuthFetchInterceptor, handleAuthFailure } from 'src/app/shared/auth';
 import { ToastService } from 'src/app/shared/toast.service';
 
 @Component({
@@ -46,7 +46,7 @@ export class AppComponent implements OnInit {
         await this.service.init(this);
         const isPublicPage = this.isPublicPage();
         if (!isPublicPage && !(await ensureAuthenticated())) {
-            location.href = '/access';
+            handleAuthFailure();
             return;
         }
         if (!isPublicPage) {

@@ -38,7 +38,11 @@ class Security:
 
     def allowed_origins(self):
         raw = os.environ.get("RUNNINGMATE_ALLOWED_ORIGINS") or self.public_base_url()
-        return [item.strip().rstrip("/") for item in raw.split(",") if item.strip() and item.strip() != "*"]
+        origins = [item.strip().rstrip("/") for item in raw.split(",") if item.strip() and item.strip() != "*"]
+        for native_origin in ("capacitor://localhost", "ionic://localhost"):
+            if native_origin not in origins:
+                origins.append(native_origin)
+        return origins
 
     def allowed_hosts(self):
         hosts = set()
