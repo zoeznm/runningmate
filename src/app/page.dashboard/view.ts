@@ -1,7 +1,7 @@
 import { AfterViewInit, ChangeDetectorRef, ElementRef, OnDestroy } from '@angular/core';
 import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, refreshAuthTokens } from 'src/app/shared/auth';
 import { apiFetch, apiErrorMessage, jsonRequest, standardApiError } from 'src/app/shared/api';
-import { resolveApiUrl } from 'src/app/shared/api-base';
+import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
 import { ToastService } from 'src/app/shared/toast.service';
 import { PredictionEngine, type HistoryInput } from 'cyclia';
 
@@ -8476,7 +8476,7 @@ export class Component implements AfterViewInit, OnDestroy {
             elevation_gain: this.toNumber(source.elevation_gain),
             water_before_ml: this.normalizeWaterMl(source.water_before_ml ?? source.waterBeforeMl),
             water_after_ml: this.normalizeWaterMl(source.water_after_ml ?? source.waterAfterMl),
-            image_url: typeof source.image_url === 'string' ? source.image_url : null,
+            image_url: this.resolveMediaUrl(source.image_url) || null,
             journal: typeof source['journal'] === 'string' && source['journal'].trim() ? source['journal'].trim() : null,
             playlist_name: typeof source['playlist_name'] === 'string' && source['playlist_name'].trim()
                 ? source['playlist_name'].trim()
@@ -9318,7 +9318,7 @@ export class Component implements AfterViewInit, OnDestroy {
         const source = row && typeof row === 'object' ? row as Record<string, unknown> : {};
         const id = typeof source['id'] === 'string' ? source['id'] : '';
         const runId = typeof source['run_id'] === 'string' ? source['run_id'] : '';
-        const mediaUrl = typeof source['media_url'] === 'string' ? source['media_url'] : '';
+        const mediaUrl = this.resolveMediaUrl(source['media_url']);
         const mediaType = source['media_type'] === 'video' ? 'video' : source['media_type'] === 'photo' ? 'photo' : null;
         if (!id || !runId || !mediaUrl || !mediaType) return null;
 
@@ -9329,6 +9329,35 @@ export class Component implements AfterViewInit, OnDestroy {
             media_type: mediaType,
             created_at: typeof source['created_at'] === 'string' ? source['created_at'] : ''
         };
+    }
+
+    private resolveMediaUrl(value: unknown): string {
+        const raw = typeof value === 'string' ? value.trim() : '';
+        if (!raw) return '';
+        if (/^(data|blob):/i.test(raw)) return raw;
+        if (raw.startsWith('//')) return `https:${raw}`;
+
+        const nativeLocal = isNativeLocalOrigin();
+        try {
+            const base = typeof window !== 'undefined' && window.location?.href
+                ? window.location.href
+                : `${RUNNINGMATE_API_ORIGIN}/`;
+            const parsed = new URL(raw, base);
+            const localHost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '0.0.0.0';
+            const localNative = parsed.protocol === 'capacitor:' || parsed.protocol === 'ionic:' || parsed.protocol === 'file:';
+            if (localHost || (nativeLocal && localNative)) {
+                return `${RUNNINGMATE_API_ORIGIN}${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+            if (nativeLocal && raw.startsWith('/')) {
+                return `${RUNNINGMATE_API_ORIGIN}${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+            return raw;
+        } catch {
+            if (nativeLocal) {
+                return `${RUNNINGMATE_API_ORIGIN}/${raw.replace(/^\/+/, '')}`;
+            }
+            return raw;
+        }
     }
 
     private normalizeMusicTrack(row: unknown): MusicTrack | null {
