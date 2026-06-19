@@ -5,7 +5,7 @@ fs = wiz.project.fs(os.path.join("config", "pwa"))
 swjs = fs.read("sw.js", "")
 swjs = re.sub(
     r'const CACHE_VERSION = "[^"]+";',
-    'const CACHE_VERSION = "runningmate-pwa-v59-fast-initial-load";',
+    'const CACHE_VERSION = "runningmate-pwa-v60-cycle-api-native";',
     swjs,
     count=1,
 )

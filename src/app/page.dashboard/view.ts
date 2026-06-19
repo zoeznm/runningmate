@@ -5472,7 +5472,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch('/api/cycles', {
+            const response = await fetch(resolveApiUrl('/api/cycles'), {
                 method: 'POST',
                 headers: this.cycleRequestHeaders(),
                 body: JSON.stringify({
@@ -5518,7 +5518,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch('/api/cycles', {
+            const response = await fetch(resolveApiUrl('/api/cycles'), {
                 method: 'DELETE',
                 headers: this.cycleRequestHeaders(),
                 body: JSON.stringify({ consent: true, id: log.id })
@@ -5548,7 +5548,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch('/api/cycles', {
+            const response = await fetch(resolveApiUrl('/api/cycles'), {
                 method: 'DELETE',
                 headers: this.cycleRequestHeaders(),
                 body: JSON.stringify({ consent: true, all: true })
@@ -6987,7 +6987,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         try {
-            const response = await fetch('/api/cycles?enabled=1', {
+            const response = await fetch(resolveApiUrl('/api/cycles?enabled=1'), {
                 headers: this.cycleRequestHeaders()
             });
             const payload = await response.json();
