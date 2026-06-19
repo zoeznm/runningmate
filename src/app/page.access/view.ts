@@ -70,7 +70,12 @@ export class Component implements OnInit, OnDestroy {
     public socialLoginEnabled: boolean = false;
     private readonly accessViewportProperty: string = '--access-visual-height';
     private readonly accessViewportClass: string = 'is-access-page';
-    private readonly updateAccessViewportHeight = () => this.syncAccessViewportHeight();
+    private readonly updateAccessViewportHeight = () => {
+        this.syncAccessViewportHeight();
+        if (!this.isAccessFormControlFocused()) this.scheduleAccessScrollReset();
+    };
+    private readonly accessFocusOutHandler = () => this.scheduleAccessScrollReset(60);
+    private accessScrollResetTimer: number = 0;
     private themeMeta: HTMLMetaElement | null = null;
     private previousThemeColor: string = '';
     private appRootElement: HTMLElement | null = null;
@@ -127,7 +132,10 @@ export class Component implements OnInit, OnDestroy {
         window.addEventListener('orientationchange', this.updateAccessViewportHeight, { passive: true });
         window.visualViewport?.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
         window.visualViewport?.addEventListener('scroll', this.updateAccessViewportHeight, { passive: true });
+        document.addEventListener('focusout', this.accessFocusOutHandler, true);
+        document.addEventListener('visibilitychange', this.accessFocusOutHandler, true);
         window.setTimeout(this.updateAccessViewportHeight, 250);
+        window.setTimeout(this.accessFocusOutHandler, 450);
     }
 
     private uninstallAccessViewportSync() {
@@ -135,6 +143,9 @@ export class Component implements OnInit, OnDestroy {
         window.removeEventListener('orientationchange', this.updateAccessViewportHeight);
         window.visualViewport?.removeEventListener('resize', this.updateAccessViewportHeight);
         window.visualViewport?.removeEventListener('scroll', this.updateAccessViewportHeight);
+        document.removeEventListener('focusout', this.accessFocusOutHandler, true);
+        document.removeEventListener('visibilitychange', this.accessFocusOutHandler, true);
+        window.clearTimeout(this.accessScrollResetTimer);
         document.documentElement.classList.remove(this.accessViewportClass);
         document.body?.classList.remove(this.accessViewportClass);
         document.documentElement.style.removeProperty(this.accessViewportProperty);
@@ -148,8 +159,9 @@ export class Component implements OnInit, OnDestroy {
     }
 
     private syncAccessViewportHeight() {
+        const visualViewportHeight = (window.visualViewport?.height || 0) + (window.visualViewport?.offsetTop || 0);
         const height = Math.ceil(Math.max(
-            window.visualViewport?.height || 0,
+            visualViewportHeight,
             window.innerHeight || 0,
             document.documentElement.clientHeight || 0
         ));
@@ -158,6 +170,39 @@ export class Component implements OnInit, OnDestroy {
         const value = `${height}px`;
         document.documentElement.style.setProperty(this.accessViewportProperty, value);
         document.body?.style.setProperty(this.accessViewportProperty, value);
+    }
+
+    private scheduleAccessScrollReset(delay: number = 0) {
+        if (this.view === 'signup' || this.activePolicy) return;
+        window.clearTimeout(this.accessScrollResetTimer);
+        this.accessScrollResetTimer = window.setTimeout(() => this.resetAccessScrollPosition(), delay);
+    }
+
+    private isAccessFormControlFocused() {
+        const element = document.activeElement as HTMLElement | null;
+        if (!element || !element.closest('.access-shell')) return false;
+        return ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
+    }
+
+    private resetAccessScrollPosition() {
+        if (this.view === 'signup' || this.activePolicy) return;
+        const elements = [
+            document.documentElement,
+            document.body,
+            this.appRootElement,
+            document.querySelector('.access-page') as HTMLElement | null,
+            document.querySelector('.access-shell') as HTMLElement | null
+        ];
+
+        try {
+            window.scrollTo(0, 0);
+        } catch { }
+
+        elements.forEach((element) => {
+            if (!element) return;
+            element.scrollTop = 0;
+            element.scrollLeft = 0;
+        });
     }
 
     public async loadPolicies() {
@@ -203,6 +248,7 @@ export class Component implements OnInit, OnDestroy {
         } catch {
             this.refreshAgreementControls();
         }
+        this.scheduleAccessScrollReset();
     }
 
     private async resumeAuthenticatedSession() {
@@ -473,6 +519,7 @@ export class Component implements OnInit, OnDestroy {
 
         this.isLoginLoading = true;
         await this.service.render();
+        this.scheduleAccessScrollReset();
 
         const result = await jsonRequest<any>('/api/auth/login', 'POST', {
             username: user.username,
@@ -502,12 +549,14 @@ export class Component implements OnInit, OnDestroy {
         this.resetData.newPassword = '';
         this.resetData.confirmPassword = '';
         await this.service.render();
+        this.scheduleAccessScrollReset();
     }
 
     public async showSignup() {
         this.view = 'signupOptions';
         this.signupStep = 1;
         await this.service.render();
+        this.scheduleAccessScrollReset();
     }
 
     public async showEmailSignup() {
@@ -528,6 +577,7 @@ export class Component implements OnInit, OnDestroy {
         this.view = 'forgot';
         this.forgotData.email = this.normalizeEmail(this.forgotData.email);
         await this.service.render();
+        this.scheduleAccessScrollReset();
     }
 
     public async forgotPassword() {
@@ -558,6 +608,7 @@ export class Component implements OnInit, OnDestroy {
         this.forgotData.email = email;
         this.view = 'forgotSent';
         await this.service.render();
+        this.scheduleAccessScrollReset();
     }
 
     public async resetPassword() {
