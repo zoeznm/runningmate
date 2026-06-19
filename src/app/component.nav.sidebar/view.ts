@@ -4,6 +4,8 @@ import { Service } from '@wiz/libs/portal/season/service';
 import { clearAuthTokens } from 'src/app/shared/auth';
 
 export class Component implements OnInit {
+    public isLogoutConfirmVisible: boolean = false;
+
     constructor(public service: Service) { }
 
     public async ngOnInit() {
@@ -28,7 +30,20 @@ export class Component implements OnInit {
 
     public async logout(event?: Event) {
         event?.preventDefault();
-        if (!window.confirm('로그아웃 하시겠습니까?')) return;
+        event?.stopPropagation();
+        this.isLogoutConfirmVisible = true;
+    }
+
+    public cancelLogout(event?: Event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+        this.isLogoutConfirmVisible = false;
+    }
+
+    public async confirmLogout(event?: Event) {
+        event?.preventDefault();
+        event?.stopPropagation();
+        this.isLogoutConfirmVisible = false;
 
         try {
             await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });

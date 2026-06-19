@@ -632,6 +632,26 @@ interface CycleSummary {
     menstrual_log_count: number;
 }
 
+type AppConfirmTone = 'default' | 'danger';
+
+interface AppConfirmOptions {
+    title?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    tone?: AppConfirmTone;
+    iconClass?: string;
+}
+
+interface AppConfirmDialog {
+    visible: boolean;
+    title: string;
+    message: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    tone: AppConfirmTone;
+    iconClass: string;
+}
+
 interface CycleDayInfo {
     phase: CyclePhase;
     label: string;
@@ -1432,8 +1452,18 @@ export class Component implements AfterViewInit, OnDestroy {
         invalidateOtherSessions: true
     };
     public changingPassword: boolean = false;
+    public confirmDialog: AppConfirmDialog = {
+        visible: false,
+        title: '확인',
+        message: '',
+        confirmLabel: '확인',
+        cancelLabel: '취소',
+        tone: 'default',
+        iconClass: 'fa-circle-question'
+    };
 
     private runs: RunRecord[] = [];
+    private confirmDialogResolver: ((confirmed: boolean) => void) | null = null;
     private pendingMediaRunId: string | null = null;
     private calendarNotes = new Map<string, CalendarNote>();
     private cycleDayMap = new Map<string, CycleDayInfo>();
@@ -3393,6 +3423,39 @@ export class Component implements AfterViewInit, OnDestroy {
         this.openLegalPage('/account/delete');
     }
 
+    public openConfirmDialog(message: string, options: AppConfirmOptions = {}): Promise<boolean> {
+        if (this.confirmDialogResolver) {
+            this.resolveConfirmDialog(false);
+        }
+
+        const tone = options.tone || 'default';
+        this.confirmDialog = {
+            visible: true,
+            title: options.title || '확인',
+            message,
+            confirmLabel: options.confirmLabel || '확인',
+            cancelLabel: options.cancelLabel || '취소',
+            tone,
+            iconClass: options.iconClass || (tone === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-question')
+        };
+        this.cdr.detectChanges();
+
+        return new Promise((resolve) => {
+            this.confirmDialogResolver = resolve;
+        });
+    }
+
+    public resolveConfirmDialog(confirmed: boolean): void {
+        const resolver = this.confirmDialogResolver;
+        this.confirmDialogResolver = null;
+        this.confirmDialog = {
+            ...this.confirmDialog,
+            visible: false
+        };
+        this.cdr.detectChanges();
+        if (resolver) resolver(confirmed);
+    }
+
     public openAccountDelete(): void {
         if (this.deletingAccount) return;
         this.deleteStep = 1;
@@ -3421,7 +3484,15 @@ export class Component implements AfterViewInit, OnDestroy {
             return;
         }
 
-        const confirmed = window.confirm('계정과 모든 러닝 데이터를 삭제합니다. 이 작업은 되돌릴 수 없습니다. 최종 삭제할까요?');
+        const confirmed = await this.openConfirmDialog(
+            '계정과 모든 러닝 데이터를 삭제합니다. 이 작업은 되돌릴 수 없습니다. 최종 삭제할까요?',
+            {
+                title: '계정 삭제',
+                confirmLabel: '최종 삭제',
+                tone: 'danger',
+                iconClass: 'fa-user-slash'
+            }
+        );
         if (!confirmed) return;
 
         this.deletingAccount = true;
@@ -3458,7 +3529,12 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async logout(): Promise<void> {
-        if (!window.confirm('로그아웃 하시겠습니까?')) return;
+        if (!(await this.openConfirmDialog('로그아웃 하시겠습니까?', {
+            title: '로그아웃',
+            confirmLabel: '로그아웃',
+            tone: 'danger',
+            iconClass: 'fa-right-from-bracket'
+        }))) return;
 
         try {
             await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
@@ -3668,7 +3744,12 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async deleteGoal(goalType: GoalType): Promise<void> {
         if (this.deletingGoalType || !this.goalByType(goalType)) return;
-        if (!window.confirm(`${this.goalTypeLabel(goalType)} 목표를 삭제할까요?`)) return;
+        if (!(await this.openConfirmDialog(`${this.goalTypeLabel(goalType)} 목표를 삭제할까요?`, {
+            title: '목표 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-trash-can'
+        }))) return;
 
         this.deletingGoalType = goalType;
         this.goalStatus = '목표 삭제 중';
@@ -3812,7 +3893,12 @@ export class Component implements AfterViewInit, OnDestroy {
     public async deleteChallenge(challenge: Challenge, event?: Event): Promise<void> {
         event?.stopPropagation();
         if (this.deletingChallengeId || !challenge.viewer_owned) return;
-        if (!window.confirm('이 챌린지를 삭제할까요?')) return;
+        if (!(await this.openConfirmDialog('이 챌린지를 삭제할까요?', {
+            title: '챌린지 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-flag'
+        }))) return;
 
         this.deletingChallengeId = challenge.id;
         this.challengeStatus = '챌린지 삭제 중';
@@ -4277,7 +4363,12 @@ export class Component implements AfterViewInit, OnDestroy {
         event?.preventDefault();
         event?.stopPropagation();
         if (!run?.id || !comment?.id || !comment.is_mine || this.deletingFeedCommentId) return;
-        if (!window.confirm('댓글을 삭제할까요?')) return;
+        if (!(await this.openConfirmDialog('댓글을 삭제할까요?', {
+            title: '댓글 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-comment-slash'
+        }))) return;
 
         this.deletingFeedCommentId = comment.id;
         this.cdr.detectChanges();
@@ -4463,7 +4554,12 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!session?.id || this.deletingChatSessionId) return;
 
         const title = session.title || '이 대화';
-        if (!window.confirm(`"${title}" 대화를 삭제할까요?`)) return;
+        if (!(await this.openConfirmDialog(`"${title}" 대화를 삭제할까요?`, {
+            title: '대화 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-message'
+        }))) return;
 
         this.deletingChatSessionId = session.id;
         this.cdr.detectChanges();
@@ -4711,7 +4807,12 @@ export class Component implements AfterViewInit, OnDestroy {
         event?.preventDefault();
         event?.stopPropagation();
         if (!log?.date || this.deletingWeightDate) return;
-        if (!window.confirm(`${this.displayDate(log.date, true)} 체중 기록을 삭제할까요?`)) return;
+        if (!(await this.openConfirmDialog(`${this.displayDate(log.date, true)} 체중 기록을 삭제할까요?`, {
+            title: '체중 기록 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-weight-scale'
+        }))) return;
 
         this.deletingWeightDate = log.date;
         this.cdr.detectChanges();
@@ -5117,7 +5218,12 @@ export class Component implements AfterViewInit, OnDestroy {
         event?.preventDefault();
         event?.stopPropagation();
         if (!run?.id || this.savingJournalRunId) return;
-        if (!window.confirm('오늘의 일기를 삭제할까요?')) return;
+        if (!(await this.openConfirmDialog('오늘의 일기를 삭제할까요?', {
+            title: '일기 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-book'
+        }))) return;
 
         const previousDraft = this.journalDraftText;
         const previousEditingRunId = this.editingJournalRunId;
@@ -5512,7 +5618,12 @@ export class Component implements AfterViewInit, OnDestroy {
         event?.preventDefault();
         event?.stopPropagation();
         if (!this.isCycleFeatureEnabled || !log?.id || this.deletingCycleId) return;
-        if (!window.confirm(`${this.displayDate(log.start_date, true)} 주기 기록을 삭제할까요?`)) return;
+        if (!(await this.openConfirmDialog(`${this.displayDate(log.start_date, true)} 생리 기록을 삭제할까요?`, {
+            title: '생리 기록 삭제',
+            confirmLabel: '삭제',
+            tone: 'danger',
+            iconClass: 'fa-heart'
+        }))) return;
 
         this.deletingCycleId = log.id;
         this.cdr.detectChanges();
@@ -5541,7 +5652,12 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async deleteAllCycleData(): Promise<void> {
         if (!this.isCycleFeatureEnabled) return;
-        if (!window.confirm('저장된 주기 데이터를 모두 삭제할까요?')) return;
+        if (!(await this.openConfirmDialog('저장된 생리 기록을 모두 삭제할까요?', {
+            title: '생리 기록 전체 삭제',
+            confirmLabel: '전체 삭제',
+            tone: 'danger',
+            iconClass: 'fa-heart-crack'
+        }))) return;
 
         this.deletingCycleId = '__all__';
         this.cycleStatus = '전체 삭제 중';

@@ -21,6 +21,17 @@ div(class="mx-2 mb-4 rounded-lg bg-gray-50 border border-gray-200/80")
                 path(stroke-linecap="round", stroke-linejoin="round", d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9")
             span Logout
 
+div(*ngIf="isLogoutConfirmVisible", class="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 backdrop-blur-sm", role="presentation", (click)="cancelLogout($event)")
+    section(class="w-full max-w-[320px] rounded-[20px] border border-white/10 bg-[#12121c] px-5 py-5 text-center shadow-2xl", role="dialog", aria-modal="true", aria-label="로그아웃 확인", (click)="$event.stopPropagation()")
+        div(class="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/15 text-red-300")
+            svg(xmlns="http://www.w3.org/2000/svg", fill="none", viewBox="0 0 24 24", stroke-width="2", stroke="currentColor", class="size-5")
+                path(stroke-linecap="round", stroke-linejoin="round", d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9")
+        h3(class="mt-3 text-[18px] font-black leading-tight text-white") 로그아웃
+        p(class="mt-2 text-[13px] font-semibold leading-relaxed text-slate-400") 로그아웃 하시겠습니까?
+        div(class="mt-5 grid grid-cols-2 gap-2")
+            button(type="button", class="h-11 rounded-2xl border border-white/10 text-[13px] font-black text-slate-100", (click)="cancelLogout($event)") 취소
+            button(type="button", class="h-11 rounded-2xl bg-red-500 text-[13px] font-black text-white", (click)="confirmLogout($event)") 로그아웃
+
 nav(class="flex flex-1 flex-col overflow-y-auto")
     ul(role="list", class="flex flex-1 flex-col gap-y-4 mx-2")
         li

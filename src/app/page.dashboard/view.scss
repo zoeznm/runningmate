@@ -10925,6 +10925,109 @@ button span {
     opacity: 0.55;
 }
 
+.app-confirm-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 10, 14, 0.58);
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    backdrop-filter: blur(14px);
+}
+
+.app-confirm-dialog {
+    display: grid;
+    justify-items: center;
+    width: min(100%, 318px);
+    border: 0.5px solid var(--line);
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--screen-bg) 94%, var(--surface));
+    box-shadow: 0 24px 62px rgba(0, 0, 0, 0.38);
+    padding: 22px 18px 18px;
+    text-align: center;
+}
+
+.app-confirm-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
+    font-size: 20px;
+}
+
+.app-confirm-dialog-danger .app-confirm-icon {
+    background: rgba(239, 68, 68, 0.14);
+    color: #ff7b7b;
+}
+
+.app-confirm-dialog h3 {
+    margin: 14px 0 0;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.22;
+    letter-spacing: 0;
+}
+
+.app-confirm-dialog p {
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.5;
+    word-break: keep-all;
+}
+
+.app-confirm-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin-top: 18px;
+}
+
+.app-confirm-cancel,
+.app-confirm-accept {
+    min-height: 44px;
+    border-radius: 14px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+.app-confirm-cancel {
+    border: 0.5px solid var(--line);
+    background: transparent;
+    color: var(--text);
+}
+
+.app-confirm-accept {
+    border: 0;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+}
+
+.app-confirm-dialog-danger .app-confirm-accept {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.light-screen .app-confirm-backdrop {
+    background: rgba(10, 18, 28, 0.34);
+}
+
+.light-screen .app-confirm-dialog {
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 24px 56px rgba(15, 23, 42, 0.18);
+}
+
 .dark-screen .cycle-primary-btn,
 .dark-screen .music-fetch-btn,
 .dark-screen .calendar-upload-btn,
