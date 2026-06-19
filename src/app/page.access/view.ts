@@ -75,6 +75,10 @@ export class Component implements OnInit, OnDestroy {
         if (!this.isAccessFormControlFocused()) this.scheduleAccessScrollReset();
     };
     private readonly accessFocusOutHandler = () => this.scheduleAccessScrollReset(60);
+    private readonly accessTouchMoveHandler = (event: TouchEvent) => {
+        if (this.view === 'signup' || this.activePolicy) return;
+        event.preventDefault();
+    };
     private accessScrollResetTimer: number = 0;
     private themeMeta: HTMLMetaElement | null = null;
     private previousThemeColor: string = '';
@@ -134,6 +138,7 @@ export class Component implements OnInit, OnDestroy {
         window.visualViewport?.addEventListener('scroll', this.updateAccessViewportHeight, { passive: true });
         document.addEventListener('focusout', this.accessFocusOutHandler, true);
         document.addEventListener('visibilitychange', this.accessFocusOutHandler, true);
+        document.addEventListener('touchmove', this.accessTouchMoveHandler, { passive: false });
         window.setTimeout(this.updateAccessViewportHeight, 250);
         window.setTimeout(this.accessFocusOutHandler, 450);
     }
@@ -145,6 +150,7 @@ export class Component implements OnInit, OnDestroy {
         window.visualViewport?.removeEventListener('scroll', this.updateAccessViewportHeight);
         document.removeEventListener('focusout', this.accessFocusOutHandler, true);
         document.removeEventListener('visibilitychange', this.accessFocusOutHandler, true);
+        document.removeEventListener('touchmove', this.accessTouchMoveHandler);
         window.clearTimeout(this.accessScrollResetTimer);
         document.documentElement.classList.remove(this.accessViewportClass);
         document.body?.classList.remove(this.accessViewportClass);

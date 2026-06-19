@@ -82,6 +82,9 @@ html.is-access-page body,
 body.is-access-page,
 html.is-access-page app-root,
 body.is-access-page app-root {
+    position: fixed;
+    inset: 0;
+    width: 100%;
     background: #05070c;
     height: var(--access-visual-height, 100dvh);
     min-height: var(--access-visual-height, 100dvh);

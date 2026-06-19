@@ -22,6 +22,8 @@
         linear-gradient(125deg, rgba(73, 214, 200, 0.10), rgba(73, 214, 200, 0) 46%),
         var(--access-bg);
     isolation: isolate;
+    overscroll-behavior: none;
+    touch-action: none;
 }
 
 @supports not (height: 100dvh) {
@@ -45,6 +47,7 @@
     overflow-x: hidden;
     overflow-y: hidden;
     overscroll-behavior-y: none;
+    touch-action: none;
     color: var(--access-text);
     background:
         linear-gradient(180deg, rgba(116, 245, 106, 0.10), rgba(116, 245, 106, 0) 35%),
@@ -73,6 +76,7 @@
     overflow-x: hidden;
     overflow-y: hidden;
     overscroll-behavior-y: none;
+    touch-action: none;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -106,6 +110,7 @@
     justify-content: flex-start;
     overflow-y: auto;
     overscroll-behavior-y: contain;
+    touch-action: pan-y;
     padding-top: max(28px, calc(env(safe-area-inset-top) + 18px));
     -webkit-overflow-scrolling: touch;
 }
@@ -681,6 +686,7 @@
     justify-content: center;
     padding: 16px;
     color: #ffffff;
+    touch-action: pan-y;
 }
 
 .policy-scrim {
@@ -756,6 +762,9 @@
 
 .policy-body {
     overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     padding: 18px;
 }
 

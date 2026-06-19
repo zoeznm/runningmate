@@ -1,0 +1,163 @@
+:host {
+    display: contents;
+}
+
+.wiz-app-modal {
+    position: relative;
+    z-index: 1000;
+    color: #f8fafc;
+    font-family: SUIT, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.wiz-app-modal-scrim,
+.wiz-app-modal-frame {
+    position: fixed;
+    inset: 0;
+}
+
+.wiz-app-modal-scrim {
+    z-index: 0;
+    background: rgba(5, 10, 14, 0.68);
+    backdrop-filter: blur(14px);
+}
+
+.wiz-app-modal-frame {
+    z-index: 1;
+    width: 100vw;
+    overflow-y: auto;
+    padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.wiz-app-modal-position {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wiz-app-modal-dialog {
+    position: relative;
+    width: min(100%, 330px);
+    overflow: hidden;
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    background:
+        linear-gradient(180deg, rgba(116, 245, 106, 0.08), rgba(116, 245, 106, 0) 42%),
+        #12121c;
+    box-shadow: 0 24px 62px rgba(0, 0, 0, 0.38);
+    padding: 22px 18px 18px;
+    text-align: center;
+}
+
+.wiz-app-modal-content {
+    display: grid;
+    justify-items: center;
+}
+
+.wiz-app-modal-icon {
+    width: 50px;
+    height: 50px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    border: 0;
+}
+
+.wiz-app-modal-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.wiz-app-modal-icon-success {
+    background: rgba(116, 245, 106, 0.14);
+    color: #a7ff8a;
+}
+
+.wiz-app-modal-icon-warning {
+    background: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+}
+
+.wiz-app-modal-icon-error {
+    background: rgba(239, 68, 68, 0.14);
+    color: #ff7b7b;
+}
+
+.wiz-app-modal-copy {
+    min-width: 0;
+}
+
+.wiz-app-modal-copy h3 {
+    margin: 14px 0 0;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.22;
+    letter-spacing: 0;
+}
+
+.wiz-app-modal-copy p {
+    margin: 8px 0 0;
+    color: #aebdcc;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.5;
+    white-space: pre-line;
+    word-break: keep-all;
+}
+
+.wiz-app-modal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    margin-top: 18px;
+}
+
+.wiz-app-modal-actions-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.wiz-app-modal-button {
+    min-height: 44px;
+    width: 100%;
+    border-radius: 14px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: 0;
+    cursor: pointer;
+}
+
+.wiz-app-modal-button:disabled {
+    cursor: default;
+    opacity: 0.55;
+}
+
+.wiz-app-modal-button-cancel {
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    background: transparent;
+    color: #f1f5f9;
+}
+
+.wiz-app-modal-button-primary {
+    border: 0;
+    color: #ffffff;
+}
+
+.wiz-app-modal-button-success {
+    background: #74f56a;
+    color: #07100a;
+}
+
+.wiz-app-modal-button-warning {
+    background: #d97706;
+}
+
+.wiz-app-modal-button-error {
+    background: #ef4444;
+}

@@ -13,22 +13,22 @@ export class Component implements OnInit {
 
     public statusIconWrapClass() {
         if (this.model.opts.status == 'warning')
-            return 'border-white/10 bg-white/5 text-yellow-600';
+            return 'wiz-app-modal-icon-warning';
         if (this.model.opts.status == 'success')
-            return 'border-white/10 bg-[#74f56a]/10 text-[#a7ff8a]';
-        return 'border-white/10 bg-white/5 text-red-300';
+            return 'wiz-app-modal-icon-success';
+        return 'wiz-app-modal-icon-error';
     }
 
     public btnColorClass() {
-        const base = 'inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-[13px] font-black shadow-sm transition-shadow hover:shadow-md disabled:opacity-60 sm:w-auto';
+        const base = 'wiz-app-modal-button wiz-app-modal-button-primary';
         if (this.model.opts.status == 'warning')
-            return `${base} bg-yellow-600 text-white`;
+            return `${base} wiz-app-modal-button-warning`;
         if (this.model.opts.status == 'success')
-            return `${base} bg-[#74f56a] text-[#07100a] shadow-[#74f56a]/20`;
-        return `${base} bg-red-600 text-white hover:bg-red-500`;
+            return `${base} wiz-app-modal-button-success`;
+        return `${base} wiz-app-modal-button-error`;
     }
 
     public cancelButtonClass() {
-        return 'inline-flex h-10 w-full items-center justify-center rounded-lg border border-white/10 bg-white/5 px-4 text-[13px] font-black text-slate-200 shadow-sm transition-shadow hover:shadow-md sm:w-auto';
+        return 'wiz-app-modal-button wiz-app-modal-button-cancel';
     }
 }
