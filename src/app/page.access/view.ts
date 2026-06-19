@@ -67,7 +67,7 @@ export class Component implements OnInit, OnDestroy {
     public isSignupLoading: boolean = false;
     public isForgotLoading: boolean = false;
     public isResetLoading: boolean = false;
-    public socialLoginEnabled: boolean = false;
+    public socialLoginEnabled: boolean = true;
     private readonly accessViewportProperty: string = '--access-visual-height';
     private readonly accessViewportClass: string = 'is-access-page';
     private readonly updateAccessViewportHeight = () => {

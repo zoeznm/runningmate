@@ -52,6 +52,14 @@ div.access-page
                         wiz-component-loading-spinner(*ngIf="isLoginLoading", size="sm", label="로그인 중")
                         span {{isLoginLoading ? '로그인 중' : '로그인'}}
 
+                    div.social-stack(*ngIf="socialLoginEnabled")
+                        button.social-button.social-button--naver(type="button", (click)="startSocialSignup('naver')")
+                            span.social-mark N
+                            span 네이버로 계속하기
+                        button.social-button.social-button--google(type="button", (click)="startSocialSignup('google')")
+                            span.social-mark G
+                            span 구글로 계속하기
+
                     div.auth-switch
                         span 아직 계정이 없나요?
                         button.link-button(type="button", (click)="showSignup()") 회원가입
