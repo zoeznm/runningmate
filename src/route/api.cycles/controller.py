@@ -1,6 +1,7 @@
 import json
 
 
+auth = wiz.model("auth")
 running = wiz.model("runningmate")
 try:
     session = wiz.model("portal/season/session").use()
@@ -25,9 +26,37 @@ def _request_payload():
 
 
 def _current_user_id():
-    if session is None:
+    try:
+        session_user_id = session.get("id") if session is not None else ""
+    except Exception:
+        session_user_id = ""
+    if session_user_id:
+        return session_user_id
+
+    try:
+        header = str(request.headers.get("Authorization") or "")
+    except Exception:
+        header = ""
+
+    if not header.lower().startswith("bearer "):
         return ""
-    return session.get("id") or ""
+
+    token = header.split(" ", 1)[1].strip()
+    try:
+        verified, error = auth.verify_token(token, token_type="access")
+    except Exception:
+        verified, error = None, "invalid_token"
+    if error or not verified:
+        return ""
+
+    user = verified.get("user") or {}
+    try:
+        if session is not None:
+            session.set(**auth.session_payload(user))
+    except Exception:
+        pass
+
+    return user.get("id") or verified.get("claims", {}).get("sub") or ""
 
 
 def _has_cycle_consent(payload=None):
