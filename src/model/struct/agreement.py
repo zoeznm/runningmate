@@ -128,7 +128,16 @@ class Agreement:
             "needs_reagreement": self.needs_reagreement(user_id) if user_id else False,
         }
 
-    def record(self, user_id, marketing_optin=False, agreed_at=None, terms_version=None, privacy_version=None):
+    def record(
+        self,
+        user_id,
+        marketing_optin=False,
+        location_info_agreed=False,
+        photo_access_agreed=False,
+        agreed_at=None,
+        terms_version=None,
+        privacy_version=None,
+    ):
         if not agreed_at:
             agreed_at = datetime.datetime.now()
         if isinstance(agreed_at, str):
@@ -143,6 +152,8 @@ class Agreement:
             "terms_version": str(terms_version or TERMS_VERSION)[:10],
             "privacy_version": str(privacy_version or PRIVACY_VERSION)[:10],
             "marketing_optin": bool(marketing_optin),
+            "location_info_agreed": bool(location_info_agreed),
+            "photo_access_agreed": bool(photo_access_agreed),
             "agreed_at": agreed_at,
         })
 

@@ -109,16 +109,12 @@ html(lang="ko")
             }
 
             .app-shell-loader-mark {
-                display: grid;
-                place-items: center;
-                width: 48px;
-                height: 48px;
+                display: block;
+                width: 52px;
+                height: 52px;
                 border-radius: 18px;
                 background: #10201a;
-                color: #78d6b3;
-                font-size: 16px;
-                font-weight: 900;
-                line-height: 1;
+                object-fit: cover;
                 box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
             }
 
@@ -167,7 +163,7 @@ html(lang="ko")
 
         script(type="text/javascript").
             if ("serviceWorker" in navigator) {
-                const refreshVersion = "rm-ios-input-zoom-cache-20260614";
+                const refreshVersion = "rm-fast-initial-load-20260619";
                 const refreshKey = `runningmate-sw-refresh-${refreshVersion}`;
                 const hadController = Boolean(navigator.serviceWorker.controller);
                 let refreshing = false;
@@ -222,7 +218,7 @@ html(lang="ko")
     body
         app-root
             div(class="app-shell-loader", role="status", aria-live="polite")
-                div(class="app-shell-loader-mark", aria-hidden="true") RM
+                img(class="app-shell-loader-mark", src="/assets/brand/icon-192.png?v=rm-run-icon-20260522", alt="", aria-hidden="true")
                 div(class="app-shell-loader-title") 러닝메이트
                 div(class="app-shell-loader-detail") 앱을 불러오는 중
                 div(class="app-shell-loader-bar", aria-hidden="true")

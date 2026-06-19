@@ -3,10 +3,6 @@ import { AppComponent } from './app.component';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { FormsModule, COMPOSITION_BUFFER_MODE } from '@angular/forms';
-import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-import { NuMonacoEditorModule } from '@ng-util/monaco-editor';
-import { SortablejsModule } from "@wiz/libs/portal/season/ngx-sortablejs";
-import { KeyboardShortcutsModule } from 'ng-keyboard-shortcuts';
 import { Pipe, PipeTransform } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 
@@ -37,10 +33,6 @@ export function createTranslateLoader(http: HttpClient) {
         BrowserModule,
         AppRoutingModule,
         FormsModule,
-        NgbModule,
-        SortablejsModule,
-        KeyboardShortcutsModule.forRoot(),
-        NuMonacoEditorModule.forRoot({ baseUrl: `lib` }),
         HttpClientModule,
         TranslateModule.forRoot({
             loader: {

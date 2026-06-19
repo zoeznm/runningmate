@@ -13,4 +13,6 @@ class Model(base):
     terms_version = pw.CharField(max_length=10)
     privacy_version = pw.CharField(max_length=10)
     marketing_optin = pw.BooleanField(default=False)
+    location_info_agreed = pw.BooleanField(default=False)
+    photo_access_agreed = pw.BooleanField(default=False)
     agreed_at = pw.DateTimeField(index=True)

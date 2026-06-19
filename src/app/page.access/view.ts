@@ -1,7 +1,7 @@
 import { ChangeDetectorRef, OnDestroy, OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
 import { apiFetch, jsonRequest } from 'src/app/shared/api';
-import { authenticatedUser, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
+import { authenticatedUser, clearAuthTokens, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
 
 export class Component implements OnInit, OnDestroy {
     constructor(public service: Service, public ref: ChangeDetectorRef) { }
@@ -43,10 +43,12 @@ export class Component implements OnInit, OnDestroy {
         terms: false,
         privacy: false,
         age: false,
+        locationInfo: false,
+        photoAccess: false,
         marketing: false
     };
     public allAgreementsChecked: boolean = false;
-    private readonly agreementKeys: string[] = ['terms', 'privacy', 'age', 'marketing'];
+    private readonly agreementKeys: string[] = ['terms', 'privacy', 'age', 'locationInfo', 'photoAccess', 'marketing'];
     private readonly requiredAgreementKeys: string[] = ['terms', 'privacy', 'age'];
     public identityStatus: any = {
         username: { state: 'idle', message: '' },
@@ -65,6 +67,7 @@ export class Component implements OnInit, OnDestroy {
     public isSignupLoading: boolean = false;
     public isForgotLoading: boolean = false;
     public isResetLoading: boolean = false;
+    public socialLoginEnabled: boolean = false;
     private readonly accessViewportProperty: string = '--access-visual-height';
     private readonly accessViewportClass: string = 'is-access-page';
     private readonly updateAccessViewportHeight = () => this.syncAccessViewportHeight();
@@ -74,6 +77,8 @@ export class Component implements OnInit, OnDestroy {
     private previousRootBackground: string = '';
     private previousBodyBackground: string = '';
     private previousAppRootBackground: string = '';
+    private readonly mediaAccessNoticeAcceptedKey: string = 'runningmate-media-access-notice-accepted-v1';
+    private readonly locationInfoConsentKey: string = 'runningmate-location-info-consent-v1';
     private readonly sessionBootstrapTimeoutMs: number = 10000;
 
     public async ngOnInit() {
@@ -109,14 +114,14 @@ export class Component implements OnInit, OnDestroy {
         document.body?.classList.add(this.accessViewportClass);
         this.themeMeta = document.querySelector('meta[name="theme-color"]');
         this.previousThemeColor = this.themeMeta?.getAttribute('content') || '';
-        this.themeMeta?.setAttribute('content', '#05070c');
+        this.themeMeta?.setAttribute('content', '#020406');
         this.appRootElement = document.querySelector('app-root');
         this.previousRootBackground = document.documentElement.style.background;
         this.previousBodyBackground = document.body?.style.background || '';
         this.previousAppRootBackground = this.appRootElement?.style.background || '';
-        document.documentElement.style.background = '#05070c';
-        if (document.body) document.body.style.background = '#05070c';
-        if (this.appRootElement) this.appRootElement.style.background = '#05070c';
+        document.documentElement.style.background = '#020406';
+        if (document.body) document.body.style.background = '#020406';
+        if (this.appRootElement) this.appRootElement.style.background = '#020406';
         this.syncAccessViewportHeight();
         window.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
         window.addEventListener('orientationchange', this.updateAccessViewportHeight, { passive: true });
@@ -205,21 +210,42 @@ export class Component implements OnInit, OnDestroy {
             authenticatedUser(),
             this.sessionBootstrapTimeoutMs
         ).catch(() => null);
-        const refreshed = tokenUser
-            ? false
-            : await this.withTimeout(refreshAuthTokens(), this.sessionBootstrapTimeoutMs).catch(() => false);
-        if (!tokenUser && !refreshed) return false;
+        if (tokenUser) {
+            this.goDashboard();
+            return true;
+        }
 
-        this.goDashboard();
-        return true;
+        const refreshed = await this.withTimeout(refreshAuthTokens(), this.sessionBootstrapTimeoutMs).catch(() => false);
+        if (!refreshed) {
+            clearAuthTokens();
+            return false;
+        }
+
+        const refreshedUser = await this.withTimeout(
+            authenticatedUser(),
+            this.sessionBootstrapTimeoutMs
+        ).catch(() => null);
+        if (refreshedUser) {
+            this.goDashboard();
+            return true;
+        }
+
+        clearAuthTokens();
+        return false;
     }
 
     public async confirmAuthSession(payload: any, autoLogin: boolean) {
-        saveAuthTokens(payload, autoLogin);
-        return Boolean(await this.withTimeout(
+        if (!saveAuthTokens(payload, autoLogin)) {
+            clearAuthTokens();
+            return false;
+        }
+        const user = await this.withTimeout(
             authenticatedUser(),
             this.sessionBootstrapTimeoutMs
-        ).catch(() => null));
+        ).catch(() => null);
+        if (user) return true;
+        clearAuthTokens();
+        return false;
     }
 
     public goDashboard() {
@@ -323,7 +349,7 @@ export class Component implements OnInit, OnDestroy {
     }
 
     public get pageDescription() {
-        if (this.view === 'signupOptions') return '원하는 방식으로 러닝메이트를 시작하세요.';
+        if (this.view === 'signupOptions') return '이메일로 러닝메이트를 시작하세요.';
         if (this.view === 'signup') return '아이디와 이메일을 확인하고 바로 시작하세요.';
         if (this.view === 'forgot') return '가입한 이메일로 재설정 링크를 보내드립니다.';
         if (this.view === 'forgotSent') return '메일함에서 비밀번호 재설정 링크를 확인해주세요.';
@@ -491,14 +517,11 @@ export class Component implements OnInit, OnDestroy {
     }
 
     public startSocialSignup(provider: string) {
+        if (!this.socialLoginEnabled) return;
         const normalized = String(provider || '').trim().toLowerCase();
         if (!['naver', 'google'].includes(normalized)) return;
         const url = `/api/auth/oauth/${normalized}/start`;
-        try {
-            const opened = window.open(url, '_top');
-            if (opened) return;
-        } catch { }
-        location.href = url;
+        location.assign(url);
     }
 
     public async showForgotPassword() {
@@ -728,6 +751,8 @@ export class Component implements OnInit, OnDestroy {
             terms_agreed: this.agreements.terms,
             privacy_agreed: this.agreements.privacy,
             age_confirmed: this.agreements.age,
+            location_info_agreed: this.agreements.locationInfo,
+            photo_access_agreed: this.agreements.photoAccess,
             marketing_optin: this.agreements.marketing,
             terms_version: this.policies.terms?.version || '',
             privacy_version: this.policies.privacy?.version || '',
@@ -746,11 +771,26 @@ export class Component implements OnInit, OnDestroy {
                 await this.service.render();
                 return;
             }
+            this.persistOptionalConsentFlags();
             this.goDashboard();
             return;
         }
         await this.alert(result.error?.message || "회원가입에 실패했습니다.");
         await this.service.render();
+    }
+
+    private persistOptionalConsentFlags() {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            if (this.agreements.photoAccess) {
+                window.localStorage.setItem(this.mediaAccessNoticeAcceptedKey, '1');
+            }
+            if (this.agreements.locationInfo) {
+                window.localStorage.setItem(this.locationInfoConsentKey, '1');
+            }
+        } catch {
+            return;
+        }
     }
 
     public openPolicy(type: string) {

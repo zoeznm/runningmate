@@ -59,14 +59,20 @@ try:
         security.audit("auth.login", target=identifier, success=False, metadata={"reason": "missing_credentials"})
         _response(400, {"success": False, "message": "아이디와 비밀번호를 입력해주세요."})
 
-    user = auth.authenticate(identifier, password)
+    user, failure_reason = auth.authenticate_with_reason(identifier, password)
     if not user:
-        security.audit("auth.login", target=identifier, success=False, metadata={"reason": "invalid_credentials"})
+        security.audit("auth.login", target=identifier, success=False, metadata={
+            "reason": "invalid_credentials",
+            "detail": failure_reason or "invalid_credentials",
+            "identifier_type": "email" if "@" in str(identifier or "") else "username",
+        })
         _response(401, {"success": False, "message": "아이디 또는 비밀번호가 올바르지 않습니다."})
 
     tokens = auth.issue_tokens(user)
     session.set(**auth.session_payload(user))
-    security.audit("auth.login", actor_id=user.get("id"), actor_role=user.get("role"), target=user.get("id"), success=True)
+    security.audit("auth.login", actor_id=user.get("id"), actor_role=user.get("role"), target=user.get("id"), success=True, metadata={
+        "detail": failure_reason,
+    } if failure_reason else {})
     _send_response(200, {"success": True, "data": tokens, **tokens})
 except ApiResponse as response:
     _send_response(response.status_code, response.payload)

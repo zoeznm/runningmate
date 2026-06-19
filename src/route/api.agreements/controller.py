@@ -62,6 +62,8 @@ else:
         privacy_agreed = _bool_value(payload.get("privacy_agreed") or payload.get("privacyAgreed"))
         age_confirmed = _bool_value(payload.get("age_confirmed") or payload.get("ageConfirmed"))
         marketing_optin = _bool_value(payload.get("marketing_optin") or payload.get("marketingOptin"))
+        location_info_agreed = _bool_value(payload.get("location_info_agreed") or payload.get("locationInfoAgreed"))
+        photo_access_agreed = _bool_value(payload.get("photo_access_agreed") or payload.get("photoAccessAgreed"))
 
         if not terms_agreed or not privacy_agreed or not age_confirmed:
             _response(400, {"success": False, "message": "필수 동의 항목을 모두 체크해주세요."})
@@ -69,6 +71,8 @@ else:
             struct.agreement.record(
                 user_id,
                 marketing_optin=marketing_optin,
+                location_info_agreed=location_info_agreed,
+                photo_access_agreed=photo_access_agreed,
                 agreed_at=payload.get("agreed_at") or payload.get("agreedAt"),
                 terms_version=payload.get("terms_version") or payload.get("termsVersion"),
                 privacy_version=payload.get("privacy_version") or payload.get("privacyVersion"),
@@ -79,10 +83,14 @@ else:
         latest = struct.agreement.latest(user_id)
         current = struct.agreement.current()
         marketing_optin = _bool_value(payload.get("marketing_optin") or payload.get("marketingOptin"))
+        location_info_agreed = (latest or {}).get("location_info_agreed", False)
+        photo_access_agreed = (latest or {}).get("photo_access_agreed", False)
 
         struct.agreement.record(
             user_id,
             marketing_optin=marketing_optin,
+            location_info_agreed=location_info_agreed,
+            photo_access_agreed=photo_access_agreed,
             terms_version=(latest or {}).get("terms_version") or current["terms"]["version"],
             privacy_version=(latest or {}).get("privacy_version") or current["privacy"]["version"],
         )

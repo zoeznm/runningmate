@@ -1,7 +1,9 @@
 import { AfterViewInit, ChangeDetectorRef, ElementRef, OnDestroy } from '@angular/core';
-import { clearAuthTokens, ensureAuthenticated, refreshAuthTokens } from 'src/app/shared/auth';
+import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, refreshAuthTokens } from 'src/app/shared/auth';
 import { apiFetch, apiErrorMessage, jsonRequest, standardApiError } from 'src/app/shared/api';
+import { resolveApiUrl } from 'src/app/shared/api-base';
 import { ToastService } from 'src/app/shared/toast.service';
+import { PredictionEngine, type HistoryInput } from 'cyclia';
 
 type ScreenKey = 'home' | 'goals' | 'challenges' | 'feed' | 'friends' | 'ranking' | 'achievements' | 'calendar' | 'weight' | 'chart' | 'gallery' | 'chat' | 'ai-settings' | 'settings' | 'profile';
 type OnboardingStepKey = 'welcome' | 'menu-record' | 'menu-goal' | 'menu-community' | 'menu-ai' | 'menu-settings' | 'profile' | 'goal' | 'complete';
@@ -13,7 +15,7 @@ type TrainingLoadStatus = 'safe' | 'caution' | 'danger';
 type WeightPeriod = '1m' | '3m' | 'all';
 type RankingPeriod = 'this_week' | 'last_week' | 'this_month';
 type RankingScope = 'global' | 'following';
-type RunType = 'jogging' | 'long' | 'interval' | 'tempo' | 'race' | 'recovery';
+type RunType = 'jogging' | 'long' | 'interval' | 'tempo' | 'race' | 'recovery' | 'strength' | 'home_training';
 type GoalType = 'distance' | 'count' | 'duration' | 'pace';
 type ChallengeType = 'total_distance' | 'individual_distance' | 'count';
 type ChallengeListTab = 'joined' | 'recruiting' | 'owned' | 'ended';
@@ -24,6 +26,7 @@ type RunMediaType = 'photo' | 'video';
 type ReactionType = 'like' | 'fire' | 'clap' | 'strong';
 type CyclePhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';
 type CycleSource = 'manual' | 'predicted';
+type CycleFlowLevel = 'light' | 'normal' | 'heavy';
 type ThemeMode = 'dark' | 'light' | 'system';
 type DistanceUnit = 'km' | 'mile';
 type PaceDisplayMode = 'pace' | 'speed';
@@ -33,6 +36,14 @@ type SettingsDetailKey = 'reminder' | 'password' | 'export' | null;
 type SettingsExportFormat = 'json' | 'csv';
 
 const KM_PER_MILE = 1.609344;
+const AI_PARSE_CONFIGURATION_ERROR_CODES = new Set([
+    'missing_api_key',
+    'invalid_api_key',
+    'insufficient_quota',
+    'model_not_found',
+    'api_forbidden',
+    'openai_error'
+]);
 
 interface RunMedia {
     id: string;
@@ -71,8 +82,18 @@ interface RunRecord {
     top_tracks?: MusicTrack[];
     media?: RunMedia[];
     is_public?: boolean;
+    journal_only?: boolean;
     user_id?: string | null;
     created_at?: string | null;
+}
+
+interface DashboardBootstrapData {
+    profile?: Partial<UserProfile> | null;
+    runs?: unknown[];
+    run_count?: number;
+    run_limit?: number;
+    has_more_runs?: boolean;
+    has_media_history?: boolean;
 }
 
 interface FeedUser {
@@ -225,19 +246,12 @@ interface CalendarCell {
     cyclePhase?: CyclePhase;
     cyclePhaseLabel?: string;
     cycleSource?: CycleSource;
+    cycleMarkerClass?: string;
 }
 
 interface JournalCalendarCell extends CalendarCell {
     journalCount: number;
     journalRuns: RunRecord[];
-}
-
-interface ParsedRun {
-    id: string | null;
-    date: string;
-    badge: string;
-    runType: RunType;
-    stats: StatCard[];
 }
 
 interface CalendarRunDetail {
@@ -286,20 +300,21 @@ interface WeatherDay {
     humidityText: string;
     windText: string;
     hourly: WeatherHourly[];
-}
-
-interface WeatherPosition {
-    latitude: number;
-    longitude: number;
-    accuracy?: number;
-    source?: 'browser' | 'ip';
-    updatedAt: number;
+    locationName?: string;
+    locationSource?: string;
+    stored?: boolean;
+    capturedAt?: string;
 }
 
 interface WeatherCoverage {
     startDate: string;
     endDate: string;
     message: string;
+}
+
+interface WeatherPosition {
+    lat: number;
+    lon: number;
 }
 
 interface WeatherResponseData {
@@ -592,11 +607,17 @@ interface CycleConditionOption {
     label: string;
 }
 
+interface CycleFlowOption {
+    id: CycleFlowLevel;
+    label: string;
+}
+
 interface CycleLog {
     id?: string | null;
     start_date: string;
     end_date: string;
     cycle_phase: CyclePhase;
+    flow_level?: CycleFlowLevel | '';
     condition_emoji?: string;
     note?: string;
 }
@@ -862,6 +883,13 @@ const RUN_TYPE_OPTIONS: RunTypeOption[] = [
     { id: 'recovery', label: '회복주' }
 ];
 
+const SUPPORT_ACTIVITY_OPTIONS: RunTypeOption[] = [
+    { id: 'strength', label: '근력운동' },
+    { id: 'home_training', label: '홈트' }
+];
+
+const SUPPORT_ACTIVITY_TYPES = new Set<RunType>(['strength', 'home_training']);
+
 const GOAL_TYPE_OPTIONS: GoalTypeOption[] = [
     { id: 'distance', label: '월 총 거리', icon: 'fa-route', unit: 'km', hint: '예: 100' },
     { id: 'count', label: '월 러닝 횟수', icon: 'fa-shoe-prints', unit: '회', hint: '예: 12' },
@@ -1002,9 +1030,15 @@ const CYCLE_CONDITION_OPTIONS: CycleConditionOption[] = [
     { emoji: '😣', label: '힘듦' }
 ];
 
+const CYCLE_FLOW_OPTIONS: CycleFlowOption[] = [
+    { id: 'light', label: '적음' },
+    { id: 'normal', label: '보통' },
+    { id: 'heavy', label: '많음' }
+];
+
 const EMPTY_CYCLE_SUMMARY: CycleSummary = {
     average_cycle_days: 28,
-    average_period_days: 5,
+    average_period_days: 7,
     next_start_date: null,
     current_phase: null,
     current_phase_label: null,
@@ -1262,11 +1296,13 @@ export class Component implements AfterViewInit, OnDestroy {
     public cycleSummary: CycleSummary = { ...EMPTY_CYCLE_SUMMARY };
     public cyclePhaseOptions: CyclePhaseOption[] = CYCLE_PHASE_OPTIONS;
     public cycleConditionOptions: CycleConditionOption[] = CYCLE_CONDITION_OPTIONS;
+    public cycleFlowOptions: CycleFlowOption[] = CYCLE_FLOW_OPTIONS;
     public cycleStartDate: string = this.dateKey(new Date());
     public cycleEndDate: string = this.dateKey(new Date());
-    public selectedCyclePhase: CyclePhase = 'menstrual';
+    public selectedCycleFlowLevel: CycleFlowLevel = 'normal';
     public selectedCycleConditionEmoji: string = '😐';
     public cycleNoteText: string = '';
+    public isCycleNoteEditing: boolean = false;
     public cycleStatus: string = '';
     public isCycleSaving: boolean = false;
     public deletingCycleId: string | null = null;
@@ -1275,7 +1311,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public weatherStatus: string = '';
     public weatherLocationText: string = '';
     public weatherUpdatedText: string = '';
-    public parsedRuns: ParsedRun[] = [];
+    public isWeatherLocationBusy: boolean = false;
     public activeWeightPeriod: WeightPeriod = '3m';
     public weightLogs: WeightLog[] = [];
     public visibleWeightLogs: WeightLog[] = [];
@@ -1342,6 +1378,8 @@ export class Component implements AfterViewInit, OnDestroy {
     public uploadProgress: number = 0;
     public isUploading: boolean = false;
     public parseErrorMessage: string = '';
+    public uploadJournalStatus: string = '';
+    public isUploadJournalSaving: boolean = false;
     public calendarMediaDraftFiles: File[] = [];
     public calendarMediaDraftStatus: string = '';
     public calendarUploadIsPublic: boolean = true;
@@ -1387,8 +1425,6 @@ export class Component implements AfterViewInit, OnDestroy {
         confirm_text: '',
         password: ''
     };
-    public isLocationPermissionPromptVisible: boolean = false;
-    public isLocationPermissionPromptBusy: boolean = false;
     public passwordForm = {
         currentPassword: '',
         newPassword: '',
@@ -1401,14 +1437,35 @@ export class Component implements AfterViewInit, OnDestroy {
     private pendingMediaRunId: string | null = null;
     private calendarNotes = new Map<string, CalendarNote>();
     private cycleDayMap = new Map<string, CycleDayInfo>();
+    private cyclePredictionEngine = new PredictionEngine({ strategy: 'wma', lutealPhaseDays: 14, timezone: 'Asia/Seoul' });
     private weatherDays = new Map<string, WeatherDay>();
     private weatherCoverage: WeatherCoverage | null = null;
-    private recentParsedRunIds: string[] = [];
+    private initialRunsTruncated: boolean = false;
+    private runMediaLoaded: boolean = false;
+    private deferredDashboardDataStarted: boolean = false;
     private activeYearMonth: string = this.yearMonthKey(new Date());
     private activeWeightYearMonth: string = this.yearMonthKey(new Date());
     private readonly cleanupHandlers: Array<() => void> = [];
-    private readonly weatherPositionCacheKey: string = 'runningmate-weather-position-v1';
-    private readonly weatherLocationPromptSkipKey: string = 'runningmate-weather-location-prompt-skipped-v1';
+    private readonly initialDashboardRunLimit: number = 60;
+    private readonly initialRunFields: string[] = [
+        'id',
+        'date',
+        'distance_km',
+        'avg_pace',
+        'duration',
+        'run_type',
+        'calories',
+        'avg_heart_rate',
+        'cadence',
+        'elevation_gain',
+        'water_before_ml',
+        'water_after_ml',
+        'journal',
+        'is_public',
+        'user_id',
+        'created_at'
+    ];
+    private readonly mediaAccessNoticeAcceptedKey: string = 'runningmate-media-access-notice-accepted-v1';
     private readonly cycleEnabledStorageKey: string = 'runningmate-cycle-enabled-v1';
     private readonly cycleOverlayStorageKey: string = 'runningmate-cycle-overlay-v1';
     private readonly restBannerDismissStorageKey: string = 'runningmate-rest-banner-dismissed-v1';
@@ -1416,6 +1473,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly pacerPersonaStorageKey: string = 'runningmate-pacer-persona-v1';
     private readonly appleMusicUserTokenStorageKey: string = 'runningmate-apple-music-user-token-v1';
     private readonly weightTargetStorageKey: string = 'runningmate-weight-target-v1';
+    private readonly weatherPositionStorageKey: string = 'runningmate-weather-position-v1';
     private readonly onboardingScreenMap: Partial<Record<OnboardingStepKey, ScreenKey>> = {
         welcome: 'home',
         'menu-record': 'calendar',
@@ -1428,6 +1486,7 @@ export class Component implements AfterViewInit, OnDestroy {
         complete: 'calendar'
     };
     private readonly weatherRefreshIntervalMs: number = 30 * 60 * 1000;
+    private readonly initialDashboardTaskTimeoutMs: number = 9000;
     private readonly initialLoadingStepPriority: string[] = [
         'auth',
         'location',
@@ -1437,11 +1496,14 @@ export class Component implements AfterViewInit, OnDestroy {
         'profile',
         'chat',
         'feed',
+        'friends',
+        'friendCode',
         'ranking',
         'goals',
         'challenges',
         'notifications',
         'weights',
+        'training',
         'badges',
         'dayNotes',
         'restDays',
@@ -1451,9 +1513,8 @@ export class Component implements AfterViewInit, OnDestroy {
     private initialLoadingSteps = new Map<string, string>();
     private onboardingTouchStartX: number | null = null;
     private weatherRequestSeq: number = 0;
-    private weatherPositionPromise: Promise<WeatherPosition | null> | null = null;
-    private locationPermissionPromptResolve: ((accepted: boolean) => void) | null = null;
     private weatherRefreshTimer: number | null = null;
+    private weatherPosition: WeatherPosition | null = null;
     private accountDeleteRedirectTimer: number | null = null;
     private lastWeatherLoadedAt: number = 0;
     private systemThemeQuery: MediaQueryList | null = null;
@@ -1485,6 +1546,7 @@ export class Component implements AfterViewInit, OnDestroy {
         private readonly toast: ToastService
     ) {
         this.loadAppSettings();
+        this.weatherPosition = this.readStoredWeatherPosition();
         this.applyInitialScreenFromLocation();
         this.startSystemThemeListener();
         this.refreshDerivedState();
@@ -1523,15 +1585,72 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private async runDeferredDashboardTask(task: () => Promise<void>): Promise<void> {
+    private async withInitialTaskTimeout<T>(task: Promise<T>, detail: string, timeoutMs: number = this.initialDashboardTaskTimeoutMs): Promise<T> {
+        if (typeof window === 'undefined') return task;
+
+        let timeoutId: number | null = null;
+        const timeout = new Promise<T>((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+                reject(standardApiError('timeout', {
+                    message: `${detail} 시간이 초과됐어. 다시 시도해줘`
+                }));
+            }, timeoutMs);
+        });
+
         try {
-            await task();
+            return await Promise.race([task, timeout]);
+        } finally {
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
+        }
+    }
+
+    private async runDeferredDashboardTask(task: () => Promise<void>, detail: string = '요청 처리'): Promise<void> {
+        try {
+            await this.withInitialTaskTimeout(task(), detail);
         } catch {
             // Deferred dashboard data should never block the first usable screen.
         }
     }
 
+    private async runInitialDashboardTask(key: string, detail: string, task: () => Promise<void>): Promise<void> {
+        await this.runInitialLoadingStep(key, detail, () => this.runDeferredDashboardTask(task, detail));
+    }
+
+    private async loadDeferredDashboardEssentials(): Promise<void> {
+        await Promise.all([
+            this.runDeferredDashboardTask(() => this.loadDayNotes(), '기록 메모를 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadRestDays(), '휴식일을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadWeights(), '체중 설정을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadBadges(), '업적을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadGoalsForActiveMonth(), '목표를 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadChallenges(), '챌린지를 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadFeed(true), '커뮤니티를 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadFriendLists(true), '친구 목록을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadFriendCode(), '친구 코드를 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadCommunityNotifications(true), '알림을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadRanking(), '랭킹을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadChatHistory(true), 'AI 대화 기록을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadAiConnection(), 'AI 설정을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadAppleMusicConnection(), '음악 설정을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadTrainingLoad(), '분석 데이터를 불러오는 중')
+        ]);
+
+        if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+            await this.runDeferredDashboardTask(() => this.loadCycles(), '주기 설정을 불러오는 중');
+        }
+    }
+
+    private async deferredDashboardYield(delayMs: number = 80): Promise<void> {
+        if (typeof window === 'undefined') return;
+        await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
+    }
+
     private scheduleDeferredDashboardData(): void {
+        if (this.deferredDashboardDataStarted) return;
+        this.deferredDashboardDataStarted = true;
+
         const run = (): void => {
             void this.loadDeferredDashboardData();
         };
@@ -1545,25 +1664,21 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async loadDeferredDashboardData(): Promise<void> {
-        await Promise.all([
-            this.runDeferredDashboardTask(() => this.loadAiConnection()),
-            this.runDeferredDashboardTask(() => this.loadAppleMusicConnection()),
-            this.runDeferredDashboardTask(() => this.loadChatHistory(true)),
-            this.runDeferredDashboardTask(() => this.loadDayNotes()),
-            this.runDeferredDashboardTask(() => this.loadRestDays()),
-            this.runDeferredDashboardTask(() => this.loadWeights()),
-            this.runDeferredDashboardTask(() => this.loadBadges()),
-            this.runDeferredDashboardTask(() => this.loadGoalsForActiveMonth()),
-            this.runDeferredDashboardTask(() => this.loadChallenges()),
-            this.runDeferredDashboardTask(() => this.loadFeed(false)),
-            this.runDeferredDashboardTask(() => this.loadCommunityNotifications(false)),
-            this.runDeferredDashboardTask(() => this.loadRanking()),
-            this.runDeferredDashboardTask(() => this.loadTrainingLoad()),
-            this.shouldShowCycleFeature && this.isCycleFeatureEnabled
-                ? this.runDeferredDashboardTask(() => this.loadCycles())
-                : Promise.resolve(),
-            this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth())
-        ]);
+        await this.loadDeferredDashboardEssentials();
+        await this.deferredDashboardYield();
+
+        if (this.initialRunsTruncated) {
+            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: false }), false));
+            this.initialRunsTruncated = false;
+            await this.deferredDashboardYield();
+        }
+
+        if (this.activeScreen === 'calendar') {
+            await this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth());
+        }
+        if (this.activeScreen === 'gallery' && !this.runMediaLoaded) {
+            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true));
+        }
         this.cdr.detectChanges();
     }
 
@@ -2067,7 +2182,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get activeMonthJournalCount(): number {
-        return this.runs.filter((run) => run.date.startsWith(this.activeYearMonth) && this.hasJournal(run)).length;
+        return this.buildJournalRuns().filter((run) => run.date.startsWith(this.activeYearMonth)).length;
     }
 
     public get selectedCalendarDateText(): string {
@@ -2120,6 +2235,10 @@ export class Component implements AfterViewInit, OnDestroy {
         return '운동 앱 캡처 이미지를 선택하면 날짜, 거리, 페이스를 읽어 저장해.';
     }
 
+    public get shouldShowCalendarMediaAccessNotice(): boolean {
+        return !this.hasAcceptedMediaAccessNotice();
+    }
+
     public get calendarUploadButtonText(): string {
         if (this.isUploading) return '처리 중';
         return this.canUploadSelectedCalendarDate ? '캡처 이미지 업로드' : '업로드 불가';
@@ -2135,8 +2254,36 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.calendarMediaDraftFiles.length ? '추가 선택' : '사진/영상 추가';
     }
 
+    public get canSaveSelectedCalendarActivity(): boolean {
+        return Boolean(
+            this.selectedCalendarDate &&
+            this.selectedCalendarDate <= this.dateKey(new Date()) &&
+            !this.isRestDate(this.selectedCalendarDate) &&
+            !this.hasRunsOnDate(this.selectedCalendarDate)
+        );
+    }
+
     public get calendarUploadPrivacyText(): string {
         return this.calendarUploadIsPublic ? '피드 공개' : '피드 비공개';
+    }
+
+    public get hasSavedUploadJournal(): boolean {
+        return Boolean(this.memoForDate(this.selectedCalendarDate).trim());
+    }
+
+    public get uploadJournalSaveButtonText(): string {
+        if (this.isUploadJournalSaving) return '저장 중';
+        if (!this.uploadJournalText.trim() && this.hasSavedUploadJournal) return '일기 지우기';
+        return '일기 저장';
+    }
+
+    public get isUploadJournalSaveDisabled(): boolean {
+        if (this.isUploadJournalSaving || this.isUploading || this.isManualRunSaving) return true;
+        if (!this.canUploadSelectedCalendarDate) return true;
+
+        const draft = this.uploadJournalText.trim();
+        const saved = this.memoForDate(this.selectedCalendarDate).trim();
+        return !draft && !saved;
     }
 
     public isRunRecordUploadActive(runId?: string | null): boolean {
@@ -2180,6 +2327,14 @@ export class Component implements AfterViewInit, OnDestroy {
         return '날씨 정보 없음';
     }
 
+    public get selectedCalendarWeatherSourceText(): string {
+        const weather = this.selectedCalendarWeather;
+        if (weather?.stored) {
+            return weather.capturedAt ? `저장된 날씨 · ${weather.capturedAt.slice(0, 10)}` : '저장된 날씨';
+        }
+        return this.weatherUpdatedText;
+    }
+
     public get calendarMemoButtonText(): string {
         if (this.isCalendarMemoSaving) return '저장 중';
         return this.calendarMemoText.trim() ? '메모 저장' : '메모 지우기';
@@ -2187,7 +2342,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get cycleFeatureStatusText(): string {
         if (!this.isCycleFeatureEnabled) return '꺼짐';
-        return this.cycleSummary.log_count ? `${this.cycleSummary.log_count}개 기록` : '켜짐';
+        return this.cycleSummary.menstrual_log_count ? `생리 기록 ${this.cycleSummary.menstrual_log_count}개` : '켜짐';
     }
 
     public get cycleNextDateText(): string {
@@ -2199,20 +2354,49 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get cycleCurrentPhaseText(): string {
-        return this.cycleSummary.current_phase_label || '입력 대기';
+        return this.cycleSummary.current_phase_label || '예측 대기';
     }
 
     public get cycleSaveButtonText(): string {
-        return this.isCycleSaving ? '저장 중' : '주기 저장';
+        if (this.isCycleSaving) return '저장 중';
+        if (this.isCycleNoteEditing) return '저장하기';
+        return this.selectedCalendarCycleLog ? '수정하기' : '저장하기';
+    }
+
+    public get cyclePrimaryIconClass(): string {
+        if (this.isCycleSaving) return 'fa-spinner';
+        if (this.isCycleNoteEditing) return 'fa-floppy-disk';
+        return this.selectedCalendarCycleLog ? 'fa-pen-to-square' : 'fa-floppy-disk';
     }
 
     public get selectedCalendarCycleText(): string {
         const info = this.selectedCalendarDate ? this.cycleDayMap.get(this.selectedCalendarDate) : null;
-        return info ? info.label : '기록 없음';
+        if (info?.phase === 'menstrual' && info.source === 'predicted') return '생리 예정';
+        return info ? info.label : '주기 예측 대기';
+    }
+
+    public get selectedCalendarCyclePhase(): CyclePhase | null {
+        const info = this.selectedCalendarDate ? this.cycleDayMap.get(this.selectedCalendarDate) : null;
+        return info?.phase || null;
+    }
+
+    public get selectedCalendarCycleLog(): CycleLog | null {
+        const date = this.selectedCalendarDate;
+        if (!date) return null;
+        return this.cycleLogs.find((log) => (
+            log.cycle_phase === 'menstrual' &&
+            log.start_date <= date &&
+            log.end_date >= date
+        )) || null;
     }
 
     public get recentCycleLogs(): CycleLog[] {
-        return this.cycleLogs.slice(0, 5);
+        const date = this.selectedCalendarDate;
+        if (!date) return [];
+
+        return this.cycleLogs
+            .filter((log) => log.cycle_phase === 'menstrual' && log.start_date <= date && log.end_date >= date)
+            .slice(0, 5);
     }
 
     public get hasCyclePatternStats(): boolean {
@@ -2372,7 +2556,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get galleryJournalCount(): number {
-        return this.runs.filter((run) => this.hasJournal(run)).length;
+        return this.buildJournalRuns().length;
     }
 
     public get gallerySummaryText(): string {
@@ -2412,7 +2596,8 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get weatherLocationTags(): string[] {
-        const text = String(this.weatherLocationText || '').replace(/\s*(기준|근처)\s*$/, '').trim();
+        const selectedLocation = this.selectedCalendarWeather?.locationName || '';
+        const text = String(selectedLocation || this.weatherLocationText || '').replace(/\s*(기준|근처)\s*$/, '').trim();
         if (!text) return [];
 
         const tags = text
@@ -2420,6 +2605,39 @@ export class Component implements AfterViewInit, OnDestroy {
             .map((item) => item.trim())
             .filter(Boolean);
         return tags.length ? tags.slice(0, 3) : [text];
+    }
+
+    public get weatherLocationButtonText(): string {
+        if (this.isWeatherLocationBusy) return '위치 확인 중';
+        return this.weatherPosition ? '현재 위치 갱신' : '현재 위치로 보기';
+    }
+
+    public async useCurrentLocationWeather(): Promise<void> {
+        if (this.isWeatherLocationBusy || this.isWeatherLoading) return;
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+            this.showToast('이 기기에서는 위치 권한을 사용할 수 없어.', 'error');
+            return;
+        }
+
+        this.isWeatherLocationBusy = true;
+        this.weatherStatus = '';
+        this.cdr.detectChanges();
+
+        try {
+            const position = await this.requestCurrentWeatherPosition();
+            this.weatherPosition = position;
+            this.storeWeatherPosition(position);
+            await this.loadWeatherForActiveMonth();
+            this.showToast('현재 위치 기준으로 날씨를 불러왔어.', 'success');
+        } catch (error) {
+            const message = error instanceof Error && error.message
+                ? error.message
+                : '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.';
+            this.showToast(message, 'error');
+        } finally {
+            this.isWeatherLocationBusy = false;
+            this.cdr.detectChanges();
+        }
     }
 
     public get activeJournalStats(): StatCard[] {
@@ -2704,31 +2922,61 @@ export class Component implements AfterViewInit, OnDestroy {
     public setScreen(screen: ScreenKey): void {
         this.activeScreen = screen;
         this.updateRouteScreen(screen);
+        void this.loadActiveScreenData(true);
+    }
+
+    private async loadActiveScreenData(showLoading: boolean = true): Promise<void> {
+        const screen = this.activeScreen;
         if (screen === 'feed' || screen === 'friends' || screen === 'ranking' || screen === 'profile') {
-            void this.loadCommunityNotifications(false);
+            await this.runDeferredDashboardTask(() => this.loadCommunityNotifications(false));
         }
         if (screen === 'achievements' && !this.badges.length) {
-            void this.loadBadges();
+            await this.runDeferredDashboardTask(() => this.loadBadges());
         }
         if (screen === 'goals') {
             this.syncGoalDrafts();
         }
         if (screen === 'challenges') {
-            void this.loadChallenges();
+            await this.runDeferredDashboardTask(() => this.loadChallenges());
         }
         if (screen === 'feed') {
-            void this.loadFeed();
+            await this.runDeferredDashboardTask(() => this.loadFeed(showLoading));
         }
         if (screen === 'friends') {
-            void this.loadFriendLists();
-            void this.loadFriendCode();
+            await this.runDeferredDashboardTask(() => this.loadFriendLists(showLoading));
+            await this.runDeferredDashboardTask(() => this.loadFriendCode());
         }
         if (screen === 'ranking') {
-            void this.loadRanking();
+            await this.runDeferredDashboardTask(() => this.loadRanking());
         }
         if (screen === 'profile') {
             this.isProfileEditOpen = false;
-            void this.loadFriendLists(false);
+            await this.runDeferredDashboardTask(() => this.loadFriendLists(false));
+        }
+        if (screen === 'calendar') {
+            await this.runDeferredDashboardTask(() => this.loadDayNotes());
+            await this.runDeferredDashboardTask(() => this.loadRestDays());
+            await this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth());
+        }
+        if (screen === 'weight') {
+            await this.runDeferredDashboardTask(() => this.loadWeights());
+        }
+        if (screen === 'chart') {
+            await this.runDeferredDashboardTask(() => this.loadTrainingLoad());
+        }
+        if (screen === 'gallery' && !this.runMediaLoaded) {
+            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true));
+        }
+        if (screen === 'chat' || screen === 'ai-settings') {
+            if (!this.aiConnection) {
+                await this.runDeferredDashboardTask(() => this.loadAiConnection());
+            }
+            if (!this.chatSessions.length) {
+                await this.runDeferredDashboardTask(() => this.loadChatHistory(true));
+            }
+            if (!this.appleMusicConnection.configured) {
+                await this.runDeferredDashboardTask(() => this.loadAppleMusicConnection());
+            }
         }
     }
 
@@ -3210,6 +3458,8 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async logout(): Promise<void> {
+        if (!window.confirm('로그아웃 하시겠습니까?')) return;
+
         try {
             await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
         } catch {
@@ -4221,10 +4471,14 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const response = await fetch('/api/chat', {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeaderForUrl('/api/chat')
+                },
                 body: JSON.stringify({ id: session.id })
             });
-            const payload = await response.json().catch(() => null) as { success?: boolean; message?: string; data?: unknown[]; usage?: Partial<AiUsage> } | null;
+            const rawPayload = await response.json().catch(() => null);
+            const payload = this.normalizeWizStatusPayload(rawPayload) as { success?: boolean; message?: string; data?: unknown[]; usage?: Partial<AiUsage> } | null;
             this.applyAiUsage(payload?.usage);
             if (!payload?.success) {
                 this.showToast(payload?.message || '대화를 삭제하지 못했어.', 'error');
@@ -4657,11 +4911,15 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async onRunRecordFilesSelected(event: Event, run: CalendarRunDetail): Promise<void> {
         const input = event.target instanceof HTMLInputElement ? event.target : null;
+        const files = Array.from(input?.files || []);
         if (!run?.id) {
             if (input) input.value = '';
             return;
         }
 
+        if (files.length) {
+            this.markMediaAccessNoticeAccepted();
+        }
         this.recordReuploadTargetId = run.id;
         await this.onFilesSelected(event, run.date || this.selectedCalendarDate, run.id, run.is_public !== false);
     }
@@ -4676,6 +4934,7 @@ export class Component implements AfterViewInit, OnDestroy {
             return;
         }
 
+        this.markMediaAccessNoticeAccepted();
         this.uploadingMediaRunId = runId;
         this.runMediaStatus = `${files.length}개 사진/영상 업로드 중`;
         this.cdr.detectChanges();
@@ -4878,7 +5137,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public selectJournalDate(cell: JournalCalendarCell): void {
-        if (!cell.day || !cell.journalCount) return;
+        if (!cell.day) return;
 
         this.selectedJournalDate = cell.key;
         this.selectedJournalRuns = this.buildSelectedJournalRuns();
@@ -4932,6 +5191,63 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
+    public async saveCalendarActivity(runType: RunType): Promise<void> {
+        const normalized = this.normalizeRunType(runType);
+        if (!SUPPORT_ACTIVITY_TYPES.has(normalized)) return;
+
+        const date = this.selectedCalendarDate;
+        if (!date) {
+            this.showToast('기록할 날짜를 선택해줘.', 'error');
+            return;
+        }
+        if (date > this.dateKey(new Date())) {
+            this.showToast('미래 날짜는 지나간 뒤 기록할 수 있어.', 'error');
+            return;
+        }
+        if (this.isRestDate(date)) {
+            this.showToast('휴식일 해제 후 운동 기록을 남길 수 있어.', 'error');
+            return;
+        }
+        if (this.hasRunsOnDate(date)) {
+            this.showToast('이미 기록이 있는 날짜야.', 'error');
+            return;
+        }
+        if (this.isManualRunSaving || this.isUploading) return;
+
+        const label = this.runTypeLabel(normalized);
+        const payload: RunRecord = {
+            date,
+            distance_km: 0,
+            avg_pace: null,
+            duration: null,
+            run_type: normalized,
+            calories: null,
+            avg_heart_rate: null,
+            cadence: null,
+            is_public: false
+        };
+
+        this.isManualRunSaving = true;
+        this.uploadStatus = `${label} 저장 중`;
+        this.cdr.detectChanges();
+
+        try {
+            const saved = await this.saveRunRecord(payload);
+            if (!saved.saved) {
+                this.uploadStatus = saved.message || `${label} 기록을 저장하지 못했어.`;
+                this.showToast(this.uploadStatus, 'error');
+                return;
+            }
+
+            this.uploadStatus = `${label} 기록을 저장했어.`;
+            this.showToast(`${label} 기록을 저장했어.`, 'success');
+            await this.loadRuns();
+        } finally {
+            this.isManualRunSaving = false;
+            this.cdr.detectChanges();
+        }
+    }
+
     public dismissRestRecommendation(): void {
         this.isRestBannerDismissed = true;
         try {
@@ -4981,6 +5297,58 @@ export class Component implements AfterViewInit, OnDestroy {
             this.calendarMemoStatus = '메모 저장 중 오류가 발생했어.';
         } finally {
             this.isCalendarMemoSaving = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    public async saveUploadJournal(): Promise<void> {
+        const date = this.selectedCalendarDate;
+        if (!date) {
+            this.showToast('일기를 남길 날짜를 선택해줘.', 'error');
+            return;
+        }
+        if (!this.canUploadSelectedCalendarDate) {
+            this.showToast('이 날짜에는 일기를 저장할 수 없어.', 'error');
+            return;
+        }
+        if (this.isUploadJournalSaving) return;
+
+        const memo = this.uploadJournalText.trim();
+        const savedMemo = this.memoForDate(date).trim();
+        if (!memo && !savedMemo) {
+            this.uploadJournalStatus = '저장할 일기를 입력해줘.';
+            this.cdr.detectChanges();
+            return;
+        }
+
+        this.isUploadJournalSaving = true;
+        this.uploadJournalStatus = '저장 중';
+        this.cdr.detectChanges();
+
+        try {
+            const response = await fetch('/api/day-notes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date, memo })
+            });
+            const payload = await response.json().catch(() => null);
+            if (!payload?.success) {
+                this.uploadJournalStatus = payload?.message || '일기를 저장하지 못했어.';
+                this.showToast(this.uploadJournalStatus, 'error');
+                return;
+            }
+
+            const rows = Array.isArray(payload?.notes) ? payload.notes : [];
+            this.setDayNotes(rows);
+            this.selectedCalendarDate = date;
+            this.uploadJournalText = memo ? this.memoForDate(date) || memo : '';
+            this.uploadJournalStatus = memo ? '저장됨' : '삭제됨';
+            this.showToast(memo ? '일기를 저장했어.' : '일기를 지웠어.', 'success');
+        } catch {
+            this.uploadJournalStatus = '일기 저장 중 오류가 발생했어.';
+            this.showToast(this.uploadJournalStatus, 'error');
+        } finally {
+            this.isUploadJournalSaving = false;
             this.cdr.detectChanges();
         }
     }
@@ -5046,9 +5414,9 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    public selectCyclePhase(phase: CyclePhase): void {
-        if (!CYCLE_PHASE_OPTIONS.some((item) => item.id === phase)) return;
-        this.selectedCyclePhase = phase;
+    public selectCycleFlow(level: CycleFlowLevel): void {
+        if (!CYCLE_FLOW_OPTIONS.some((item) => item.id === level)) return;
+        this.selectedCycleFlowLevel = level;
         this.cycleStatus = '';
         this.cdr.detectChanges();
     }
@@ -5060,13 +5428,42 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
+    public handleCyclePrimaryAction(): void {
+        if (this.isCycleSaving) return;
+        if (this.selectedCalendarCycleLog && !this.isCycleNoteEditing) {
+            this.startCycleNoteEdit();
+            return;
+        }
+        void this.saveCycleLog();
+    }
+
+    public startCycleNoteEdit(): void {
+        const log = this.selectedCalendarCycleLog;
+        if (log) {
+            this.selectedCycleFlowLevel = this.normalizeCycleFlowLevel(log.flow_level) || this.selectedCycleFlowLevel;
+            this.selectedCycleConditionEmoji = this.normalizeCycleConditionEmoji(log.condition_emoji) || this.selectedCycleConditionEmoji;
+            this.cycleNoteText = log.note || '';
+        }
+        this.isCycleNoteEditing = true;
+        this.cycleStatus = '';
+        this.cdr.detectChanges();
+    }
+
     public async saveCycleLog(): Promise<void> {
         if (!this.isCycleFeatureEnabled || this.isCycleSaving) return;
 
-        const startDate = this.normalizeDateKey(this.cycleStartDate);
-        const endDate = this.normalizeDateKey(this.cycleEndDate) || startDate;
-        if (!startDate || !endDate) {
-            this.cycleStatus = '시작일과 종료일을 선택해줘.';
+        if (!(await ensureAuthenticated())) {
+            this.cycleStatus = '로그인이 만료되었습니다. 다시 로그인해주세요.';
+            return;
+        }
+
+        const logDate = this.normalizeDateKey(this.selectedCalendarDate) || this.todayDateKey;
+        if (!logDate) {
+            this.cycleStatus = '기록할 날짜를 선택해줘.';
+            return;
+        }
+        if (logDate > this.todayDateKey) {
+            this.cycleStatus = '미래 날짜에는 생리 기록을 저장할 수 없어.';
             return;
         }
 
@@ -5080,10 +5477,12 @@ export class Component implements AfterViewInit, OnDestroy {
                 headers: this.cycleRequestHeaders(),
                 body: JSON.stringify({
                     consent: true,
-                    start_date: startDate,
-                    end_date: endDate < startDate ? startDate : endDate,
-                    cycle_phase: this.selectedCyclePhase,
+                    start_date: logDate,
+                    end_date: logDate,
+                    cycle_phase: 'menstrual',
+                    flow_level: this.selectedCycleFlowLevel,
                     condition_emoji: this.selectedCycleConditionEmoji,
+                    id: this.selectedCalendarCycleLog?.id || undefined,
                     note: this.cycleNoteText.trim()
                 })
             });
@@ -5093,12 +5492,16 @@ export class Component implements AfterViewInit, OnDestroy {
                 return;
             }
 
+            const savedNote = this.cycleNoteText.trim();
             this.setCycles(Array.isArray(payload.cycles) ? payload.cycles : payload.data ? [payload.data] : [], payload.summary);
-            this.cycleNoteText = '';
+            this.cycleNoteText = savedNote;
+            this.isCycleNoteEditing = false;
+            this.cycleStartDate = logDate;
+            this.cycleEndDate = logDate;
             this.cycleStatus = '저장됨';
-            this.showToast('주기 기록을 저장했어.', 'success');
+            this.showToast('생리 기록을 저장했어.', 'success');
         } catch {
-            this.cycleStatus = '주기 저장 중 오류가 발생했어.';
+            this.cycleStatus = '생리 기록 저장 중 오류가 발생했어.';
         } finally {
             this.isCycleSaving = false;
             this.cdr.detectChanges();
@@ -5169,10 +5572,14 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async onCalendarFilesSelected(event: Event): Promise<void> {
         const input = event.target instanceof HTMLInputElement ? event.target : null;
+        const files = Array.from(input?.files || []);
         const targetDate = this.canUploadSelectedCalendarDate ? this.selectedCalendarDate : null;
         if (!targetDate) {
             if (input) input.value = '';
             return;
+        }
+        if (files.length) {
+            this.markMediaAccessNoticeAccepted();
         }
 
         await this.onFilesSelected(event, targetDate);
@@ -5194,6 +5601,7 @@ export class Component implements AfterViewInit, OnDestroy {
             return;
         }
 
+        this.markMediaAccessNoticeAccepted();
         this.calendarMediaDraftFiles = [...this.calendarMediaDraftFiles, ...mediaFiles];
         this.calendarMediaDraftStatus = `${this.calendarMediaDraftFiles.length}개 사진/영상 선택됨`;
         if (input) input.value = '';
@@ -5232,7 +5640,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
         const runType = this.selectedRunType;
         const hydration = this.hydrationUploadPayload();
-        const music = this.musicUploadPayload();
+        const music = this.musicUploadPayload(!updateRunId);
         const isPublic = updateRunPublic !== null ? updateRunPublic : targetDate ? this.calendarUploadIsPublic : true;
         let savedCount = 0;
         let lastMessage = '';
@@ -5273,12 +5681,6 @@ export class Component implements AfterViewInit, OnDestroy {
             : lastMessage || '저장된 기록이 없어.';
         if (!savedCount && lastMessage) {
             this.parseErrorMessage = lastMessage;
-        }
-        if (savedIds.length) {
-            this.recentParsedRunIds = [
-                ...savedIds,
-                ...this.recentParsedRunIds.filter((id) => !savedIds.includes(id))
-            ].slice(0, 5);
         }
         if (savedCount) {
             this.resetHydrationInputs();
@@ -5364,7 +5766,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         const hydration = this.hydrationUploadPayload();
-        const music = this.musicUploadPayload();
+        const music = this.musicUploadPayload(!this.manualEntryRunId);
         const manualTargetRun = this.manualEntryRunId
             ? this.runs.find((run) => run.id === this.manualEntryRunId)
             : null;
@@ -5403,41 +5805,6 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    public completeParsedRun(run: ParsedRun): void {
-        if (!run.id) return;
-
-        this.recentParsedRunIds = this.recentParsedRunIds.filter((id) => id !== run.id);
-        this.uploadStatus = '갤러리와 데이터에 저장했어.';
-        this.refreshDerivedState();
-        this.cdr.detectChanges();
-    }
-
-    public async deleteParsedRun(run: ParsedRun): Promise<void> {
-        if (!run.id || this.isUploading) return;
-        if (!window.confirm('이 파싱 기록을 삭제할까요?')) return;
-
-        this.uploadProgress = 0;
-        try {
-            const response = await fetch('/api/runs', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: run.id })
-            });
-            const payload = await response.json();
-            this.uploadStatus = payload?.success
-                ? '파싱 기록을 삭제했어.'
-                : payload?.message || '파싱 기록을 삭제하지 못했어.';
-            if (payload?.success) {
-                this.recentParsedRunIds = this.recentParsedRunIds.filter((id) => id !== run.id);
-            }
-            await this.loadRuns();
-            await this.loadChallenges();
-        } catch {
-            this.uploadStatus = '삭제 중 오류가 발생했어.';
-            this.cdr.detectChanges();
-        }
-    }
-
     public async sendChat(): Promise<void> {
         const text = this.chatText.trim();
         if (!text || this.isChatSending) return;
@@ -5464,7 +5831,8 @@ export class Component implements AfterViewInit, OnDestroy {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...authHeaderForUrl('/api/chat')
                 },
                 body: JSON.stringify({
                     message: text,
@@ -5475,7 +5843,8 @@ export class Component implements AfterViewInit, OnDestroy {
                     cycle_enabled: this.isCycleFeatureEnabled
                 })
             });
-            const payload = await response.json().catch(() => null) as ChatResponse | null;
+            const rawPayload = await response.json().catch(() => null);
+            const payload = this.normalizeWizStatusPayload(rawPayload) as ChatResponse | null;
             this.applyAiUsage(payload?.usage, true);
             const reply = payload?.success
                 ? payload?.reply || '답변을 만들지 못했어.'
@@ -5517,7 +5886,10 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const response = await fetch('/api/ai-config', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...authHeaderForUrl('/api/ai-config')
+                },
                 body: JSON.stringify({ action: 'refresh_login' })
             });
             const payload = await response.json() as AiLoginRefreshResult;
@@ -5603,37 +5975,61 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async loadInitialDashboardData(): Promise<void> {
         this.isInitialLoading = true;
+        this.deferredDashboardDataStarted = false;
         this.initialLoadingSteps.clear();
-        this.initialLoadingDetail = '러닝 기록을 불러오는 중';
+        this.initialLoadingDetail = '초기 데이터를 불러오는 중';
         this.initialErrorMessage = '';
         this.cdr.detectChanges();
+        let shouldStartDeferredData = false;
 
-        const authenticated = await this.runInitialLoadingStep('auth', '로그인 상태를 확인하는 중', () => ensureAuthenticated());
-        if (!authenticated) {
-            this.redirectToAccess();
-            return;
+        try {
+            this.loadRestBannerDismissed();
+            this.loadCycleLocalSettings();
+
+            const bootstrapStatus = await this.runInitialLoadingStep('runs', '초기 데이터를 불러오는 중', () => this.loadDashboardBootstrap());
+            if (bootstrapStatus === 'unauthenticated') {
+                this.redirectToAccess();
+                return;
+            }
+
+            let runLoaded = bootstrapStatus === 'loaded';
+            if (!runLoaded) {
+                const authenticated = await this.runInitialLoadingStep('auth', '로그인 상태를 확인하는 중', () => ensureAuthenticated());
+                if (!authenticated) {
+                    this.redirectToAccess();
+                    return;
+                }
+
+                runLoaded = await this.runInitialLoadingStep('runs', '러닝 기록을 불러오는 중', () => this.loadRuns(true, false, false, this.initialRunsUrl(), false));
+                await this.runInitialLoadingStep('profile', '프로필을 확인하는 중', () => this.loadProfile());
+            }
+
+            if (!runLoaded && !this.initialErrorMessage) {
+                this.initialErrorMessage = '초기 데이터를 불러오지 못했어. 네트워크를 확인한 뒤 다시 시도해줘';
+            }
+
+            if (runLoaded) {
+                shouldStartDeferredData = true;
+            }
+        } catch (error) {
+            this.initialErrorMessage = error instanceof Error && error.message
+                ? error.message
+                : '초기 데이터를 불러오지 못했어. 네트워크를 확인한 뒤 다시 시도해줘';
+        } finally {
+            this.initialLoadingSteps.clear();
+            this.initialLoadingDetail = '';
+            this.isInitialLoading = false;
+            this.cdr.detectChanges();
+            if (shouldStartDeferredData) {
+                this.startWeatherAutoRefresh();
+                this.scheduleDeferredDashboardData();
+            }
         }
-
-        this.loadRestBannerDismissed();
-        this.loadCycleLocalSettings();
-
-        const runLoaded = await this.runInitialLoadingStep('runs', '러닝 기록을 불러오는 중', () => this.loadRuns(true, false));
-        await this.runInitialLoadingStep('profile', '프로필을 확인하는 중', () => this.loadProfile());
-
-        if (!runLoaded && !this.initialErrorMessage) {
-            this.initialErrorMessage = '잠깐 문제가 생겼어. 다시 시도해줘';
-        }
-
-        this.initialLoadingSteps.clear();
-        this.initialLoadingDetail = '';
-        this.isInitialLoading = false;
-        this.cdr.detectChanges();
-        this.startWeatherAutoRefresh();
-        this.scheduleDeferredDashboardData();
     }
 
     private redirectToAccess(): void {
-        window.location.href = '/access';
+        clearAuthTokens();
+        window.location.replace('/access');
     }
 
     public ngOnDestroy(): void {
@@ -5648,8 +6044,6 @@ export class Component implements AfterViewInit, OnDestroy {
             window.clearTimeout(this.accountDeleteRedirectTimer);
             this.accountDeleteRedirectTimer = null;
         }
-        this.locationPermissionPromptResolve?.(false);
-        this.locationPermissionPromptResolve = null;
         this.stopSystemThemeListener();
     }
 
@@ -5738,10 +6132,6 @@ export class Component implements AfterViewInit, OnDestroy {
         return item.user_id || `${index}`;
     }
 
-    public trackParsedRun(index: number, item: ParsedRun): string {
-        return item.id || item.date || `${index}`;
-    }
-
     public trackCalendarCell(index: number, item: CalendarCell): string {
         return item.key || `${index}`;
     }
@@ -5818,6 +6208,10 @@ export class Component implements AfterViewInit, OnDestroy {
         return item.emoji || `${index}`;
     }
 
+    public trackCycleFlow(index: number, item: CycleFlowOption): string {
+        return item.id || `${index}`;
+    }
+
     public trackCycleLog(index: number, item: CycleLog): string {
         return item.id || `${item.start_date}-${index}`;
     }
@@ -5852,12 +6246,16 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public runTypeLabel(runType?: string | null): string {
         const normalized = this.normalizeRunType(runType);
-        return RUN_TYPE_OPTIONS.find((item) => item.id === normalized)?.label || '조깅';
+        return [...RUN_TYPE_OPTIONS, ...SUPPORT_ACTIVITY_OPTIONS].find((item) => item.id === normalized)?.label || '조깅';
     }
 
     public runTypeClass(runType?: string | null): string {
         const normalized = this.normalizeRunType(runType);
         return `run-type-chip run-type-${normalized}`;
+    }
+
+    public isSupportActivityRunType(runType?: string | null): boolean {
+        return SUPPORT_ACTIVITY_TYPES.has(this.normalizeRunType(runType));
     }
 
     public badgeIconClass(badge?: Badge | null): string {
@@ -5956,20 +6354,27 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.uploadingMediaRunId === runId;
     }
 
+    private applyProfilePayload(source: unknown): boolean {
+        const profile = this.normalizeProfile(source as Partial<UserProfile> | null | undefined);
+        if (!profile.id) return false;
+
+        this.profile = profile;
+        this.syncWeightTargetLocalForProfile();
+        this.syncPacerPersonaLocalForProfile();
+        this.applyCycleAvailability();
+        if (!profile.onboarded) {
+            this.openOnboarding(profile);
+        }
+        return true;
+    }
+
     private async loadProfile(): Promise<void> {
         try {
             const response = await fetch('/api/profile', { cache: 'no-store' });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success || !payload.data) return;
 
-            const profile = this.normalizeProfile(payload.data);
-            this.profile = profile;
-            this.syncWeightTargetLocalForProfile();
-            this.syncPacerPersonaLocalForProfile();
-            this.applyCycleAvailability();
-            if (!profile.onboarded) {
-                this.openOnboarding(profile);
-            }
+            this.applyProfilePayload(payload.data);
         } catch {
             return;
         } finally {
@@ -6165,20 +6570,68 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private async loadRuns(markInitialError: boolean = false, includeTrainingLoad: boolean = true): Promise<boolean> {
-        const result = await apiFetch<any[]>('/api/runs');
+    private runsUrl(options: { limit?: number; fields?: string[]; includeMedia?: boolean } = {}): string {
+        const params = new URLSearchParams();
+        if (options.limit) params.set('limit', String(options.limit));
+        if (options.fields?.length) params.set('fields', options.fields.join(','));
+        if (options.includeMedia === false) params.set('include_media', 'false');
+        if (options.includeMedia === true) params.set('include_media', 'true');
+        const query = params.toString();
+        return query ? `/api/runs?${query}` : '/api/runs';
+    }
+
+    private initialRunsUrl(): string {
+        return this.runsUrl({
+            limit: this.initialDashboardRunLimit,
+            fields: this.initialRunFields,
+            includeMedia: false
+        });
+    }
+
+    private async loadDashboardBootstrap(): Promise<'loaded' | 'unauthenticated' | 'failed'> {
+        const result = await apiFetch<DashboardBootstrapData>(
+            `/api/dashboard/bootstrap?limit=${encodeURIComponent(String(this.initialDashboardRunLimit))}`,
+            { retries: 0, timeoutMs: 8000 }
+        );
+        if (!result.success) {
+            if (result.error?.status === 401) return 'unauthenticated';
+            this.initialErrorMessage = result.error?.message || '초기 데이터를 불러오지 못했어.';
+            return 'failed';
+        }
+
+        const data = (result.data || {}) as DashboardBootstrapData;
+        const rows = Array.isArray(data.runs) ? data.runs : [];
+        this.applyProfilePayload(data.profile || null);
+        this.initialRunsTruncated = Boolean(data.has_more_runs);
+        this.runMediaLoaded = false;
+        if (data.has_media_history) {
+            this.markMediaAccessNoticeAccepted();
+        }
+        this.setRuns(rows, { loadRelatedData: false });
+        return 'loaded';
+    }
+
+    private async loadRuns(
+        markInitialError: boolean = false,
+        includeTrainingLoad: boolean = true,
+        loadRelatedData: boolean = true,
+        url: string = '/api/runs',
+        includesMedia: boolean = true
+    ): Promise<boolean> {
+        const result = await apiFetch<any[]>(url);
         if (result.success) {
             const payload = result.raw as any;
             const rows = Array.isArray(payload) ? payload : Array.isArray(result.data) ? result.data : [];
-            this.setRuns(rows);
+            this.runMediaLoaded = includesMedia;
+            this.setRuns(rows, { loadRelatedData });
             if (includeTrainingLoad) {
                 await this.loadTrainingLoad();
             }
             return true;
         }
 
-        this.setRuns([]);
         if (markInitialError) {
+            this.setRuns([], { loadRelatedData: false });
             if (result.error?.status === 401) {
                 this.redirectToAccess();
                 return false;
@@ -6540,7 +6993,7 @@ export class Component implements AfterViewInit, OnDestroy {
             const payload = await response.json();
             const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
             this.setCycles(rows, payload?.summary);
-            this.cycleStatus = rows.length ? '' : '주기 기록 없음';
+            this.cycleStatus = rows.length ? '' : '생리 기록 없음';
         } catch {
             this.setCycles([], EMPTY_CYCLE_SUMMARY);
             this.cycleStatus = '주기 데이터를 불러오지 못했어.';
@@ -6555,24 +7008,18 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
+            await this.refreshWeatherPositionIfAlreadyGranted();
             const params = new URLSearchParams({ year_month: targetMonth });
-            if (this.isInitialLoading) {
-                this.setInitialLoadingStep('location', '위치 확인 중');
+            if (this.weatherPosition) {
+                params.set('lat', String(this.weatherPosition.lat));
+                params.set('lon', String(this.weatherPosition.lon));
+                params.set('location_source', 'browser');
             }
-            const position = await this.getWeatherPosition();
-            if (requestSeq !== this.weatherRequestSeq || targetMonth !== this.activeYearMonth) return;
-            if (this.isInitialLoading) {
-                this.clearInitialLoadingStep('location');
-                this.setInitialLoadingStep('weather', '날씨를 불러오는 중');
-            }
-            if (position) {
-                params.set('lat', position.latitude.toFixed(5));
-                params.set('lon', position.longitude.toFixed(5));
-                params.set('location_source', position.source || 'browser');
-            }
-            params.set('require_location', '1');
 
-            const result = await apiFetch<WeatherResponseData>(`/api/weather/monthly?${params.toString()}`);
+            const result = await apiFetch<WeatherResponseData>(`/api/weather/monthly?${params.toString()}`, {
+                retries: 0,
+                timeoutMs: 7000
+            });
             if (requestSeq !== this.weatherRequestSeq || targetMonth !== this.activeYearMonth) return;
 
             if (!result.success || !result.data) {
@@ -6598,6 +7045,7 @@ export class Component implements AfterViewInit, OnDestroy {
         } finally {
             if (this.isInitialLoading) {
                 this.clearInitialLoadingStep('location');
+                this.clearInitialLoadingStep('weather');
             }
             if (requestSeq === this.weatherRequestSeq) {
                 this.lastWeatherLoadedAt = Date.now();
@@ -6633,183 +7081,110 @@ export class Component implements AfterViewInit, OnDestroy {
         void this.loadWeatherForActiveMonth();
     }
 
-    public acceptLocationPermission(): void {
-        this.resolveLocationPermissionPrompt(true);
-    }
+    private async refreshWeatherPositionIfAlreadyGranted(): Promise<void> {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) return;
 
-    public declineLocationPermission(): void {
-        if (typeof window !== 'undefined' && window.sessionStorage) {
-            try {
-                window.sessionStorage.setItem(this.weatherLocationPromptSkipKey, '1');
-            } catch {
-                // Session storage can be unavailable in private contexts.
-            }
-        }
-        this.resolveLocationPermissionPrompt(false);
-    }
+        const permissions = (navigator as any).permissions;
+        if (!permissions || typeof permissions.query !== 'function') return;
 
-    private resolveLocationPermissionPrompt(accepted: boolean): void {
-        const resolve = this.locationPermissionPromptResolve;
-        this.locationPermissionPromptResolve = null;
-        this.isLocationPermissionPromptVisible = false;
-        this.isLocationPermissionPromptBusy = accepted;
-        this.cdr.detectChanges();
-        resolve?.(accepted);
-    }
-
-    private async confirmLocationPermission(): Promise<boolean> {
-        if (typeof navigator === 'undefined' || !navigator.geolocation) return false;
-
-        const permissionState = await this.currentGeolocationPermissionState();
-        if (permissionState === 'granted') return true;
-        if (permissionState === 'denied') return false;
-        if (this.wasLocationPromptSkipped()) return false;
-
-        if (this.locationPermissionPromptResolve) {
-            return new Promise((resolve) => {
-                const previousResolve = this.locationPermissionPromptResolve;
-                this.locationPermissionPromptResolve = (accepted) => {
-                    previousResolve?.(accepted);
-                    resolve(accepted);
-                };
-            });
+        try {
+            const status = await permissions.query({ name: 'geolocation' });
+            if (status?.state !== 'granted') return;
+        } catch {
+            return;
         }
 
-        this.isLocationPermissionPromptVisible = true;
-        this.isLocationPermissionPromptBusy = false;
-        this.cdr.detectChanges();
+        try {
+            const position = await this.requestCurrentWeatherPosition();
+            this.weatherPosition = position;
+            this.storeWeatherPosition(position);
+        } catch {
+            return;
+        }
+    }
 
-        return new Promise((resolve) => {
-            this.locationPermissionPromptResolve = resolve;
+    private requestCurrentWeatherPosition(): Promise<WeatherPosition> {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const lat = Number(position.coords.latitude);
+                    const lon = Number(position.coords.longitude);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                        reject(new Error('현재 위치를 확인하지 못했어.'));
+                        return;
+                    }
+                    resolve({
+                        lat: Math.round(lat * 100000) / 100000,
+                        lon: Math.round(lon * 100000) / 100000
+                    });
+                },
+                (error) => {
+                    if (error.code === error.PERMISSION_DENIED) {
+                        reject(new Error('위치 권한이 허용되지 않았어.'));
+                    } else if (error.code === error.TIMEOUT) {
+                        reject(new Error('위치 확인 시간이 초과됐어.'));
+                    } else {
+                        reject(new Error('현재 위치를 확인하지 못했어.'));
+                    }
+                },
+                {
+                    enableHighAccuracy: false,
+                    maximumAge: 15 * 60 * 1000,
+                    timeout: 8000
+                }
+            );
         });
     }
 
-    private async currentGeolocationPermissionState(): Promise<PermissionState | null> {
-        if (typeof navigator === 'undefined' || !('permissions' in navigator)) return null;
+    private readStoredWeatherPosition(): WeatherPosition | null {
+        if (typeof window === 'undefined' || !window.localStorage) return null;
+
         try {
-            const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-            return status.state;
+            const raw = window.localStorage.getItem(this.weatherPositionStorageKey);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            const lat = Number(parsed?.lat);
+            const lon = Number(parsed?.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+            return { lat, lon };
         } catch {
             return null;
         }
     }
 
-    private wasLocationPromptSkipped(): boolean {
-        if (typeof window === 'undefined' || !window.sessionStorage) return false;
+    private storeWeatherPosition(position: WeatherPosition): void {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+
         try {
-            return window.sessionStorage.getItem(this.weatherLocationPromptSkipKey) === '1';
+            window.localStorage.setItem(this.weatherPositionStorageKey, JSON.stringify(position));
+        } catch {
+            return;
+        }
+    }
+
+    private hasAcceptedMediaAccessNotice(): boolean {
+        if (this.hasUploadedMediaHistory()) return true;
+        if (typeof window === 'undefined' || !window.localStorage) return false;
+
+        try {
+            return window.localStorage.getItem(this.mediaAccessNoticeAcceptedKey) === '1';
         } catch {
             return false;
         }
     }
 
-    private async getWeatherPosition(): Promise<WeatherPosition | null> {
-        const cached = this.readCachedWeatherPosition();
-        if (cached) return cached;
-        if (this.weatherPositionPromise) return this.weatherPositionPromise;
-        if (typeof navigator === 'undefined' || !navigator.geolocation) {
-            return this.getIpWeatherPosition();
-        }
-
-        this.weatherPositionPromise = new Promise((resolve) => {
-            let settled = false;
-            const finish = (position: WeatherPosition | null): void => {
-                if (settled) return;
-                settled = true;
-                resolve(position);
-            };
-
-            void this.confirmLocationPermission().then((accepted) => {
-                if (!accepted) {
-                    void this.getIpWeatherPosition().then(finish);
-                    return;
-                }
-
-                navigator.geolocation.getCurrentPosition(
-                    (result) => {
-                        const position: WeatherPosition = {
-                            latitude: result.coords.latitude,
-                            longitude: result.coords.longitude,
-                            accuracy: result.coords.accuracy,
-                            source: 'browser',
-                            updatedAt: Date.now()
-                        };
-                        this.cacheWeatherPosition(position);
-                        finish(position);
-                    },
-                    async () => finish(await this.getIpWeatherPosition()),
-                    {
-                        enableHighAccuracy: false,
-                        maximumAge: 6 * 60 * 60 * 1000,
-                        timeout: 5000
-                    }
-                );
-            });
-        });
-
-        try {
-            return await this.weatherPositionPromise;
-        } finally {
-            this.weatherPositionPromise = null;
-            this.isLocationPermissionPromptBusy = false;
-        }
-    }
-
-    private readCachedWeatherPosition(): WeatherPosition | null {
-        if (typeof window === 'undefined' || !window.localStorage) return null;
-
-        try {
-            const raw = window.localStorage.getItem(this.weatherPositionCacheKey);
-            if (!raw) return null;
-
-            const source = JSON.parse(raw) as Partial<WeatherPosition>;
-            const latitude = Number(source.latitude);
-            const longitude = Number(source.longitude);
-            const updatedAt = Number(source.updatedAt);
-            if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || !Number.isFinite(updatedAt)) return null;
-            if (Date.now() - updatedAt > 24 * 60 * 60 * 1000) return null;
-
-            return {
-                latitude,
-                longitude,
-                accuracy: Number.isFinite(Number(source.accuracy)) ? Number(source.accuracy) : undefined,
-                source: source.source === 'ip' ? 'ip' : 'browser',
-                updatedAt
-            };
-        } catch {
-            return null;
-        }
-    }
-
-    private async getIpWeatherPosition(): Promise<WeatherPosition | null> {
-        try {
-            const response = await fetch('https://ipapi.co/json/', { cache: 'no-store' });
-            const payload = await response.json().catch(() => null) as { latitude?: unknown; longitude?: unknown } | null;
-            const latitude = Number(payload?.latitude);
-            const longitude = Number(payload?.longitude);
-            if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-
-            const position: WeatherPosition = {
-                latitude,
-                longitude,
-                source: 'ip',
-                updatedAt: Date.now()
-            };
-            this.cacheWeatherPosition(position);
-            return position;
-        } catch {
-            return null;
-        }
-    }
-
-    private cacheWeatherPosition(position: WeatherPosition): void {
+    private markMediaAccessNoticeAccepted(): void {
         if (typeof window === 'undefined' || !window.localStorage) return;
 
         try {
-            window.localStorage.setItem(this.weatherPositionCacheKey, JSON.stringify(position));
+            window.localStorage.setItem(this.mediaAccessNoticeAcceptedKey, '1');
         } catch {
             return;
         }
+    }
+
+    private hasUploadedMediaHistory(): boolean {
+        return this.runs.some((run) => Boolean(run.image_url) || Boolean(run.media?.length));
     }
 
     private aiUsagePeriodText(remaining: number | null, limit: number, label: string): string {
@@ -6895,10 +7270,16 @@ export class Component implements AfterViewInit, OnDestroy {
     private async loadChatHistory(selectLatest: boolean = false): Promise<void> {
         this.isChatHistoryLoading = true;
         try {
-            const response = await fetch('/api/chat');
-            const payload = await response.json();
-            const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
-            this.applyAiUsage(payload?.usage);
+            const response = await fetch('/api/chat', {
+                headers: authHeaderForUrl('/api/chat')
+            });
+            const rawPayload = await response.json();
+            const payload = this.normalizeWizStatusPayload(rawPayload);
+            const payloadObject = payload && typeof payload === 'object' && !Array.isArray(payload)
+                ? payload as { data?: unknown[]; usage?: Partial<AiUsage> }
+                : null;
+            const rows = Array.isArray(payload) ? payload : Array.isArray(payloadObject?.data) ? payloadObject.data : [];
+            this.applyAiUsage(payloadObject?.usage);
             this.chatSessions = rows
                 .map((row: unknown) => this.normalizeChatSession(row))
                 .filter((row: ChatSession | null): row is ChatSession => Boolean(row));
@@ -7224,7 +7605,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 this.updateUploadProgress(fileIndex, totalFiles, stage, `${fileIndex + 1}/${totalFiles} 이미지 파싱 중`);
             });
             if (!parsePayload?.success || !parsePayload?.data) {
-                return { saved: false, message: parsePayload?.message || '이미지를 읽지 못했어. 수동으로 입력할래?' };
+                return { saved: false, message: this.parseImageFailureMessage(parsePayload) };
             }
 
             const data = parsePayload.data as RunRecord;
@@ -7250,7 +7631,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 data.journal = music.journal;
             }
             if (!data.date || !this.toNumber(data.distance_km)) {
-                return { saved: false, message: '이미지를 읽지 못했어. 수동으로 입력할래?' };
+                return { saved: false, message: this.parseImageFailureMessage(parsePayload, '이미지에서 날짜와 거리 값을 확인하지 못했어. 수동으로 입력해줘.') };
             }
 
             this.updateUploadProgress(fileIndex, totalFiles, 94, `${fileIndex + 1}/${totalFiles} 기록 저장 중`);
@@ -7264,8 +7645,28 @@ export class Component implements AfterViewInit, OnDestroy {
                 : typeof payload?.error?.message === 'string'
                     ? payload.error.message
                     : '';
-            return { saved: false, message: message || '이미지를 읽지 못했어. 수동으로 입력할래?' };
+            return { saved: false, message: this.parseImageFailureMessage(payload, message || '이미지를 읽지 못했어. 수동으로 입력할래?') };
         }
+    }
+
+    private parseImageFailureMessage(payload: unknown, fallback: string = '이미지를 읽지 못했어. 수동으로 입력할래?'): string {
+        const normalizedPayload = this.normalizeWizStatusPayload(payload);
+        if (normalizedPayload !== payload) {
+            return this.parseImageFailureMessage(normalizedPayload, fallback);
+        }
+
+        if (payload && typeof payload === 'object') {
+            const source = payload as Record<string, unknown>;
+            const message = typeof source['message'] === 'string' ? source['message'].trim() : '';
+            if (message) return message;
+
+            const errorCode = typeof source['error_code'] === 'string' ? source['error_code'] : '';
+            if (AI_PARSE_CONFIGURATION_ERROR_CODES.has(errorCode)) {
+                return this.aiConnection?.message || 'AI 이미지 파싱 설정을 확인해야 해. OpenAI API 키, 결제 상태, 모델 설정을 확인해줘.';
+            }
+        }
+
+        return fallback;
     }
 
     private async uploadCalendarMediaFile(runId: string, file: File, fileIndex: number, totalFiles: number): Promise<SaveRunResult> {
@@ -7364,7 +7765,11 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    private parseImageFile(file: File, targetDate: string | null, onProgress: (stage: number) => void): Promise<any> {
+    private async parseImageFile(file: File, targetDate: string | null, onProgress: (stage: number) => void): Promise<any> {
+        if (!(await ensureAuthenticated())) {
+            throw { message: '로그인이 만료되었습니다. 다시 로그인해주세요.' };
+        }
+
         return new Promise((resolve, reject) => {
             const form = new FormData();
             form.append('image', file);
@@ -7386,8 +7791,12 @@ export class Component implements AfterViewInit, OnDestroy {
                 }
             };
 
-            xhr.open('POST', '/api/parse-image');
+            xhr.open('POST', resolveApiUrl('/api/parse-image'));
+            xhr.timeout = 20000;
             xhr.responseType = 'json';
+            Object.entries(authHeaderForUrl('/api/parse-image')).forEach(([key, value]) => {
+                xhr.setRequestHeader(key, value);
+            });
             xhr.upload.addEventListener('progress', (event) => {
                 if (event.lengthComputable && event.total > 0) {
                     setStage(5 + (event.loaded / event.total) * 35);
@@ -7400,7 +7809,7 @@ export class Component implements AfterViewInit, OnDestroy {
             xhr.addEventListener('load', () => {
                 clearTimer();
                 setStage(90);
-                const payload = xhr.response || this.parseJson(xhr.responseText);
+                const payload = this.normalizeWizStatusPayload(xhr.response || this.parseJson(xhr.responseText));
                 if (xhr.status >= 200 && xhr.status < 300) {
                     resolve(payload);
                 } else {
@@ -7410,6 +7819,10 @@ export class Component implements AfterViewInit, OnDestroy {
             xhr.addEventListener('error', () => {
                 clearTimer();
                 reject(standardApiError('network'));
+            });
+            xhr.addEventListener('timeout', () => {
+                clearTimer();
+                reject(standardApiError('timeout'));
             });
             xhr.addEventListener('abort', () => {
                 clearTimer();
@@ -7425,6 +7838,24 @@ export class Component implements AfterViewInit, OnDestroy {
         } catch {
             return null;
         }
+    }
+
+    private normalizeWizStatusPayload(payload: unknown): unknown {
+        if (!payload || typeof payload !== 'object') return payload;
+
+        const source = payload as Record<string, unknown>;
+        const code = source['code'];
+        const data = source['data'];
+        if (
+            (typeof code === 'number' || typeof code === 'string') &&
+            data &&
+            typeof data === 'object' &&
+            !('success' in source)
+        ) {
+            return data;
+        }
+
+        return payload;
     }
 
     private async readChatResponse(response: Response, aiMessageIndex: number): Promise<void> {
@@ -7545,7 +7976,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }, 0);
     }
 
-    private setRuns(rows: unknown[]): void {
+    private setRuns(rows: unknown[], options: { loadRelatedData?: boolean } = {}): void {
         this.runs = rows
             .map((row) => this.normalizeRun(row))
             .filter((row): row is RunRecord => Boolean(row))
@@ -7556,9 +7987,11 @@ export class Component implements AfterViewInit, OnDestroy {
         this.activeYearMonth = nextYearMonth;
         this.refreshDerivedState();
         this.cdr.detectChanges();
-        void this.loadGoalsForActiveMonth();
-        if (monthChanged) {
-            void this.loadWeatherForActiveMonth();
+        if (options.loadRelatedData !== false) {
+            void this.loadGoalsForActiveMonth();
+            if (monthChanged) {
+                void this.loadWeatherForActiveMonth();
+            }
         }
     }
 
@@ -7658,6 +8091,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 .map((note) => [note.date, note])
         );
         this.syncSelectedCalendarMemo();
+        this.syncUploadJournalWithSelectedDate();
         this.refreshDerivedState();
         this.cdr.detectChanges();
     }
@@ -8729,6 +9163,7 @@ export class Component implements AfterViewInit, OnDestroy {
         const startDate = this.normalizeDateKey(source['start_date'] ?? source['startDate']);
         const endDate = this.normalizeDateKey(source['end_date'] ?? source['endDate']) || startDate;
         const phase = this.normalizeCyclePhase(source['cycle_phase'] ?? source['cyclePhase']);
+        const flowLevel = this.normalizeCycleFlowLevel(source['flow_level'] ?? source['flowLevel'] ?? source['flow']);
         const conditionEmoji = this.normalizeCycleConditionEmoji(source['condition_emoji'] ?? source['conditionEmoji'] ?? source['condition']);
         if (!startDate || !endDate) return null;
 
@@ -8737,6 +9172,7 @@ export class Component implements AfterViewInit, OnDestroy {
             start_date: startDate <= endDate ? startDate : endDate,
             end_date: endDate >= startDate ? endDate : startDate,
             cycle_phase: phase,
+            flow_level: flowLevel,
             condition_emoji: conditionEmoji,
             note: typeof source['note'] === 'string' ? source['note'].trim() : ''
         };
@@ -8753,7 +9189,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
         return {
             average_cycle_days: averageCycleDays && averageCycleDays > 0 ? Math.round(averageCycleDays) : EMPTY_CYCLE_SUMMARY.average_cycle_days,
-            average_period_days: averagePeriodDays && averagePeriodDays > 0 ? Math.round(averagePeriodDays) : EMPTY_CYCLE_SUMMARY.average_period_days,
+            average_period_days: averagePeriodDays && averagePeriodDays > 0 ? Math.max(7, Math.round(averagePeriodDays)) : EMPTY_CYCLE_SUMMARY.average_period_days,
             next_start_date: this.normalizeDateKey(source['next_start_date'] ?? source['nextStartDate']),
             current_phase: currentPhase,
             current_phase_label: currentPhaseLabel,
@@ -8843,7 +9279,11 @@ export class Component implements AfterViewInit, OnDestroy {
             snowText: this.textValue(source.snowText, '-'),
             humidityText: this.textValue(source.humidityText, '-'),
             windText: this.textValue(source.windText, '-'),
-            hourly
+            hourly,
+            locationName: this.textValue(source.locationName || source.location_name, ''),
+            locationSource: this.textValue(source.locationSource || source.location_source, ''),
+            stored: Boolean(source.stored),
+            capturedAt: this.textValue(source.capturedAt || source.captured_at, '')
         };
     }
 
@@ -8926,7 +9366,8 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private refreshDerivedState(): void {
-        const monthRuns = this.runs.filter((run) => run.date.startsWith(this.activeYearMonth));
+        const monthRecords = this.runs.filter((run) => run.date.startsWith(this.activeYearMonth));
+        const monthRuns = monthRecords.filter((run) => this.isRunningRecord(run));
         if (this.selectedCalendarDate && !this.selectedCalendarDate.startsWith(this.activeYearMonth)) {
             this.selectedCalendarDate = null;
             this.calendarMemoText = '';
@@ -8942,11 +9383,10 @@ export class Component implements AfterViewInit, OnDestroy {
         this.calendarCells = this.buildCalendarCells();
         this.calendarStats = this.buildCalendarStats();
         this.selectedCalendarRuns = this.buildSelectedCalendarRuns();
-        this.parsedRuns = this.buildParsedRuns();
         this.refreshWeightDerivedState();
         this.chartCards = this.buildChartCards();
         this.hydrationPattern = this.buildHydrationPattern();
-        this.runTypeStats = this.buildRunTypeStats(monthRuns);
+        this.runTypeStats = this.buildRunTypeStats(monthRecords);
         this.cyclePatternStats = this.buildCyclePatternStats();
         this.miniStats = this.buildMiniStats();
         this.galleryItems = this.buildGalleryItems();
@@ -9384,10 +9824,10 @@ export class Component implements AfterViewInit, OnDestroy {
         const [year, month] = this.activeYearMonth.split('-').map(Number);
         const first = new Date(year, month - 1, 1);
         const daysInMonth = new Date(year, month, 0).getDate();
-        const runCounts = this.runs.reduce((counts, run) => {
-            counts.set(run.date, (counts.get(run.date) || 0) + 1);
-            return counts;
-        }, new Map<string, number>());
+        const runsByDate = this.runs.reduce((map, run) => {
+            map.set(run.date, [...(map.get(run.date) || []), run]);
+            return map;
+        }, new Map<string, RunRecord[]>());
         const restDates = new Set(this.restDays);
         const noteDates = new Set(this.calendarNotes.keys());
         const todayKey = this.dateKey(new Date());
@@ -9403,17 +9843,20 @@ export class Component implements AfterViewInit, OnDestroy {
             const date = new Date(year, month - 1, day);
             const key = this.dateKey(date);
             const isFuture = key > todayKey;
-            const runCount = runCounts.get(key) || 0;
+            const dayRuns = runsByDate.get(key) || [];
+            const runCount = dayRuns.length;
             const hasRun = runCount > 0;
             const isRest = restDates.has(key) && !hasRun;
             const weather = this.weatherDays.get(key);
             const cycle = this.isCycleFeatureEnabled && this.isCycleOverlayEnabled ? this.cycleDayMap.get(key) : null;
             const status: CalendarStatus = hasRun ? 'run' : isRest ? 'rest' : isFuture ? 'future' : key === todayKey ? 'today' : 'no-run';
+            const supportActivityType = this.primarySupportActivityType(dayRuns);
             const classList = ['cal-day'];
 
             if (key === todayKey) classList.push('today-marker');
             if (status === 'future') classList.push('future');
             if (status === 'rest') classList.push('rest-day');
+            if (supportActivityType) classList.push(`${supportActivityType.replace('_', '-')}-day`);
             if (noteDates.has(key)) classList.push('has-note');
             if (cycle) classList.push('has-cycle', `cycle-phase-${cycle.phase}`, `cycle-source-${cycle.source}`);
             if (weather) {
@@ -9424,15 +9867,16 @@ export class Component implements AfterViewInit, OnDestroy {
                 key,
                 day,
                 className: classList.join(' '),
-                dotClass: this.dotClass(status),
-                ariaLabel: `${this.displayDate(key, true)}${runCount ? `, 러닝 기록 ${runCount}개` : isRest ? ', 휴식일' : ', 러닝 기록 없음'}${cycle ? `, 주기 ${cycle.label}` : ''}${weather ? `, 날씨 ${weather.summary}` : ''}${noteDates.has(key) ? ', 메모 있음' : ''}`,
+                dotClass: this.dotClass(status, supportActivityType),
+                ariaLabel: `${this.displayDate(key, true)}${this.calendarDayRecordLabel(dayRuns, isRest)}${cycle ? `, 주기 ${cycle.label}` : ''}${weather ? `, 날씨 ${weather.summary}` : ''}${noteDates.has(key) ? ', 메모 있음' : ''}`,
                 runCount,
                 weatherIcon: weather?.icon,
                 weatherTone: weather?.tone,
                 weatherSummary: weather?.summary,
                 cyclePhase: cycle?.phase,
                 cyclePhaseLabel: cycle?.label,
-                cycleSource: cycle?.source
+                cycleSource: cycle?.source,
+                cycleMarkerClass: cycle ? this.cycleMarkerClass(cycle.phase, cycle.source) : undefined
             });
         }
 
@@ -9464,9 +9908,9 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         return [
-            { label: '러닝일', value: runCount, unit: '일' },
+            { label: '기록일', value: runCount, unit: '일' },
             { label: '휴식일', value: restCount, unit: '일' },
-            { label: '미러닝', value: noRunCount, unit: '일' },
+            { label: '미기록', value: noRunCount, unit: '일' },
             { label: '남은 날', value: futureCount, unit: '일' }
         ];
     }
@@ -9476,8 +9920,8 @@ export class Component implements AfterViewInit, OnDestroy {
         const first = new Date(year, month - 1, 1);
         const daysInMonth = new Date(year, month, 0).getDate();
         const todayKey = this.dateKey(new Date());
-        const journalRunsByDate = this.runs.reduce((map, run) => {
-            if (run.date.startsWith(this.activeYearMonth) && this.hasJournal(run)) {
+        const journalRunsByDate = this.buildJournalRuns().reduce((map, run) => {
+            if (run.date.startsWith(this.activeYearMonth)) {
                 map.set(run.date, [...(map.get(run.date) || []), run]);
             }
             return map;
@@ -9518,14 +9962,15 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private syncSelectedJournalDate(): void {
+        const journalRuns = this.buildJournalRuns();
         const selectedStillValid = Boolean(
             this.selectedJournalDate &&
             this.selectedJournalDate.startsWith(this.activeYearMonth) &&
-            this.runs.some((run) => run.date === this.selectedJournalDate && this.hasJournal(run))
+            journalRuns.some((run) => run.date === this.selectedJournalDate)
         );
 
         if (!selectedStillValid) {
-            this.selectedJournalDate = this.runs.find((run) => run.date.startsWith(this.activeYearMonth) && this.hasJournal(run))?.date || null;
+            this.selectedJournalDate = journalRuns.find((run) => run.date.startsWith(this.activeYearMonth))?.date || null;
         }
 
         this.selectedJournalRuns = this.buildSelectedJournalRuns();
@@ -9534,7 +9979,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private buildSelectedJournalRuns(): RunRecord[] {
         if (!this.selectedJournalDate) return [];
 
-        return this.runs.filter((run) => run.date === this.selectedJournalDate && this.hasJournal(run));
+        return this.buildJournalRuns().filter((run) => run.date === this.selectedJournalDate);
     }
 
     private buildCycleDayMap(): Map<string, CycleDayInfo> {
@@ -9542,23 +9987,32 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!this.isCycleFeatureEnabled || !this.cycleLogs.length) return map;
 
         const sortedLogs = [...this.cycleLogs].sort((a, b) => a.start_date.localeCompare(b.start_date));
-        for (const log of sortedLogs) {
-            this.fillCycleRange(map, log.start_date, log.end_date, log.cycle_phase, 'manual', true);
+        const menstrualWindows = this.menstrualCycleWindows(sortedLogs);
+        for (const period of menstrualWindows) {
+            this.fillCycleRange(map, period.start_date, period.end_date, 'menstrual', 'manual', true);
         }
 
-        const menstrualLogs = sortedLogs.filter((log) => log.cycle_phase === 'menstrual');
-        const averageCycleDays = Math.max(15, Math.min(60, this.cycleSummary.average_cycle_days || 28));
-        const averagePeriodDays = Math.max(1, Math.min(12, this.cycleSummary.average_period_days || 5));
+        const predictionHistory = this.cyclePredictionHistory(menstrualWindows);
+        const averageCycleDays = this.cycliaAverageCycleDays(
+            predictionHistory,
+            Math.max(15, Math.min(60, this.cycleSummary.average_cycle_days || 28))
+        );
+        const averagePeriodDays = Math.max(7, Math.min(12, this.cycleSummary.average_period_days || 7));
         const predictedCycleCount = 6;
-        const maxProjectionDays = (averageCycleDays * predictedCycleCount) - 1;
-        for (let index = 0; index < menstrualLogs.length; index++) {
-            const start = this.parseDate(menstrualLogs[index].start_date);
+        const predictedStarts = this.predictedCycleStarts(predictionHistory, averageCycleDays, predictedCycleCount);
+        const projectionWindows = [
+            ...menstrualWindows,
+            ...predictedStarts.map((date) => ({ start_date: date, end_date: date }))
+        ].sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+        for (let index = 0; index < projectionWindows.length; index++) {
+            const start = this.parseDate(projectionWindows[index].start_date);
             if (!start) continue;
 
-            const explicitNext = this.parseDate(menstrualLogs[index + 1]?.start_date || null);
+            const explicitNext = this.parseDate(projectionWindows[index + 1]?.start_date || null);
             const totalDays = explicitNext
-                ? Math.min(maxProjectionDays, Math.max(0, Math.round((this.addDays(explicitNext, -1).getTime() - start.getTime()) / 86400000)))
-                : maxProjectionDays;
+                ? Math.max(0, Math.round((this.addDays(explicitNext, -1).getTime() - start.getTime()) / 86400000))
+                : averageCycleDays - 1;
 
             for (let offset = 0; offset <= totalDays; offset++) {
                 const date = this.addDays(start, offset);
@@ -9576,6 +10030,91 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         return map;
+    }
+
+    private cyclePredictionHistory(windows: { start_date: string; end_date: string }[]): HistoryInput {
+        return {
+            periodStarts: windows
+                .map((window) => this.normalizeDateKey(window.start_date))
+                .filter((date): date is string => Boolean(date))
+                .map((date) => ({ date }))
+        };
+    }
+
+    private cycliaAverageCycleDays(history: HistoryInput, fallback: number): number {
+        try {
+            const averageCycle = this.cyclePredictionEngine.analyze(history).averageCycle;
+            if (averageCycle && Number.isFinite(averageCycle)) {
+                return Math.max(15, Math.min(60, Math.round(averageCycle)));
+            }
+        } catch {
+            return fallback;
+        }
+        return fallback;
+    }
+
+    private predictedCycleStarts(history: HistoryInput, averageCycleDays: number, count: number): string[] {
+        let periodStarts = [...history.periodStarts].sort((a, b) => a.date.localeCompare(b.date));
+        const predictions: string[] = [];
+        if (!periodStarts.length) return predictions;
+
+        for (let index = 0; index < count; index++) {
+            const lastStart = periodStarts[periodStarts.length - 1]?.date;
+            if (!lastStart) break;
+
+            let nextStart = this.cycliaNextPeriod({ periodStarts });
+            if (!nextStart || nextStart <= lastStart) {
+                const lastDate = this.parseDate(lastStart);
+                if (!lastDate) break;
+                nextStart = this.dateKey(this.addDays(lastDate, averageCycleDays));
+            }
+            if (!nextStart || predictions.includes(nextStart) || periodStarts.some((item) => item.date === nextStart)) break;
+
+            predictions.push(nextStart);
+            periodStarts = [...periodStarts, { date: nextStart }];
+        }
+
+        return predictions;
+    }
+
+    private cycliaNextPeriod(history: HistoryInput): string | null {
+        try {
+            return this.normalizeDateKey(this.cyclePredictionEngine.predictNextPeriod(history).likely);
+        } catch {
+            return null;
+        }
+    }
+
+    private menstrualCycleWindows(logs: CycleLog[]): { start_date: string; end_date: string }[] {
+        const ranges = logs
+            .filter((log) => log.cycle_phase === 'menstrual')
+            .map((log) => ({
+                start_date: log.start_date <= log.end_date ? log.start_date : log.end_date,
+                end_date: log.end_date >= log.start_date ? log.end_date : log.start_date
+            }))
+            .sort((a, b) => a.start_date.localeCompare(b.start_date));
+        const windows: { start_date: string; end_date: string }[] = [];
+
+        for (const range of ranges) {
+            const current = windows[windows.length - 1];
+            if (!current) {
+                windows.push({ ...range });
+                continue;
+            }
+
+            const currentEnd = this.parseDate(current.end_date);
+            const rangeStart = this.parseDate(range.start_date);
+            if (!currentEnd || !rangeStart || rangeStart.getTime() > this.addDays(currentEnd, 1).getTime()) {
+                windows.push({ ...range });
+                continue;
+            }
+
+            if (range.end_date > current.end_date) {
+                current.end_date = range.end_date;
+            }
+        }
+
+        return windows;
     }
 
     private fillCycleRange(map: Map<string, CycleDayInfo>, startDate: string, endDate: string, phase: CyclePhase, source: CycleSource, overwrite: boolean): void {
@@ -9609,38 +10148,44 @@ export class Component implements AfterViewInit, OnDestroy {
 
         const dayRuns = this.runs.filter((run) => run.date === this.selectedCalendarDate);
 
-        return dayRuns.map((run, index) => ({
-            id: run.id || `${run.date}-${index}`,
-            date: run.date,
-            title: dayRuns.length > 1 ? `러닝 기록 ${index + 1}` : '러닝 기록',
-            badge: '저장됨',
-            runType: run.run_type,
-            stats: this.buildRunStatCards(run),
-            media: run.media || [],
-            waterBeforeMl: run.water_before_ml || null,
-            waterAfterMl: run.water_after_ml || null,
-            journal: run.journal || null,
-            playlistName: run.playlist_name || null,
-            musicUrl: run.music_url || null,
-            topTracks: run.top_tracks || [],
-            is_public: run.is_public !== false
-        }));
-    }
-
-    private buildParsedRuns(): ParsedRun[] {
-        return this.recentParsedRunIds
-            .map((id) => this.runs.find((run) => run.id === id))
-            .filter((run): run is RunRecord => Boolean(run))
-            .map((run) => ({
-                id: run.id || null,
-                date: this.displayDate(run.date, true),
-                badge: '파싱 완료',
+        return dayRuns.map((run, index) => {
+            const isSupportActivity = SUPPORT_ACTIVITY_TYPES.has(this.normalizeRunType(run.run_type));
+            return {
+                id: run.id || `${run.date}-${index}`,
+                date: run.date,
+                title: isSupportActivity
+                    ? `${this.runTypeLabel(run.run_type)} 기록`
+                    : dayRuns.length > 1 ? `러닝 기록 ${index + 1}` : '러닝 기록',
+                badge: isSupportActivity ? '운동 기록' : '저장됨',
                 runType: run.run_type,
-                stats: this.buildRunStatCards(run)
-            }));
+                stats: this.buildRunStatCards(run),
+                media: run.media || [],
+                waterBeforeMl: run.water_before_ml || null,
+                waterAfterMl: run.water_after_ml || null,
+                journal: run.journal || null,
+                playlistName: run.playlist_name || null,
+                musicUrl: run.music_url || null,
+                topTracks: run.top_tracks || [],
+                is_public: run.is_public !== false
+            };
+        });
     }
 
     private buildRunStatCards(run: RunRecord): StatCard[] {
+        if (run.journal_only) {
+            return [
+                { label: '종류', value: '일기', unit: '' },
+                { label: '날짜', value: this.displayDate(run.date, true), unit: '' }
+            ];
+        }
+        if (SUPPORT_ACTIVITY_TYPES.has(this.normalizeRunType(run.run_type))) {
+            return [
+                { label: '운동', value: this.runTypeLabel(run.run_type), unit: '' },
+                { label: '날짜', value: this.displayDate(run.date, true), unit: '' },
+                { label: '상태', value: '기록됨', unit: '' }
+            ];
+        }
+
         return [
             { label: '거리', value: this.distanceText(run.distance_km), unit: '' },
             { label: this.paceMetricLabel, value: this.paceText(run.avg_pace), unit: '' },
@@ -9807,6 +10352,33 @@ export class Component implements AfterViewInit, OnDestroy {
         return CYCLE_CONDITION_OPTIONS.some((item) => item.emoji === text) ? text : '';
     }
 
+    private normalizeCycleFlowLevel(value: unknown): CycleFlowLevel | '' {
+        const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+        if (text === 'light' || text === 'normal' || text === 'heavy') return text;
+        return '';
+    }
+
+    public cycleFlowLabel(level?: CycleFlowLevel | '' | null): string {
+        return CYCLE_FLOW_OPTIONS.find((item) => item.id === level)?.label || '';
+    }
+
+    public cycleLegendMarkerClass(phase: CyclePhase): string {
+        return `${this.cycleMarkerClass(phase, 'predicted')} cycle-legend-icon`;
+    }
+
+    private cycleMarkerClass(phase: CyclePhase, source: CycleSource): string {
+        const iconClass = phase === 'menstrual' && source === 'predicted'
+            ? 'fa-regular fa-heart'
+            : phase === 'menstrual'
+                ? 'fa-solid fa-heart'
+            : phase === 'ovulation'
+                ? 'fa-solid fa-star'
+                : phase === 'luteal'
+                    ? 'fa-solid fa-moon'
+                    : 'fa-solid fa-circle';
+        return `cycle-day-marker cycle-marker-${phase} ${iconClass}`;
+    }
+
     private buildChartPeriodSeries(): ChartPeriodSeries {
         if (this.activeChartPeriod === 'monthly') {
             return this.buildMonthlyChartSeries();
@@ -9891,22 +10463,21 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private buildGalleryItems(): GalleryItem[] {
         if (this.galleryTab === 'journal') {
-            return this.runs
-                .filter((run) => this.hasJournal(run))
+            return this.buildJournalRuns()
                 .map((run) => {
-                    const km = this.distanceText(run.distance_km, true);
+                    const km = run.journal_only ? '일기만 저장' : this.distanceText(run.distance_km, true);
                     const date = this.displayDate(run.date, false);
                     return {
                         id: run.id || `${run.date}-journal`,
                         km,
                         date,
                         stats: [
-                            { label: '거리', value: km },
-                            { label: this.paceDisplaySettingsText, value: this.paceText(run.avg_pace) },
-                            { label: '시간', value: this.shortDuration(run) }
+                            { label: run.journal_only ? '종류' : '거리', value: km },
+                            { label: run.journal_only ? '날짜' : this.paceDisplaySettingsText, value: run.journal_only ? this.displayDate(run.date, true) : this.paceText(run.avg_pace) },
+                            { label: '시간', value: run.journal_only ? '-' : this.shortDuration(run) }
                         ],
                         runType: run.run_type,
-                        altText: `${date} ${km} 러닝 일기 보기`,
+                        altText: run.journal_only ? `${date} 일기 보기` : `${date} ${km} 러닝 일기 보기`,
                         run,
                         journal: run.journal || ''
                     };
@@ -10103,11 +10674,31 @@ export class Component implements AfterViewInit, OnDestroy {
         return count;
     }
 
-    private dotClass(status: CalendarStatus): string | undefined {
+    private dotClass(status: CalendarStatus, supportActivityType: RunType | null = null): string | undefined {
         if (status === 'future') return undefined;
+        if (supportActivityType === 'strength') return 'dot dot-strength';
+        if (supportActivityType === 'home_training') return 'dot dot-home-training';
         if (status === 'run') return 'dot dot-green';
         if (status === 'rest') return 'dot dot-gray';
-        return 'dot dot-red';
+        return undefined;
+    }
+
+    private primarySupportActivityType(runs: RunRecord[]): RunType | null {
+        const activity = runs.find((run) => SUPPORT_ACTIVITY_TYPES.has(this.normalizeRunType(run.run_type)));
+        return activity ? this.normalizeRunType(activity.run_type) : null;
+    }
+
+    private calendarDayRecordLabel(runs: RunRecord[], isRest: boolean): string {
+        if (!runs.length) return isRest ? ', 휴식일' : ', 러닝 기록 없음';
+
+        const supportRuns = runs.filter((run) => SUPPORT_ACTIVITY_TYPES.has(this.normalizeRunType(run.run_type)));
+        if (supportRuns.length === runs.length && supportRuns.length === 1) {
+            return `, ${this.runTypeLabel(supportRuns[0].run_type)} 기록`;
+        }
+        if (supportRuns.length === runs.length) {
+            return `, 운동 기록 ${supportRuns.length}개`;
+        }
+        return `, 러닝 기록 ${runs.length}개`;
     }
 
     private durationSeconds(run: RunRecord): number | null {
@@ -10278,7 +10869,7 @@ export class Component implements AfterViewInit, OnDestroy {
         return payload;
     }
 
-    private musicUploadPayload(): Partial<RunRecord> {
+    private musicUploadPayload(includeJournal: boolean = true): Partial<RunRecord> {
         const payload: Partial<RunRecord> = {};
         const playlistName = String(this.playlistNameInput || '').trim();
         const uploadJournal = String(this.uploadJournalText || '').trim();
@@ -10295,7 +10886,7 @@ export class Component implements AfterViewInit, OnDestroy {
         if (playlistName) payload.playlist_name = playlistName;
         if (musicUrl) payload.music_url = musicUrl;
         if (selectedTracks.length) payload.top_tracks = selectedTracks;
-        if (uploadJournal) payload.journal = uploadJournal;
+        if (includeJournal && uploadJournal) payload.journal = uploadJournal;
         return payload;
     }
 
@@ -10335,6 +10926,51 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private hasJournal(run: RunRecord): boolean {
         return Boolean(run.journal && run.journal.trim());
+    }
+
+    private buildJournalRuns(): RunRecord[] {
+        const entries: RunRecord[] = this.runs
+            .filter((run) => this.hasJournal(run))
+            .map((run) => ({ ...run, journal_only: false }));
+        const datesWithRunJournal = new Set(entries.map((run) => run.date));
+        const runsByDate = this.runs.reduce((map, run) => {
+            if (!map.has(run.date)) map.set(run.date, run);
+            return map;
+        }, new Map<string, RunRecord>());
+
+        for (const note of this.calendarNotes.values()) {
+            const memo = (note.memo || '').trim();
+            if (!memo || datesWithRunJournal.has(note.date)) continue;
+
+            const matchingRun = runsByDate.get(note.date);
+            if (matchingRun) {
+                entries.push({
+                    ...matchingRun,
+                    journal: memo,
+                    journal_only: false
+                });
+                continue;
+            }
+
+            entries.push({
+                id: `day-note:${note.date}`,
+                date: note.date,
+                distance_km: 0,
+                avg_pace: null,
+                duration: null,
+                run_type: 'jogging',
+                journal: memo,
+                media: [],
+                journal_only: true,
+                created_at: note.updated_at || null
+            });
+        }
+
+        return entries.sort((a, b) => {
+            const dateCompare = b.date.localeCompare(a.date);
+            if (dateCompare) return dateCompare;
+            return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+        });
     }
 
     private toNumber(value: unknown): number | null {
@@ -10451,10 +11087,22 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private normalizeRunType(value: unknown): RunType {
-        if (value === 'long' || value === 'interval' || value === 'tempo' || value === 'race' || value === 'recovery') {
+        if (
+            value === 'long' ||
+            value === 'interval' ||
+            value === 'tempo' ||
+            value === 'race' ||
+            value === 'recovery' ||
+            value === 'strength' ||
+            value === 'home_training'
+        ) {
             return value;
         }
         return 'jogging';
+    }
+
+    private isRunningRecord(run: RunRecord): boolean {
+        return !SUPPORT_ACTIVITY_TYPES.has(this.normalizeRunType(run.run_type));
     }
 
     private normalizeGoalType(value: unknown): GoalType | null {
@@ -10542,7 +11190,8 @@ export class Component implements AfterViewInit, OnDestroy {
     private cycleRequestHeaders(): HeadersInit {
         return {
             'Content-Type': 'application/json',
-            'X-Cycle-Consent': 'true'
+            'X-Cycle-Consent': 'true',
+            ...authHeaderForUrl('/api/cycles')
         };
     }
 
@@ -10866,6 +11515,15 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!this.normalizeDateKey(this.cycleEndDate)) {
             this.cycleEndDate = this.cycleStartDate;
         }
+        const log = this.selectedCalendarCycleLog;
+        if (log) {
+            this.selectedCycleFlowLevel = this.normalizeCycleFlowLevel(log.flow_level) || this.selectedCycleFlowLevel;
+            this.selectedCycleConditionEmoji = this.normalizeCycleConditionEmoji(log.condition_emoji) || this.selectedCycleConditionEmoji;
+            this.cycleNoteText = log.note || '';
+        } else {
+            this.cycleNoteText = '';
+        }
+        this.isCycleNoteEditing = false;
     }
 
     private memoForDate(date: string | null | undefined): string {
@@ -10876,6 +11534,11 @@ export class Component implements AfterViewInit, OnDestroy {
     private syncSelectedCalendarMemo(): void {
         this.calendarMemoText = this.memoForDate(this.selectedCalendarDate);
         this.calendarMemoStatus = '';
+    }
+
+    private syncUploadJournalWithSelectedDate(): void {
+        this.uploadJournalText = this.memoForDate(this.selectedCalendarDate);
+        this.uploadJournalStatus = '';
     }
 
     private syncWeightInputForDate(): void {
@@ -10936,6 +11599,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
         this.selectedCalendarDate = date;
         this.syncSelectedCalendarMemo();
+        this.syncUploadJournalWithSelectedDate();
         if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
             this.cycleStartDate = date;
             if (!this.normalizeDateKey(this.cycleEndDate) || this.cycleEndDate < date) {

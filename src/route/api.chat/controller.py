@@ -271,6 +271,41 @@ def _run_codex(prompt):
             pass
 
 
+def _safe_context_value(loader, fallback):
+    try:
+        return loader()
+    except Exception:
+        return fallback
+
+
+def _chat_run_summary(row):
+    source = row if isinstance(row, dict) else {}
+    return {
+        "date": source.get("date"),
+        "distance_km": source.get("distance_km"),
+        "avg_pace": source.get("avg_pace"),
+        "duration": source.get("duration"),
+        "run_type": source.get("run_type"),
+        "calories": source.get("calories"),
+        "avg_heart_rate": source.get("avg_heart_rate"),
+        "cadence": source.get("cadence"),
+        "elevation_gain": source.get("elevation_gain"),
+        "water_before_ml": source.get("water_before_ml"),
+        "water_after_ml": source.get("water_after_ml"),
+        "journal": source.get("journal"),
+    }
+
+
+def _chat_journal_summary(row):
+    source = row if isinstance(row, dict) else {}
+    return {
+        "date": source.get("date"),
+        "distance_km": source.get("distance_km"),
+        "avg_pace": source.get("avg_pace"),
+        "journal": source.get("journal"),
+    }
+
+
 def _month_context():
     user_id = _current_user_id()
     rows = running.runs_for_month(user_id=user_id)
@@ -286,8 +321,8 @@ def _month_context():
 
     heart_rates = [row.get("avg_heart_rate") for row in rows if row.get("avg_heart_rate")]
     avg_heart = round(sum(heart_rates) / len(heart_rates)) if heart_rates else None
-    latest = rows[0]
-    hydration = running.hydration_context(user_id=user_id)
+    latest = _chat_run_summary(rows[0])
+    hydration = _safe_context_value(lambda: running.hydration_context(user_id=user_id), {})
     year_month = str(latest.get("date") or "")[:7]
 
     return {
@@ -297,7 +332,7 @@ def _month_context():
         "avg_heart": avg_heart,
         "latest": latest,
         "hydration": hydration,
-        "goals": running.goals_context(year_month, user_id=user_id),
+        "goals": _safe_context_value(lambda: running.goals_context(year_month, user_id=user_id), {}),
     }
 
 
@@ -307,20 +342,26 @@ def _codex_reply(message, cycle_enabled=False, pacer_persona="balanced"):
 
 def _chat_context(cycle_enabled=False):
     user_id = _current_user_id()
-    rows = running.runs_for_month(user_id=user_id)
+    rows = _safe_context_value(lambda: running.runs_for_month(user_id=user_id), [])
     context = {
-        "month_summary": _month_context(),
-        "recent_runs": rows[:8],
-        "recent_journals": running.recent_journals(3, user_id=user_id),
-        "weight_context": running.running_weight_context(user_id=user_id),
-        "hydration_context": running.hydration_context(user_id=user_id),
-        "goals_context": running.goals_context(user_id=user_id),
-        "ranking_context": running.ranking_context(_current_user()),
-        "social_cheer_context": running.social_cheer_context(_current_user().get("id")),
-        "training_load": running.training_load(rows=running.load_runs(include_media=False, user_id=user_id)),
+        "month_summary": _safe_context_value(lambda: _month_context(), None),
+        "recent_runs": [_chat_run_summary(row) for row in rows[:8]],
+        "recent_journals": [
+            _chat_journal_summary(row)
+            for row in _safe_context_value(lambda: running.recent_journals(3, user_id=user_id), [])
+        ],
+        "weight_context": _safe_context_value(lambda: running.running_weight_context(user_id=user_id), {}),
+        "hydration_context": _safe_context_value(lambda: running.hydration_context(user_id=user_id), {}),
+        "goals_context": _safe_context_value(lambda: running.goals_context(user_id=user_id), {}),
+        "ranking_context": _safe_context_value(lambda: running.ranking_context(_current_user()), {}),
+        "social_cheer_context": _safe_context_value(lambda: running.social_cheer_context(_current_user().get("id")), {}),
+        "training_load": _safe_context_value(
+            lambda: running.training_load(rows=running.load_runs(include_media=False, user_id=user_id)),
+            {},
+        ),
     }
     if cycle_enabled:
-        context["cycle_context"] = running.cycle_context(user_id=user_id)
+        context["cycle_context"] = _safe_context_value(lambda: running.cycle_context(user_id=user_id), {})
     return context
 
 
@@ -495,6 +536,13 @@ def _openai_error_message(exc):
         return "OpenAI API 요청 한도에 잠시 걸렸습니다. 자동 재시도 후에도 처리하지 못했으니 잠시 후 다시 시도해주세요."
     if status_code == 401:
         return "OpenAI API 키가 올바르지 않거나 사용할 수 없습니다."
+    if code == "model_not_found" or "does not have access to model" in error_text:
+        return "OpenAI 채팅 모델에 접근할 수 없습니다. RUNNINGMATE_CHAT_MODEL을 현재 프로젝트에서 사용 가능한 모델로 설정해주세요."
+    if status_code == 400:
+        if code in {"context_length_exceeded", "string_above_max_length"} or "maximum context length" in error_text:
+            return "AI에 보낼 러닝 데이터가 너무 커서 답변을 만들지 못했습니다. 컨텍스트를 줄인 뒤 다시 시도해주세요."
+        if message:
+            return f"OpenAI 요청을 처리하지 못했습니다: {message}"
     if status_code == 403:
         return "OpenAI API 접근 권한이 없습니다. 프로젝트/조직 권한과 지역 또는 IP 제한 설정을 확인해주세요."
     if status_code in (500, 502, 503, 504):
@@ -554,6 +602,21 @@ def _openai_call_with_retries(call):
             attempt += 1
 
 
+def _local_fallback_reply(message, cycle_enabled=False, pacer_persona="balanced"):
+    try:
+        return _shape_local_reply(_reply(message, cycle_enabled), pacer_persona), None
+    except Exception:
+        return "지금 일부 러닝 데이터를 불러오지 못했어. 질문을 조금 짧게 다시 보내주면 기본 기록 기준으로 답해볼게.", None
+
+
+def _chat_prompt_or_fallback(message, cycle_enabled=False, pacer_persona="balanced"):
+    try:
+        return _chat_prompt(message, cycle_enabled, pacer_persona), None
+    except Exception:
+        fallback, _error = _local_fallback_reply(message, cycle_enabled, pacer_persona)
+        return "", fallback
+
+
 def _stream_openai_reply(message, cycle_enabled=False, pacer_persona="balanced"):
     _load_env_file()
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -571,7 +634,11 @@ def _stream_openai_reply(message, cycle_enabled=False, pacer_persona="balanced")
         client = OpenAI(**client_kwargs)
         attempt = 0
         retry_max = _openai_retry_max()
-        prompt = _chat_prompt(message, cycle_enabled, pacer_persona)
+        prompt, fallback_reply = _chat_prompt_or_fallback(message, cycle_enabled, pacer_persona)
+        if fallback_reply:
+            for chunk in _stream_text(fallback_reply):
+                yield chunk
+            return
 
         while True:
             emitted_text = False
@@ -627,10 +694,13 @@ def _openai_reply(message, cycle_enabled=False, pacer_persona="balanced"):
             client_kwargs["base_url"] = os.environ.get("OPENAI_BASE_URL")
 
         client = OpenAI(**client_kwargs)
+        prompt, fallback_reply = _chat_prompt_or_fallback(message, cycle_enabled, pacer_persona)
+        if fallback_reply:
+            return fallback_reply, None
         response = _openai_call_with_retries(
             lambda: client.responses.create(
                 model=_chat_model(),
-                input=_chat_prompt(message, cycle_enabled, pacer_persona),
+                input=prompt,
             )
         )
         text = str(getattr(response, "output_text", "") or "").strip()

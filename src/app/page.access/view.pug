@@ -111,14 +111,14 @@ div.access-page
                     button.secondary-button(type="button", (click)="showLogin()") 로그인으로 돌아가기
 
                 div.auth-form(*ngIf="!isSessionChecking && view === 'signupOptions'")
-                    div.social-stack
+                    div.social-stack(*ngIf="socialLoginEnabled")
                         button.social-button.social-button--naver(type="button", (click)="startSocialSignup('naver')")
                             span.social-mark N
                             span 네이버로 시작
                         button.social-button.social-button--google(type="button", (click)="startSocialSignup('google')")
                             span.social-mark G
                             span 구글로 시작
-                    button.secondary-button(type="button", (click)="showEmailSignup()") 이메일로 회원가입
+                    button.primary-button(type="button", (click)="showEmailSignup()") 이메일로 회원가입
                     div.auth-switch
                         span 이미 계정이 있나요?
                         button.link-button(type="button", (click)="showLogin()") 로그인
@@ -225,6 +225,12 @@ div.access-page
                             label.agreement-check
                                 input(type="checkbox", [ngModel]="agreements.age", (ngModelChange)="setSignupAgreement('age', $event)")
                                 span [필수] 만 14세 이상입니다
+                            label.agreement-check
+                                input(type="checkbox", [ngModel]="agreements.locationInfo", (ngModelChange)="setSignupAgreement('locationInfo', $event)")
+                                span [선택] 날씨 표시를 위한 위치 정보 사용 안내 동의
+                            label.agreement-check
+                                input(type="checkbox", [ngModel]="agreements.photoAccess", (ngModelChange)="setSignupAgreement('photoAccess', $event)")
+                                span [선택] 기록 업로드를 위한 사진·파일 접근 안내 동의
                             label.agreement-check
                                 input(type="checkbox", [ngModel]="agreements.marketing", (ngModelChange)="setSignupAgreement('marketing', $event)")
                                 span [선택] 마케팅 정보 수신 동의

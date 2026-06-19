@@ -59,7 +59,7 @@ if not _has_cycle_consent(payload):
             "data": [],
             "summary": {
                 "average_cycle_days": 28,
-                "average_period_days": 5,
+                "average_period_days": 7,
                 "next_start_date": None,
                 "current_phase": None,
                 "current_phase_label": None,

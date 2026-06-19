@@ -1,5 +1,14 @@
 :host {
     --access-viewport-height: var(--access-visual-height, 100dvh);
+    --access-bg: #020406;
+    --access-screen: #05070c;
+    --access-sheet: #0b1118;
+    --access-field: #111923;
+    --access-line: rgba(255, 255, 255, 0.10);
+    --access-muted: #96a6b8;
+    --access-text: #f8fafc;
+    --access-accent: #74f56a;
+    --access-aqua: #49d6c8;
 
     display: block;
     position: fixed;
@@ -9,9 +18,9 @@
     min-height: var(--access-viewport-height);
     overflow: hidden;
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.10), rgba(116, 245, 106, 0) 240px),
-        linear-gradient(145deg, rgba(83, 214, 255, 0.08), rgba(83, 214, 255, 0) 360px),
-        #05070c;
+        linear-gradient(180deg, rgba(116, 245, 106, 0.11), rgba(116, 245, 106, 0) 38%),
+        linear-gradient(125deg, rgba(73, 214, 200, 0.10), rgba(73, 214, 200, 0) 46%),
+        var(--access-bg);
     isolation: isolate;
 }
 
@@ -36,11 +45,11 @@
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior-y: none;
-    color: #f8fafc;
+    color: var(--access-text);
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.10), rgba(116, 245, 106, 0) 240px),
-        linear-gradient(145deg, rgba(83, 214, 255, 0.08), rgba(83, 214, 255, 0) 360px),
-        #05070c;
+        linear-gradient(180deg, rgba(116, 245, 106, 0.10), rgba(116, 245, 106, 0) 35%),
+        linear-gradient(122deg, rgba(73, 214, 200, 0.08), rgba(73, 214, 200, 0) 48%),
+        var(--access-bg);
     -webkit-overflow-scrolling: touch;
 }
 
@@ -49,11 +58,10 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background-image:
-        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.52), transparent 68%);
+    background:
+        linear-gradient(180deg, rgba(116, 245, 106, 0.12), transparent 24%),
+        linear-gradient(148deg, transparent 0%, rgba(73, 214, 200, 0.08) 42%, transparent 72%);
+    opacity: 0.84;
 }
 
 .access-shell {
@@ -61,56 +69,102 @@
     z-index: 1;
     width: min(100%, 430px);
     min-height: 100%;
+    height: 100%;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    padding: max(36px, env(safe-area-inset-top)) 20px max(18px, env(safe-area-inset-bottom));
+    justify-content: flex-start;
+    padding: max(28px, calc(env(safe-area-inset-top) + 18px)) 22px max(22px, calc(env(safe-area-inset-bottom) + 18px));
+    background:
+        linear-gradient(180deg, rgba(116, 245, 106, 0.13), rgba(116, 245, 106, 0) 30%),
+        linear-gradient(158deg, rgba(73, 214, 200, 0.10), rgba(73, 214, 200, 0) 42%),
+        var(--access-screen);
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.34);
+    scrollbar-width: none;
+}
+
+.access-shell::-webkit-scrollbar {
+    display: none;
+}
+
+.access-shell::after {
+    content: "";
+    position: fixed;
+    left: 50%;
+    bottom: max(7px, env(safe-area-inset-bottom));
+    width: 108px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.32);
+    transform: translateX(-50%);
+    pointer-events: none;
 }
 
 .access-shell--signup {
     justify-content: flex-start;
-    padding-top: max(108px, calc(env(safe-area-inset-top) + 76px));
+    padding-top: max(28px, calc(env(safe-area-inset-top) + 18px));
 }
 
 .app-brand {
     flex: 0 0 auto;
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 0 0 22px;
+    min-height: clamp(176px, 30vh, 252px);
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 14px;
+    padding: 18px 2px 24px;
 }
 
 .access-shell--signup .app-brand {
-    padding-bottom: 18px;
+    min-height: 78px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 0 0 18px;
 }
 
 .brand-icon {
-    width: 56px;
-    height: 56px;
+    width: 74px;
+    height: 74px;
     flex: 0 0 auto;
-    border-radius: 8px;
-    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+    border-radius: 20px;
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.30);
+}
+
+.access-shell--signup .brand-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
 }
 
 .brand-text {
     min-width: 0;
 }
 
-.brand-overline,
-.auth-eyebrow {
+.brand-overline {
     margin: 0;
-    color: #74f56a;
-    font-size: 11px;
+    color: var(--access-accent);
+    font-size: 12px;
     font-weight: 900;
     line-height: 1.2;
+}
+
+.auth-eyebrow {
+    display: none;
 }
 
 .brand-title {
     margin: 4px 0 0;
     color: #ffffff;
-    font-size: 22px;
+    font-size: 30px;
     font-weight: 900;
     line-height: 1.12;
+}
+
+.access-shell--signup .brand-title {
+    font-size: 22px;
 }
 
 .auth-panel {
@@ -120,9 +174,15 @@
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
+    margin-top: auto;
+    padding: 24px 2px 8px;
+    border-top: 1px solid var(--access-line);
 }
 
 .access-shell--signup .auth-panel {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
     justify-content: flex-start;
 }
 
@@ -141,21 +201,21 @@
 }
 
 .auth-header {
-    margin-bottom: 20px;
+    margin-bottom: 18px;
 }
 
 .auth-title {
-    margin: 8px 0 0;
+    margin: 0;
     color: #ffffff;
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 900;
-    line-height: 1.16;
+    line-height: 1.18;
 }
 
 .auth-description {
     margin: 8px 0 0;
-    color: #9aabba;
-    font-size: 13px;
+    color: var(--access-muted);
+    font-size: 14px;
     font-weight: 700;
     line-height: 1.55;
 }
@@ -164,7 +224,7 @@
 .step-panel {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 16px;
 }
 
 .session-check-card {
@@ -174,9 +234,9 @@
     gap: 10px;
     min-height: 172px;
     justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
-    background: rgba(16, 23, 34, 0.62);
+    border: 1px solid var(--access-line);
+    border-radius: 8px;
+    background: rgba(11, 17, 24, 0.72);
     padding: 22px;
     text-align: center;
 }
@@ -189,7 +249,7 @@
 }
 
 .session-check-sub {
-    color: #9aabba;
+    color: var(--access-muted);
     font-size: 12px;
     font-weight: 700;
     line-height: 1.45;
@@ -229,12 +289,12 @@
 
 .field-input {
     width: 100%;
-    height: 54px;
-    border: 1px solid rgba(255, 255, 255, 0.13);
-    border-radius: 8px;
-    padding: 0 15px;
+    height: 58px;
+    border: 1px solid var(--access-line);
+    border-radius: 16px;
+    padding: 0 17px;
     color: #ffffff;
-    background: rgba(16, 23, 34, 0.92);
+    background: var(--access-field);
     font-size: 16px;
     font-weight: 800;
     outline: none;
@@ -246,8 +306,8 @@
 }
 
 .field-input:focus {
-    border-color: rgba(116, 245, 106, 0.84);
-    background: #111b28;
+    border-color: rgba(116, 245, 106, 0.86);
+    background: #131f2b;
     box-shadow: 0 0 0 3px rgba(116, 245, 106, 0.14);
 }
 
@@ -309,8 +369,7 @@
 
 .auth-switch {
     justify-content: center;
-    border-top: 1px solid rgba(255, 255, 255, 0.10);
-    padding-top: 18px;
+    padding-top: 4px;
     color: #94a3b8;
     font-size: 13px;
     font-weight: 700;
@@ -330,6 +389,10 @@
     line-height: 1.35;
 }
 
+.check-row {
+    gap: 8px;
+}
+
 .check-row input,
 .agreement-all input,
 .agreement-check input,
@@ -340,16 +403,50 @@
     accent-color: #74f56a;
 }
 
+.check-row input {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.22);
+    appearance: none;
+    -webkit-appearance: none;
+    transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.check-row input::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+    transition: transform 160ms ease;
+}
+
+.check-row input:checked {
+    border-color: var(--access-accent);
+    background: var(--access-accent);
+}
+
+.check-row input:checked::after {
+    transform: translateX(16px);
+}
+
 .primary-button,
 .secondary-button,
 .social-button {
-    min-height: 54px;
+    min-height: 58px;
     width: 100%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    border-radius: 8px;
+    border-radius: 16px;
     border: 0;
     padding: 0 16px;
     font-size: 15px;
@@ -360,14 +457,14 @@
 
 .primary-button {
     color: #041108;
-    background: #74f56a;
-    box-shadow: 0 14px 34px rgba(116, 245, 106, 0.20);
+    background: var(--access-accent);
+    box-shadow: 0 14px 34px rgba(116, 245, 106, 0.22);
 }
 
 .secondary-button {
-    border: 1px solid rgba(255, 255, 255, 0.13);
+    border: 1px solid var(--access-line);
     color: #e5edf7;
-    background: rgba(255, 255, 255, 0.055);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .primary-button:not(:disabled):active,
@@ -400,7 +497,7 @@
 .social-stack {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
 }
 
 .social-button--naver {
@@ -434,7 +531,7 @@
 }
 
 .notice-card {
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid var(--access-line);
     border-radius: 8px;
     padding: 16px;
     background: rgba(255, 255, 255, 0.055);
@@ -506,18 +603,18 @@
 
 .segment-option {
     height: 54px;
-    border: 1px solid rgba(255, 255, 255, 0.13);
-    border-radius: 8px;
+    border: 1px solid var(--access-line);
+    border-radius: 14px;
     color: #cbd5e1;
-    background: rgba(16, 23, 34, 0.92);
+    background: var(--access-field);
     font-size: 14px;
     font-weight: 900;
 }
 
 .segment-option.is-selected {
-    border-color: #74f56a;
+    border-color: var(--access-accent);
     color: #041108;
-    background: #74f56a;
+    background: var(--access-accent);
 }
 
 .form-actions {
@@ -530,8 +627,8 @@
 .agreement-row,
 .agreement-check {
     min-height: 50px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 8px;
+    border: 1px solid var(--access-line);
+    border-radius: 14px;
     padding: 0 14px;
     background: rgba(255, 255, 255, 0.045);
 }
@@ -567,12 +664,7 @@
 }
 
 .auth-footer {
-    flex: 0 0 auto;
-    margin-top: 18px;
-    color: #637188;
-    text-align: center;
-    font-size: 11px;
-    font-weight: 700;
+    display: none;
 }
 
 .policy-modal {
@@ -689,18 +781,19 @@
 
 @media (min-width: 700px) {
     .access-page {
-        align-items: center;
-        padding: 24px;
+        align-items: stretch;
+        padding: 0;
     }
 
     .access-shell {
-        min-height: min(844px, calc(var(--access-viewport-height) - 48px));
-        max-height: min(844px, calc(var(--access-viewport-height) - 48px));
+        min-height: var(--access-viewport-height);
+        max-height: var(--access-viewport-height);
         overflow-y: auto;
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        border-radius: 8px;
-        background: rgba(7, 10, 16, 0.82);
-        box-shadow: 0 28px 92px rgba(0, 0, 0, 0.42);
+        border: 0;
+        border-radius: 0;
+        box-shadow:
+            -32px 0 86px rgba(0, 0, 0, 0.30),
+            32px 0 86px rgba(0, 0, 0, 0.30);
     }
 }
 

@@ -169,11 +169,16 @@ class Auth:
         }
 
     def authenticate(self, identifier, password):
-        struct = wiz.model("struct")
-        user = struct.user.authenticate(identifier, password)
-        if not user:
-            return None
+        user, _reason = self.authenticate_with_reason(identifier, password)
         return user
+
+    def authenticate_with_reason(self, identifier, password):
+        struct = wiz.model("struct")
+        authenticate = getattr(struct.user, "authenticate_with_reason", None)
+        if authenticate is None:
+            user = struct.user.authenticate(identifier, password)
+            return user, "" if user else "invalid_credentials"
+        return authenticate(identifier, password)
 
     def refresh(self, refresh_token):
         verified, error = self.verify_token(refresh_token, token_type="refresh")

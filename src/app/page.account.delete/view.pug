@@ -1,14 +1,12 @@
 main(class="account-delete-page", [class.dark-screen]="isDark", [class.light-screen]="!isDark")
     header(class="legal-header")
-        button(type="button", class="legal-back danger", aria-label="설정으로 돌아가기", title="뒤로", (click)="goBack()")
+        button(type="button", class="legal-back", aria-label="설정으로 돌아가기", title="뒤로", (click)="goBack()")
             i(class="fa-solid fa-chevron-left", aria-hidden="true")
-        a(class="legal-brand", href="/dashboard", aria-label="Runningmate dashboard")
-            span(class="legal-brand-mark danger") R
-            span Runningmate
+        div(class="legal-heading")
+            h1 계정 삭제
+            div(class="legal-sub") 계정과 서비스 데이터 삭제
 
     section(class="delete-hero")
-        p(class="legal-eyebrow") Account Deletion
-        h1 계정 삭제
         p(class="legal-lead") 계정과 Runningmate 서비스 데이터를 삭제합니다. 삭제가 완료되면 되돌릴 수 없습니다.
 
     section(*ngIf="loading", class="legal-state")

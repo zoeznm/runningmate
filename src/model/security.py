@@ -269,7 +269,7 @@ class Security:
         if self._bool("RUNNINGMATE_AV_SCAN_DISABLED", False):
             return "disabled"
 
-        mode = str(os.environ.get("RUNNINGMATE_AV_SCAN_MODE") or "required").strip().lower()
+        mode = str(os.environ.get("RUNNINGMATE_AV_SCAN_MODE") or "permissive").strip().lower()
         if mode in {"disabled", "off", "false", "0", "none"}:
             return "disabled"
         if mode in {"permissive", "optional", "warn"}:

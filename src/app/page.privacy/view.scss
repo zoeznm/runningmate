@@ -264,9 +264,13 @@
 
 .delete-account-row strong {
     display: block;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    overflow-wrap: normal;
     color: #132018;
     font-size: 17px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: keep-all;
 }
 
 .delete-warning {
@@ -809,4 +813,588 @@
 .legal-back:focus-visible {
     outline: 2px solid var(--legal-primary);
     outline-offset: 2px;
+}
+
+/* App shell tone override: keep these standalone legal pages visually aligned with dashboard screens. */
+:host {
+    --dashboard-viewport-height: var(--dashboard-visual-height, 100dvh);
+
+    display: block;
+    min-height: var(--dashboard-viewport-height);
+    overflow-wrap: normal;
+    background: #12121c;
+    font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    word-break: keep-all;
+}
+
+@supports not (height: 100dvh) {
+    :host {
+        --dashboard-viewport-height: var(--dashboard-visual-height, 100vh);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+button,
+input {
+    font-family: inherit;
+}
+
+button {
+    white-space: nowrap;
+    word-break: keep-all;
+}
+
+.legal-page,
+.account-delete-page {
+    --screen-bg: #12121c;
+    --surface: #1e1e30;
+    --surface-2: #2a2a40;
+    --primary: #78d6b3;
+    --primary-rgb: 120, 214, 179;
+    --primary-fill: #78d6b3;
+    --primary-fill-rgb: 120, 214, 179;
+    --primary-deep: #173e35;
+    --primary-ink: #10201a;
+    --text: #e8e8f0;
+    --text-muted: rgba(232, 232, 240, 0.68);
+    --muted: #666;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-soft: rgba(255, 255, 255, 0.06);
+    --danger: #ef4444;
+    --danger-strong: #dc2626;
+    --danger-soft: rgba(220, 38, 38, 0.1);
+    --danger-text: #fecaca;
+    width: 100%;
+    max-width: 390px;
+    min-height: var(--dashboard-viewport-height);
+    margin: 0 auto;
+    border-right: 0.5px solid var(--line);
+    border-left: 0.5px solid var(--line);
+    background: var(--screen-bg);
+    box-shadow: 0 0 0 100vmax var(--screen-bg);
+    color: var(--text);
+    overflow-x: hidden;
+    padding: 0 16px calc(78px + env(safe-area-inset-bottom, 0px));
+}
+
+.legal-page.light-screen,
+.account-delete-page.light-screen {
+    --screen-bg: #f7f7f9;
+    --surface: #ffffff;
+    --surface-2: #f0f0f6;
+    --primary: #1b7f65;
+    --primary-rgb: 27, 127, 101;
+    --primary-fill: #78d6b3;
+    --primary-fill-rgb: 120, 214, 179;
+    --primary-deep: #10201a;
+    --primary-ink: #10201a;
+    --text: #1a1a2e;
+    --text-muted: rgba(26, 26, 46, 0.62);
+    --muted: #888;
+    --line: rgba(0, 0, 0, 0.1);
+    --line-soft: rgba(0, 0, 0, 0.08);
+    --danger: #dc2626;
+    --danger-strong: #dc2626;
+    --danger-soft: #fff1f2;
+    --danger-text: #b91c1c;
+}
+
+.legal-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    min-height: 58px;
+    max-width: none;
+    margin: 0 -16px;
+    border-bottom: 0.5px solid var(--line);
+    background: color-mix(in srgb, var(--screen-bg) 94%, transparent);
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+    backdrop-filter: blur(12px);
+}
+
+.legal-back {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border: 0.5px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.legal-heading {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.legal-heading h1 {
+    overflow: hidden;
+    margin: 0;
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.legal-sub {
+    overflow: hidden;
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.legal-brand,
+.legal-brand-mark,
+.legal-nav,
+.legal-eyebrow,
+.delete-kicker,
+.legal-meta {
+    display: none !important;
+}
+
+.legal-hero,
+.delete-hero,
+.legal-document,
+.legal-state,
+.delete-panel,
+.legal-footer {
+    max-width: none;
+}
+
+.legal-hero,
+.delete-hero {
+    padding: 14px 0 12px;
+}
+
+.legal-lead {
+    max-width: none;
+    margin: 0;
+    border: 0.5px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    padding: 13px 14px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.legal-document,
+.delete-panel,
+.legal-state {
+    overflow: hidden;
+    border: 0.5px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    box-shadow: none;
+}
+
+.legal-section {
+    border-bottom: 0.5px solid var(--line-soft);
+    padding: 15px 14px;
+}
+
+.legal-section:last-child {
+    border-bottom: 0;
+}
+
+.legal-section h2,
+.delete-panel h2 {
+    margin: 0;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.legal-section p,
+.delete-panel p,
+.delete-warning li,
+.delete-field small {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.legal-section p {
+    margin: 8px 0 0;
+    white-space: pre-line;
+}
+
+.legal-state {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 13px 14px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.legal-state.error {
+    border-color: rgba(239, 68, 68, 0.28);
+    background: var(--danger-soft);
+    color: var(--danger-text);
+}
+
+.legal-state button {
+    min-height: 34px;
+    margin-left: auto;
+    border: 0;
+    border-radius: 12px;
+    background: var(--primary);
+    padding: 0 12px;
+    color: var(--primary-ink);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.legal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.legal-footer a {
+    flex: 0 0 auto;
+    color: var(--primary);
+    font-weight: 800;
+    text-decoration: none;
+}
+
+.delete-panel {
+    display: block;
+    padding: 14px;
+}
+
+.delete-panel.wide {
+    display: grid;
+    gap: 12px;
+}
+
+.delete-panel-icon {
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    border-radius: 50%;
+    background: var(--danger-soft);
+    color: var(--danger-text);
+    font-size: 17px;
+}
+
+.delete-panel-icon.success {
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
+}
+
+.delete-account-row,
+.delete-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.delete-account-row {
+    border-bottom: 0.5px solid var(--line-soft);
+    padding-bottom: 12px;
+}
+
+.delete-account-row strong {
+    display: block;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.25;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.delete-warning {
+    border: 0.5px solid rgba(239, 68, 68, 0.28);
+    border-radius: 14px;
+    background: var(--danger-soft);
+    padding: 13px;
+}
+
+.delete-warning h2 {
+    color: var(--danger-text);
+}
+
+.delete-warning ul {
+    display: grid;
+    gap: 7px;
+    margin: 10px 0;
+    padding-left: 17px;
+}
+
+.delete-warning p {
+    margin: 0;
+    color: var(--danger-text);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.delete-form {
+    display: grid;
+    gap: 12px;
+}
+
+.delete-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
+.delete-check input {
+    margin-top: 2px;
+    accent-color: var(--danger-strong);
+}
+
+.delete-field {
+    display: grid;
+    gap: 6px;
+}
+
+.delete-field span {
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.delete-field input {
+    width: 100%;
+    min-height: 42px;
+    border: 0.5px solid var(--line);
+    border-radius: 12px;
+    background: var(--screen-bg);
+    padding: 0 12px;
+    color: var(--text);
+    font-size: 14px;
+    outline: 0;
+}
+
+.delete-field input:focus {
+    border-color: rgba(239, 68, 68, 0.8);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.14);
+}
+
+.delete-status {
+    border-radius: 12px;
+    padding: 10px 11px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
+.delete-status.info {
+    background: rgba(var(--primary-fill-rgb), 0.12);
+    color: var(--primary-fill);
+}
+
+.light-screen .delete-status.info {
+    color: var(--primary);
+}
+
+.delete-status.success {
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
+}
+
+.light-screen .delete-status.success {
+    color: var(--primary);
+}
+
+.delete-status.error {
+    background: var(--danger-soft);
+    color: var(--danger-text);
+}
+
+.delete-actions.end {
+    justify-content: flex-end;
+}
+
+.delete-primary,
+.delete-danger,
+.delete-secondary {
+    display: inline-flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border-radius: 12px;
+    padding: 0 13px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+    touch-action: manipulation;
+}
+
+.delete-primary {
+    border: 0;
+    background: var(--primary);
+    color: var(--primary-ink);
+}
+
+.delete-danger {
+    border: 0;
+    background: var(--danger-strong);
+    color: #ffffff;
+}
+
+.delete-danger:disabled {
+    cursor: default;
+    opacity: 0.45;
+}
+
+.delete-secondary {
+    border: 0.5px solid var(--line);
+    background: transparent;
+    color: var(--text);
+}
+
+.delete-secondary.compact {
+    min-height: 34px;
+    padding: 0 11px;
+    font-size: 12px;
+}
+
+.delete-panel.complete {
+    text-align: center;
+}
+
+.legal-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 50%;
+    z-index: 35;
+    display: flex;
+    width: min(390px, 100vw);
+    border-top: 0.5px solid var(--line);
+    background: var(--screen-bg);
+    padding: 4px env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    transform: translateX(-50%);
+}
+
+.legal-bottom-item {
+    display: flex;
+    min-width: 0;
+    min-height: 50px;
+    flex: 1 1 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-decoration: none;
+    transform: translateY(6px);
+}
+
+.legal-bottom-item i {
+    display: flex;
+    width: 34px;
+    height: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-size: 20px;
+}
+
+.legal-bottom-item span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.legal-bottom-item.active {
+    color: var(--primary);
+}
+
+.legal-bottom-item.active i {
+    background: rgba(var(--primary-fill-rgb), 0.16);
+}
+
+.light-screen .legal-bottom-item.active i {
+    background: rgba(var(--primary-fill-rgb), 0.28);
+}
+
+.legal-bottom-item:focus-visible,
+.legal-back:focus-visible,
+.delete-primary:focus-visible,
+.delete-secondary:focus-visible,
+.delete-danger:focus-visible,
+.legal-state button:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+@media (max-width: 390px) {
+    .legal-page,
+    .account-delete-page {
+        border-right: 0;
+        border-left: 0;
+    }
+}
+
+@media (max-width: 360px) {
+    .legal-page,
+    .account-delete-page {
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+
+    .legal-header {
+        margin-right: -14px;
+        margin-left: -14px;
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+
+    .legal-footer,
+    .delete-account-row,
+    .delete-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .delete-actions.end {
+        align-items: stretch;
+    }
 }

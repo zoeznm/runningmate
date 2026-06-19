@@ -20,6 +20,7 @@ KST_OFFSET = datetime.timedelta(hours=9)
 CACHE_TTL_SECONDS = 30 * 60
 IP_LOCATION_CACHE_TTL_SECONDS = 12 * 60 * 60
 CACHE_DIR = os.environ.get("RUNNINGMATE_WEATHER_CACHE_DIR", "/opt/app/data/weather_cache")
+SNAPSHOT_FILE = os.environ.get("RUNNINGMATE_WEATHER_SNAPSHOT_FILE", "/opt/app/data/weather_snapshots.json")
 DEFAULT_LAND_REG_ID = "11B00000"
 DEFAULT_TEMP_REG_ID = "11B10101"
 DEFAULT_LAT = 37.5665
@@ -368,6 +369,143 @@ def _write_cache(cache_key, payload):
             json.dump(payload, fp, ensure_ascii=False)
     except Exception:
         return
+
+
+def _current_user_id():
+    try:
+        session = wiz.model("portal/season/session").use()
+        return _clean_text(session.get("id"))
+    except Exception:
+        return ""
+
+
+def _read_snapshot_store():
+    try:
+        with open(SNAPSHOT_FILE, "r", encoding="utf-8") as fp:
+            payload = json.load(fp)
+    except Exception:
+        return {"version": 1, "users": {}}
+
+    if not isinstance(payload, dict):
+        return {"version": 1, "users": {}}
+    users = payload.get("users")
+    if not isinstance(users, dict):
+        users = {}
+    return {"version": 1, "users": users}
+
+
+def _write_snapshot_store(payload):
+    try:
+        os.makedirs(os.path.dirname(SNAPSHOT_FILE), exist_ok=True)
+        tmp_path = SNAPSHOT_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as fp:
+            json.dump(payload, fp, ensure_ascii=False)
+        os.replace(tmp_path, SNAPSHOT_FILE)
+    except Exception:
+        return False
+    return True
+
+
+def _snapshot_location(location):
+    source = location if isinstance(location, dict) else {}
+    return {
+        "name": _clean_text(source.get("name")),
+        "source": _clean_text(source.get("source")),
+        "lat": source.get("lat"),
+        "lon": source.get("lon"),
+        "distanceKm": source.get("distanceKm"),
+    }
+
+
+def _annotate_weather_day(summary, location, base=None, stored=False, captured_at=None):
+    row = dict(summary) if isinstance(summary, dict) else {}
+    loc = _snapshot_location(location)
+    if loc["name"]:
+        row["locationName"] = loc["name"]
+    if loc["source"]:
+        row["locationSource"] = loc["source"]
+    if loc["lat"] is not None:
+        row["locationLat"] = loc["lat"]
+    if loc["lon"] is not None:
+        row["locationLon"] = loc["lon"]
+    if loc["distanceKm"] is not None:
+        row["locationDistanceKm"] = loc["distanceKm"]
+    if base:
+        row["base"] = base
+    if stored:
+        row["stored"] = True
+    if captured_at:
+        row["capturedAt"] = captured_at
+    return row
+
+
+def _annotate_weather_days(days, location, base=None):
+    return {
+        date_key: _annotate_weather_day(summary, location, base, stored=False)
+        for date_key, summary in sorted((days or {}).items())
+    }
+
+
+def _save_weather_snapshots(user_id, days, location, base=None):
+    if not user_id or not isinstance(days, dict):
+        return
+
+    today_key = _now_kst().strftime("%Y-%m-%d")
+    captured_at = _now_kst().strftime("%Y-%m-%dT%H:%M:%S+09:00")
+    rows = {
+        date_key: _annotate_weather_day(summary, location, base, stored=True, captured_at=captured_at)
+        for date_key, summary in days.items()
+        if isinstance(date_key, str) and date_key <= today_key
+    }
+    if not rows:
+        return
+
+    store = _read_snapshot_store()
+    users = store.setdefault("users", {})
+    user_days = users.setdefault(user_id, {})
+    if not isinstance(user_days, dict):
+        user_days = {}
+        users[user_id] = user_days
+    user_days.update(rows)
+
+    sorted_keys = sorted(user_days.keys())
+    for date_key in sorted_keys[:-730]:
+        user_days.pop(date_key, None)
+    _write_snapshot_store(store)
+
+
+def _merge_weather_snapshots(user_id, days, year_month):
+    merged = dict(days or {})
+    if not user_id:
+        return merged
+
+    store = _read_snapshot_store()
+    user_days = store.get("users", {}).get(user_id, {})
+    if not isinstance(user_days, dict):
+        return merged
+
+    prefix = year_month + "-"
+    for date_key, summary in sorted(user_days.items()):
+        if isinstance(date_key, str) and date_key.startswith(prefix) and date_key not in merged:
+            merged[date_key] = summary
+    return merged
+
+
+def _snapshot_response(user_id, year_month, message="저장된 날씨 기록입니다."):
+    days = _merge_weather_snapshots(user_id, {}, year_month)
+    filtered = _filter_days(days, year_month)
+    if not filtered:
+        return None
+    return {
+        "success": True,
+        "data": {
+            "year_month": year_month,
+            "location": {},
+            "base": {"message": message},
+            "coverage": _coverage_from_days(filtered),
+            "days": filtered,
+        },
+    }
 
 
 def _is_permission_error(result_code, result_message):
@@ -1144,9 +1282,10 @@ if not service_key:
     response_payload = {"success": False, "message": "날씨 인증키가 설정되지 않았습니다."}
 else:
     year_month = _year_month()
+    user_id = _current_user_id()
     location = _weather_location()
     if not location:
-        response_payload = {"success": False, "message": "현재 위치를 확인해야 날씨를 불러올 수 있습니다."}
+        response_payload = _snapshot_response(user_id, year_month) or {"success": False, "message": "현재 위치를 확인해야 날씨를 불러올 수 있습니다."}
     else:
         land_reg_id = location["landRegId"]
         temp_reg_id = location["tempRegId"]
@@ -1199,6 +1338,10 @@ else:
                     raise PermissionError(permission_errors[0])
                 raise RuntimeError(weather_errors[0] if weather_errors else "WEATHER_UNAVAILABLE")
 
+            all_days = _annotate_weather_days(all_days, location, base)
+            _save_weather_snapshots(user_id, all_days, location, base)
+            all_days = _merge_weather_snapshots(user_id, all_days, year_month)
+
             response_payload = {
                 "success": True,
                 "data": {
@@ -1210,11 +1353,11 @@ else:
                 },
             }
         except PermissionError:
-            response_payload = {
+            response_payload = _snapshot_response(user_id, year_month, "저장된 날씨 기록입니다.") or {
                 "success": False,
                 "message": "날씨 API 권한 확인이 필요합니다. 공공데이터포털에서 기상청 단기예보/중기예보 활용신청 승인 상태를 확인해 주세요.",
             }
         except Exception:
-            response_payload = {"success": False, "message": "날씨 정보를 불러오지 못했습니다."}
+            response_payload = _snapshot_response(user_id, year_month, "저장된 날씨 기록입니다.") or {"success": False, "message": "날씨 정보를 불러오지 못했습니다."}
 
 wiz.response.json(response_payload)

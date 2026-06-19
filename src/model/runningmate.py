@@ -23,7 +23,7 @@ class RunningMateData:
         "video/x-m4v": ".m4v",
     }
     DEFAULT_MAX_MEDIA_UPLOAD_BYTES = 50 * 1024 * 1024
-    RUN_TYPE_ORDER = ("jogging", "long", "interval", "tempo", "race", "recovery")
+    RUN_TYPE_ORDER = ("jogging", "long", "interval", "tempo", "race", "recovery", "strength", "home_training")
     GOAL_TYPE_ORDER = ("distance", "count", "duration", "pace")
     GOAL_TYPE_LABELS = {
         "distance": "월 총 거리",
@@ -63,6 +63,8 @@ class RunningMateData:
         "tempo": "템포",
         "race": "대회",
         "recovery": "회복주",
+        "strength": "근력운동",
+        "home_training": "홈트",
     }
     RUN_TYPE_ALIASES = {
         "jog": "jogging",
@@ -91,6 +93,18 @@ class RunningMateData:
         "recovery_run": "recovery",
         "회복주": "recovery",
         "회복 러닝": "recovery",
+        "strength": "strength",
+        "strength_training": "strength",
+        "weight_training": "strength",
+        "근력운동": "strength",
+        "근력 운동": "strength",
+        "웨이트": "strength",
+        "home_training": "home_training",
+        "hometraining": "home_training",
+        "homeworkout": "home_training",
+        "home_workout": "home_training",
+        "홈트": "home_training",
+        "홈트레이닝": "home_training",
     }
     REACTION_TYPES = ("like", "fire", "clap", "strong")
     REACTION_META = {
@@ -100,6 +114,7 @@ class RunningMateData:
         "strong": {"emoji": "💪", "label": "힘내"},
     }
     CYCLE_PHASE_ORDER = ("menstrual", "follicular", "ovulation", "luteal")
+    DEFAULT_PERIOD_DAYS = 7
     CYCLE_PHASE_LABELS = {
         "menstrual": "생리기",
         "follicular": "난포기",
@@ -1840,6 +1855,7 @@ class RunningMateData:
                     break
 
             if target_index is None:
+                remaining_notes.append(note)
                 continue
 
             current = dict(run_rows[target_index]) if isinstance(run_rows[target_index], dict) else {}
@@ -2064,6 +2080,7 @@ class RunningMateData:
         start_date = self._date(source.get("start_date", source.get("startDate")))
         end_date = self._date(source.get("end_date", source.get("endDate"))) or start_date
         phase = self._cycle_phase(source.get("cycle_phase", source.get("cyclePhase")))
+        flow_level = self._cycle_flow_level(source.get("flow_level", source.get("flowLevel", source.get("flow"))))
         condition_emoji = self._cycle_condition_emoji(
             source.get("condition_emoji", source.get("conditionEmoji", source.get("condition")))
         )
@@ -2079,6 +2096,7 @@ class RunningMateData:
             "start_date": start_date,
             "end_date": end_date,
             "cycle_phase": phase,
+            "flow_level": flow_level,
             "condition_emoji": condition_emoji,
             "note": note[:2000] if note else "",
             "user_id": self._text(source.get("user_id") or source.get("userId")),
@@ -2094,12 +2112,24 @@ class RunningMateData:
         if not log:
             return None, "주기 기록 날짜가 올바르지 않습니다."
         log["user_id"] = owner_id
+        log["cycle_phase"] = "menstrual"
 
+        requested_id = self._text(source.get("id"))
         rows = self.load_cycles()
         previous = next(
             (
                 row for row in rows
-                if row.get("id") == log.get("id")
+                if requested_id
+                and row.get("id") == requested_id
+                and (self._account_row_user_id(row) == owner_id or not self._account_row_user_id(row))
+            ),
+            None,
+        ) or next(
+            (
+                row for row in rows
+                if row.get("cycle_phase") == "menstrual"
+                and row.get("start_date") == log.get("start_date")
+                and row.get("end_date") == log.get("end_date")
                 and (self._account_row_user_id(row) == owner_id or not self._account_row_user_id(row))
             ),
             None,
@@ -2146,28 +2176,28 @@ class RunningMateData:
 
     def cycle_summary(self, user_id=None):
         logs = self.load_cycles(user_id=user_id)
-        menstrual_logs = sorted(
-            [row for row in logs if row.get("cycle_phase") == "menstrual"],
-            key=lambda row: row.get("start_date") or "",
-        )
+        menstrual_logs = [row for row in logs if row.get("cycle_phase") == "menstrual"]
+        menstrual_windows = self._cycle_menstrual_windows(logs)
         cycle_lengths = []
         period_lengths = []
 
-        for index, row in enumerate(menstrual_logs):
+        for index, row in enumerate(menstrual_windows):
             start = self._date_obj(row.get("start_date"))
             end = self._date_obj(row.get("end_date"))
             if start and end:
-                period_lengths.append(max(1, (end - start).days + 1))
+                period_length = max(1, (end - start).days + 1)
+                if period_length > 1 and end < datetime.date.today():
+                    period_lengths.append(period_length)
             if index > 0:
-                prev = self._date_obj(menstrual_logs[index - 1].get("start_date"))
+                prev = self._date_obj(menstrual_windows[index - 1].get("start_date"))
                 if start and prev:
                     length = (start - prev).days
                     if 15 <= length <= 60:
                         cycle_lengths.append(length)
 
         average_cycle_days = round(sum(cycle_lengths) / len(cycle_lengths)) if cycle_lengths else 28
-        average_period_days = round(sum(period_lengths) / len(period_lengths)) if period_lengths else 5
-        latest = menstrual_logs[-1] if menstrual_logs else None
+        average_period_days = max(self.DEFAULT_PERIOD_DAYS, round(sum(period_lengths) / len(period_lengths))) if period_lengths else self.DEFAULT_PERIOD_DAYS
+        latest = menstrual_windows[-1] if menstrual_windows else None
         next_start_date = None
         current_phase = None
         current_phase_label = None
@@ -2196,25 +2226,21 @@ class RunningMateData:
             return None
 
         logs = logs if logs is not None else self.load_cycles()
-        direct = self._direct_cycle_phase(date, logs)
-        if direct:
-            return direct
-
-        menstrual_logs = sorted(
-            [row for row in logs if row.get("cycle_phase") == "menstrual"],
-            key=lambda row: row.get("start_date") or "",
-        )
-        if not menstrual_logs:
+        menstrual_windows = self._cycle_menstrual_windows(logs)
+        if not menstrual_windows:
             return None
 
         if average_cycle_days is None or average_period_days is None:
             summary = self.cycle_summary()
             average_cycle_days = summary.get("average_cycle_days") or 28
-            average_period_days = summary.get("average_period_days") or 5
+            average_period_days = summary.get("average_period_days") or self.DEFAULT_PERIOD_DAYS
 
         previous = None
-        for row in menstrual_logs:
+        for row in menstrual_windows:
             start = self._date_obj(row.get("start_date"))
+            end = self._date_obj(row.get("end_date"))
+            if start and end and start <= date <= end:
+                return "menstrual"
             if start and start <= date:
                 previous = row
             elif start and start > date:
@@ -2257,7 +2283,7 @@ class RunningMateData:
 
         runs = self.load_runs(include_media=False, user_id=user_id)
         average_cycle_days = summary.get("average_cycle_days") or 28
-        average_period_days = summary.get("average_period_days") or 5
+        average_period_days = summary.get("average_period_days") or self.DEFAULT_PERIOD_DAYS
         patterns = []
         for phase in self.CYCLE_PHASE_ORDER:
             group = [
@@ -5986,6 +6012,62 @@ class RunningMateData:
                 return target
 
         return "menstrual"
+
+    def _cycle_flow_level(self, value):
+        text = self._text(value)
+        if not text:
+            return ""
+
+        key = re.sub(r"[\s\-_]+", "", text.strip().lower())
+        aliases = {
+            "light": "light",
+            "low": "light",
+            "small": "light",
+            "적음": "light",
+            "적어": "light",
+            "소량": "light",
+            "normal": "normal",
+            "medium": "normal",
+            "보통": "normal",
+            "heavy": "heavy",
+            "high": "heavy",
+            "많음": "heavy",
+            "많아": "heavy",
+            "다량": "heavy",
+        }
+        return aliases.get(key, "")
+
+    def _cycle_menstrual_windows(self, logs):
+        ranges = []
+        for row in logs or []:
+            if self._cycle_phase(row.get("cycle_phase")) != "menstrual":
+                continue
+            start_date = self._date(row.get("start_date"))
+            end_date = self._date(row.get("end_date")) or start_date
+            if not start_date or not end_date:
+                continue
+            if end_date < start_date:
+                start_date, end_date = end_date, start_date
+            ranges.append({"start_date": start_date, "end_date": end_date})
+
+        ranges = sorted(ranges, key=lambda row: row.get("start_date") or "")
+        windows = []
+        for row in ranges:
+            if not windows:
+                windows.append(dict(row))
+                continue
+
+            current = windows[-1]
+            current_end = self._date_obj(current.get("end_date"))
+            row_start = self._date_obj(row.get("start_date"))
+            if not current_end or not row_start or row_start > current_end + datetime.timedelta(days=1):
+                windows.append(dict(row))
+                continue
+
+            if row.get("end_date") > current.get("end_date"):
+                current["end_date"] = row.get("end_date")
+
+        return windows
 
     def _cycle_condition_emoji(self, value):
         text = self._text(value)

@@ -2,15 +2,12 @@ main(class="legal-page", [class.dark-screen]="isDark", [class.light-screen]="!is
     header(class="legal-header")
         button(type="button", class="legal-back", aria-label="설정으로 돌아가기", title="뒤로", (click)="goBack()")
             i(class="fa-solid fa-chevron-left", aria-hidden="true")
-        a(class="legal-brand", href="/dashboard", aria-label="Runningmate dashboard")
-            span(class="legal-brand-mark") R
-            span Runningmate
+        div(class="legal-heading")
+            h1 {{policy?.title || '개인정보처리방침'}}
+            div(class="legal-sub") {{policy ? effectiveText : '문서 정보'}}
 
     section(class="legal-hero")
-        p(class="legal-eyebrow") Privacy Policy
-        h1 {{policy?.title || '개인정보처리방침'}}
         p(class="legal-lead") Runningmate가 처리하는 회원 정보, 러닝 기록, 체중 기록, 사진과 영상, AI 대화 기록, 사용량 기록, 기기 및 로그인 정보를 확인할 수 있습니다.
-        div(*ngIf="policy", class="legal-meta") {{effectiveText}}
 
     section(*ngIf="loading", class="legal-state")
         i(class="fa-solid fa-spinner", aria-hidden="true")

@@ -345,6 +345,25 @@ def _error_payload(message, code=None):
     return payload
 
 
+def _error_http_status(error):
+    if not isinstance(error, dict):
+        return 200
+
+    code = error.get("error_code")
+    if code in {
+        "missing_api_key",
+        "invalid_api_key",
+        "insufficient_quota",
+        "model_not_found",
+        "api_forbidden",
+        "openai_error",
+    }:
+        return 503
+    if code in {"rate_limited", "usage_limited"}:
+        return 429
+    return 200
+
+
 def _openai_error_fields(exc):
     status_code = getattr(exc, "status_code", None)
     code = getattr(exc, "code", None)
@@ -630,7 +649,11 @@ if file_storage:
                     if isinstance(error, dict):
                         error["success"] = False
                         error["usage"] = usage
-                        wiz.response.json(error)
+                        status_code = _error_http_status(error)
+                        if status_code >= 400:
+                            wiz.response.status(status_code, **error)
+                        else:
+                            wiz.response.json(error)
                     else:
                         wiz.response.json({"success": False, "message": error, "usage": usage})
                 else:

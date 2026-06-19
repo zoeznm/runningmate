@@ -29,6 +29,23 @@ def _fields():
     return [field.strip() for field in raw_fields.split(",") if field.strip()]
 
 
+def _truthy(value, default=False):
+    text = str(value if value is not None else "").strip().lower()
+    if not text:
+        return default
+    return text in ("1", "true", "yes", "y", "on")
+
+
+def _include_media():
+    return _truthy(wiz.request.query("include_media", ""), True)
+
+
+def _should_sign_payload(fields, include_media):
+    if include_media or not fields:
+        return True
+    return any(field in ("image_url", "media", "media_url") for field in fields)
+
+
 def _filter_fields(row, fields):
     if not fields:
         return row
@@ -46,7 +63,7 @@ def _current_user():
 
 
 def _filtered_runs(user_id):
-    rows = running.load_runs(user_id=user_id)
+    rows = running.load_runs(include_media=_include_media(), user_id=user_id)
     year_month = wiz.request.query("year_month", "")
     if year_month:
         rows = [row for row in rows if str(row.get("date") or "").startswith(year_month)]
@@ -68,7 +85,12 @@ if current_user is None:
     wiz.response.status(401, success=False, message="로그인이 필요합니다.")
 
 if request.method == "GET":
-    wiz.response.json({"data": running.signed_upload_payload(_filtered_runs(current_user.get("id")))})
+    fields = _fields()
+    include_media = _include_media()
+    rows = _filtered_runs(current_user.get("id"))
+    if _should_sign_payload(fields, include_media):
+        rows = running.signed_upload_payload(rows)
+    wiz.response.json({"data": rows})
 elif request.method == "DELETE":
     payload = _request_payload()
     run_id = payload.get("id") if isinstance(payload, dict) else None

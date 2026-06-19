@@ -107,6 +107,8 @@ try:
                 struct.agreement.record(
                     user_id,
                     marketing_optin=_bool_value(payload.get("marketing_optin") or payload.get("marketingOptin")),
+                    location_info_agreed=_bool_value(payload.get("location_info_agreed") or payload.get("locationInfoAgreed")),
+                    photo_access_agreed=_bool_value(payload.get("photo_access_agreed") or payload.get("photoAccessAgreed")),
                     agreed_at=payload.get("agreed_at") or payload.get("agreedAt"),
                     terms_version=payload.get("terms_version") or payload.get("termsVersion"),
                     privacy_version=payload.get("privacy_version") or payload.get("privacyVersion"),

@@ -1,14 +1,15 @@
-import moment from "moment";
-
 export default class Formatter {
     constructor() { }
 
     public date(date, text) {
         if (!text) text = "-";
         if (!date) return text;
-        let res = moment(date).format("YYYY-MM-DD");
-        if (res == 'Invalid date') return text;
-        return res;
+        const value = date instanceof Date ? date : new Date(date);
+        if (Number.isNaN(value.getTime())) return text;
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, "0");
+        const day = String(value.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
     }
 
     public currency(number, isString = true) {

@@ -33,6 +33,8 @@ class Struct:
                 db.orm.create_table(safe=True)
                 if name == "user":
                     self._ensure_user_columns(db.orm)
+                if name == "user_agreements":
+                    self._ensure_agreement_columns(db.orm)
             except Exception:
                 pass
 
@@ -94,6 +96,28 @@ class Struct:
             database.execute_sql(f"CREATE UNIQUE INDEX `user_friend_code_unique` ON `{table}` (`friend_code`)")
         except Exception:
             pass
+
+    def _ensure_agreement_columns(self, model):
+        """기존 user_agreements 테이블에 선택 동의 컬럼을 보강한다."""
+        try:
+            database = model._meta.database
+            database.connect(reuse_if_open=True)
+            table = model._meta.table_name
+            columns = {column.name for column in database.get_columns(table)}
+        except Exception:
+            return
+
+        statements = []
+        if "location_info_agreed" not in columns:
+            statements.append(f"ALTER TABLE `{table}` ADD COLUMN `location_info_agreed` BOOLEAN NOT NULL DEFAULT 0")
+        if "photo_access_agreed" not in columns:
+            statements.append(f"ALTER TABLE `{table}` ADD COLUMN `photo_access_agreed` BOOLEAN NOT NULL DEFAULT 0")
+
+        for statement in statements:
+            try:
+                database.execute_sql(statement)
+            except Exception:
+                pass
 
     def db(self, name):
         """ORM Wrapper 반환 (src/model/db/{name}.py)"""

@@ -878,15 +878,18 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         div(class="legend-dot dot-green")
                         | 러닝
                     div(class="legend-item")
-                        div(class="legend-dot dot-red")
-                        | 미러닝
+                        div(class="legend-dot dot-strength")
+                        | 근력
+                    div(class="legend-item")
+                        div(class="legend-dot dot-home-training")
+                        | 홈트
                     div(class="legend-item")
                         div(class="legend-dot dot-gray")
                         | 휴식일
 
                 div(*ngIf="shouldShowCycleFeature && isCycleFeatureEnabled && isCycleOverlayEnabled", class="cycle-legend-row")
                     div(*ngFor="let phase of cyclePhaseOptions; trackBy: trackCyclePhase", class="cycle-legend-item")
-                        span(class="cycle-legend-swatch", [ngClass]="'cycle-swatch-' + phase.id")
+                        i([class]="cycleLegendMarkerClass(phase.id)", aria-hidden="true")
                         | {{phase.label}}
 
                 div(class="cal-grid")
@@ -914,7 +917,9 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             [ngClass]="[cell.weatherIcon, cell.weatherTone ? 'weather-' + cell.weatherTone : '']",
                             aria-hidden="true")
                         span(*ngIf="cell.day", class="cal-day-number") {{cell.day}}
-                        div(*ngIf="cell.dotClass", [class]="cell.dotClass")
+                        div(*ngIf="cell.dotClass || cell.cycleMarkerClass", class="cal-marker-row")
+                            div(*ngIf="cell.dotClass", [class]="cell.dotClass")
+                            i(*ngIf="cell.cycleMarkerClass", [class]="cell.cycleMarkerClass", aria-hidden="true")
 
                 section(*ngIf="!activeMonthRunCount", class="empty-state empty-state-panel calendar-month-empty")
                     i(class="fa-solid fa-calendar-days empty-state-icon", aria-hidden="true")
@@ -936,6 +941,21 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             (click)="toggleRestDay()")
                             i(class="fa-solid fa-bed", aria-hidden="true")
                             span {{restButtonText}}
+                        div(class="calendar-activity-row")
+                            button(
+                                type="button",
+                                class="calendar-activity-btn calendar-activity-strength",
+                                [disabled]="!canSaveSelectedCalendarActivity || isManualRunSaving || isUploading",
+                                (click)="saveCalendarActivity('strength')")
+                                i(class="fa-solid fa-dumbbell", aria-hidden="true")
+                                span 근력운동 기록
+                            button(
+                                type="button",
+                                class="calendar-activity-btn calendar-activity-home",
+                                [disabled]="!canSaveSelectedCalendarActivity || isManualRunSaving || isUploading",
+                                (click)="saveCalendarActivity('home_training')")
+                                i(class="fa-solid fa-house-chimney", aria-hidden="true")
+                                span 홈트 기록
                     div(*ngIf="!selectedCalendarRuns.length", class="calendar-upload-panel", [class.disabled]="!canUploadSelectedCalendarDate")
                         div(class="calendar-upload-copy")
                             div(class="calendar-upload-title") 기록 업로드
@@ -960,13 +980,23 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             multiple=true,
                             [disabled]="isUploading || !canUploadSelectedCalendarDate",
                             (change)="onCalendarFilesSelected($event)")
-                        label(
-                            class="calendar-upload-btn",
-                            for="calendarRunImageInput",
-                            [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
-                            i(class="fa-solid fa-upload", aria-hidden="true")
-                            span {{calendarUploadButtonText}}
-                        div(class="calendar-upload-note")
+                        div(class="calendar-upload-actions")
+                            label(
+                                class="calendar-upload-btn",
+                                for="calendarRunImageInput",
+                                [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
+                                i(class="fa-solid fa-upload", aria-hidden="true")
+                                span {{calendarUploadButtonText}}
+                            button(
+                                type="button",
+                                class="calendar-manual-btn",
+                                [class.active]="manualEntryVisible && !manualEntryRunId",
+                                [attr.aria-pressed]="manualEntryVisible && !manualEntryRunId",
+                                [disabled]="isUploading || isManualRunSaving || !canUploadSelectedCalendarDate",
+                                (click)="!(manualEntryVisible && !manualEntryRunId) && openManualEntry()")
+                                i(class="fa-solid fa-pen-to-square", aria-hidden="true")
+                                span {{manualEntryVisible && !manualEntryRunId ? '수동 입력 중' : '수동 입력'}}
+                        div(*ngIf="shouldShowCalendarMediaAccessNotice", class="calendar-upload-note")
                             i(class="fa-solid fa-circle-info", aria-hidden="true")
                             span 모바일에서는 사진 보관함이나 파일 선택창이 열립니다. 사진 접근 권한을 묻는 경우 허용해야 업로드할 수 있습니다.
                         div(class="run-media-section calendar-draft-media-section")
@@ -1008,6 +1038,15 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 div
                                     div(class="run-journal-title") 오늘의 일기
                                     div(class="run-journal-sub") {{selectedCalendarDateText}} 기록에 함께 저장돼.
+                                div(class="run-journal-head-actions")
+                                    div(*ngIf="hasSavedUploadJournal", class="calendar-note-chip") 저장됨
+                                    button(
+                                        type="button",
+                                        class="run-journal-primary-btn upload-journal-head-save",
+                                        [disabled]="isUploadJournalSaveDisabled",
+                                        (click)="saveUploadJournal()")
+                                        i(class="fa-solid", [ngClass]="isUploadJournalSaving ? 'fa-spinner' : 'fa-floppy-disk'", aria-hidden="true")
+                                        span {{uploadJournalSaveButtonText}}
                             textarea(
                                 class="run-journal-input",
                                 rows="3",
@@ -1015,6 +1054,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 placeholder="오늘 러닝은 어땠어? 기록을 남겨봐",
                                 [(ngModel)]="uploadJournalText",
                                 [disabled]="isUploading || isManualRunSaving")
+                            div(*ngIf="uploadJournalStatus", class="run-journal-status upload-journal-status") {{uploadJournalStatus}}
                         div(
                             *ngIf="isUploading || uploadProgress > 0",
                             class="upload-progress calendar-upload-progress",
@@ -1090,7 +1130,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             div(*ngFor="let stat of run.stats; trackBy: trackByLabel", class="parsed-stat")
                                 div(class="parsed-stat-val") {{stat.value}}
                                 div(class="parsed-stat-lbl") {{stat.label}}
-                        div(class="run-record-edit-section")
+                        div(*ngIf="!isSupportActivityRunType(run.runType)", class="run-record-edit-section")
                             input(
                                 '#runRecordImageInput'="",
                                 class="sr-only",
@@ -1192,7 +1232,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                     div(class="music-track-main")
                                         div(class="music-track-title") {{track.title}}
                                         div(class="music-track-artist") {{track.artist}}
-                        div(class="run-media-section")
+                        div(*ngIf="!isSupportActivityRunType(run.runType)", class="run-media-section")
                             div(class="run-media-head")
                                 div
                                     div(class="run-media-title") 사진/영상 업로드
@@ -1291,40 +1331,20 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     section(*ngIf="shouldShowCycleFeature && isCycleFeatureEnabled", class="cycle-log-panel")
                         div(class="cycle-log-head")
                             div
-                                div(class="cycle-log-title") 주기 기록
+                                div(class="cycle-log-title") 생리 기록
                                 div(class="cycle-log-sub") {{selectedCalendarDateText}} · {{selectedCalendarCycleText}}
-                            div(class="cycle-phase-pill", [ngClass]="'cycle-phase-pill-' + selectedCyclePhase") {{cyclePhaseLabel(selectedCyclePhase)}}
-                        div(class="cycle-date-grid")
-                            label(class="cycle-field")
-                                span 시작일
-                                div(class="cycle-date-input-wrap")
-                                    input(
-                                        type="date",
-                                        [(ngModel)]="cycleStartDate",
-                                        [max]="todayDateKey",
-                                        (change)="onCycleDateChange()")
-                                    button(type="button", aria-label="선택일을 시작일로", title="선택일", (click)="setCycleStartFromSelected()")
-                                        i(class="fa-solid fa-calendar-day", aria-hidden="true")
-                            label(class="cycle-field")
-                                span 종료일
-                                div(class="cycle-date-input-wrap")
-                                    input(
-                                        type="date",
-                                        [(ngModel)]="cycleEndDate",
-                                        [max]="todayDateKey",
-                                        (change)="onCycleDateChange()")
-                                    button(type="button", aria-label="선택일을 종료일로", title="선택일", (click)="setCycleEndFromSelected()")
-                                        i(class="fa-solid fa-calendar-check", aria-hidden="true")
-                        div(class="cycle-phase-row", role="radiogroup", aria-label="주기 단계")
+                            div(*ngIf="selectedCalendarCyclePhase", class="cycle-phase-pill", [ngClass]="'cycle-phase-pill-' + selectedCalendarCyclePhase") {{cyclePhaseLabel(selectedCalendarCyclePhase)}}
+                        div(class="cycle-field-label") 생리 양
+                        div(class="cycle-flow-row", role="radiogroup", aria-label="생리 양")
                             button(
-                                *ngFor="let phase of cyclePhaseOptions; trackBy: trackCyclePhase",
+                                *ngFor="let flow of cycleFlowOptions; trackBy: trackCycleFlow",
                                 type="button",
-                                class="cycle-phase-btn",
-                                [ngClass]="'cycle-phase-btn-' + phase.id",
-                                [class.active]="selectedCyclePhase === phase.id",
-                                [attr.aria-checked]="selectedCyclePhase === phase.id",
+                                class="cycle-flow-btn",
+                                [class.active]="selectedCycleFlowLevel === flow.id",
+                                [attr.aria-checked]="selectedCycleFlowLevel === flow.id",
                                 role="radio",
-                                (click)="selectCyclePhase(phase.id)") {{phase.label}}
+                                (click)="selectCycleFlow(flow.id)") {{flow.label}}
+                        div(class="cycle-field-label") 몸 상태
                         div(class="cycle-condition-row", role="radiogroup", aria-label="컨디션")
                             button(
                                 *ngFor="let item of cycleConditionOptions; trackBy: trackCycleCondition",
@@ -1338,10 +1358,11 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 span {{item.emoji}}
                                 small {{item.label}}
                         textarea(
+                            *ngIf="isCycleNoteEditing",
                             class="cycle-note-input",
                             rows="2",
                             maxlength="2000",
-                            placeholder="선택 메모",
+                            placeholder="몸 상태 메모",
                             [(ngModel)]="cycleNoteText",
                             [disabled]="isCycleSaving")
                         div(class="cycle-log-actions")
@@ -1350,20 +1371,20 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 type="button",
                                 class="cycle-primary-btn",
                                 [disabled]="isCycleSaving",
-                                (click)="saveCycleLog()")
-                                i(class="fa-solid fa-floppy-disk", aria-hidden="true")
+                                (click)="handleCyclePrimaryAction()")
+                                i(class="fa-solid", [ngClass]="cyclePrimaryIconClass", aria-hidden="true")
                                 span {{cycleSaveButtonText}}
                         div(*ngIf="recentCycleLogs.length", class="cycle-recent-list")
                             div(*ngFor="let log of recentCycleLogs; trackBy: trackCycleLog", class="cycle-recent-row")
                                 div
-                                    div(class="cycle-recent-date") {{displayDate(log.start_date, false)}} - {{displayDate(log.end_date, false)}}
+                                    div(class="cycle-recent-date") {{log.start_date === log.end_date ? displayDate(log.start_date, false) : displayDate(log.start_date, false) + ' - ' + displayDate(log.end_date, false)}}
                                     div(class="cycle-recent-meta")
-                                        span {{cyclePhaseLabel(log.cycle_phase)}}
+                                        span(*ngIf="log.flow_level") 양 {{cycleFlowLabel(log.flow_level)}}
                                         span(*ngIf="log.condition_emoji", class="cycle-recent-condition") {{log.condition_emoji}}
                                 button(
                                     type="button",
                                     class="cycle-log-delete-btn",
-                                    aria-label="주기 기록 삭제",
+                                    aria-label="생리 기록 삭제",
                                     [disabled]="deletingCycleId === log.id",
                                     (click)="deleteCycleLog(log, $event)")
                                     i(class="fa-solid", [ngClass]="deletingCycleId === log.id ? 'fa-spinner' : 'fa-trash-can'", aria-hidden="true")
@@ -1379,8 +1400,16 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                     span 날씨
                                 div(class="calendar-weather-sub")
                                     | {{selectedCalendarWeather ? selectedCalendarWeather.summary : selectedCalendarWeatherEmptyText}}
-                            div(*ngIf="weatherLocationTags.length", class="weather-location-tags", aria-label="날씨 지역")
-                                span(*ngFor="let tag of weatherLocationTags", class="weather-location-tag") {{tag}}
+                            div(class="weather-location-actions")
+                                div(*ngIf="weatherLocationTags.length", class="weather-location-tags", aria-label="날씨 지역")
+                                    span(*ngFor="let tag of weatherLocationTags", class="weather-location-tag") {{tag}}
+                                button(
+                                    type="button",
+                                    class="weather-location-button",
+                                    [disabled]="isWeatherLocationBusy || isWeatherLoading",
+                                    (click)="useCurrentLocationWeather()")
+                                    i(class="fa-solid", [ngClass]="isWeatherLocationBusy ? 'fa-spinner' : 'fa-location-crosshairs'", aria-hidden="true")
+                                    span {{weatherLocationButtonText}}
                         div(*ngIf="selectedCalendarWeather", class="weather-summary-grid")
                             div(class="weather-summary-item")
                                 div(class="mini-stat-lbl") 기온
@@ -1403,24 +1432,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 div(class="weather-hour-meta")
                                     span {{hour.tempText}}
                                     span {{hour.popText}}
-                        div(*ngIf="selectedCalendarWeather && weatherUpdatedText", class="calendar-weather-source") {{weatherUpdatedText}}
-                    div(*ngIf="parsedRuns.length", class="parsed-upload-section")
-                        div(class="parsed-title") 최근 업로드
-                        div(class="parsed-list")
-                            div(*ngFor="let run of parsedRuns; trackBy: trackParsedRun", class="parsed-card")
-                                div(class="parsed-header")
-                                    div(class="parsed-head-main")
-                                        div(class="parsed-date") {{run.date}}
-                                        div(class="parsed-badge") {{run.badge}}
-                                    div(class="parsed-actions")
-                                        button(type="button", class="parsed-complete-btn", (click)="completeParsedRun(run)") 저장 확인
-                                        button(type="button", class="parsed-delete-btn", [disabled]="isUploading", (click)="deleteParsedRun(run)") 삭제
-                                div(class="parsed-stats")
-                                    div(*ngFor="let stat of run.stats; trackBy: trackByLabel", class="parsed-stat")
-                                        div(class="parsed-stat-val") {{stat.value}}
-                                        div(class="parsed-stat-lbl") {{stat.label}}
-
-
+                        div(*ngIf="selectedCalendarWeather && selectedCalendarWeatherSourceText", class="calendar-weather-source") {{selectedCalendarWeatherSourceText}}
                 div(class="calendar-stats")
                     div(class="section-title") 이번달 통계
                     div(class="mini-stats")
@@ -1813,10 +1825,10 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             type="button",
                             [class]="cell.className",
                             [class.selected]="cell.key === selectedJournalDate",
-                            [disabled]="!cell.day || !cell.journalCount",
+                            [disabled]="!cell.day",
                             [attr.aria-hidden]="!cell.day ? true : null",
                             [attr.aria-label]="cell.ariaLabel || null",
-                            [attr.aria-pressed]="cell.day && cell.journalCount ? cell.key === selectedJournalDate : null",
+                            [attr.aria-pressed]="cell.day ? cell.key === selectedJournalDate : null",
                             (click)="selectJournalDate(cell)")
                             span(*ngIf="cell.day", class="cal-day-number") {{cell.day}}
                             span(*ngIf="cell.dotClass", [class]="cell.dotClass")
@@ -1831,18 +1843,25 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             type="button",
                             class="journal-selected-card",
                             role="listitem",
-                            [attr.aria-label]="displayDate(run.date, true) + ' 러닝 일기 보기'",
+                            [attr.aria-label]="displayDate(run.date, true) + (run.journal_only ? ' 일기 보기' : ' 러닝 일기 보기')",
                             (click)="openJournalViewer(run)")
                             div(class="journal-selected-head")
                                 div
-                                    div(class="journal-gallery-date") {{distanceText(run.distance_km, true)}}
-                                    div(class="journal-gallery-distance") {{paceText(run.avg_pace)}}
-                                span([ngClass]="runTypeClass(run.run_type)") {{runTypeLabel(run.run_type)}}
+                                    div(class="journal-gallery-date") {{run.journal_only ? '일기만 저장' : distanceText(run.distance_km, true)}}
+                                    div(class="journal-gallery-distance") {{run.journal_only ? displayDate(run.date, false) : paceText(run.avg_pace)}}
+                                span(*ngIf="!run.journal_only", [ngClass]="runTypeClass(run.run_type)") {{runTypeLabel(run.run_type)}}
+                                span(*ngIf="run.journal_only", class="calendar-note-chip") 일기
                             div(class="journal-selected-text") {{run.journal}}
-                            div(class="journal-gallery-stats")
+                            div(*ngIf="!run.journal_only", class="journal-gallery-stats")
                                 span {{paceDisplaySettingsText}} {{paceText(run.avg_pace)}}
                                 span 시간 {{shortDuration(run)}}
                                 span 거리 {{distanceText(run.distance_km)}}
+                            div(*ngIf="run.journal_only", class="journal-gallery-stats")
+                                span {{displayDate(run.date, true)}}
+                    section(*ngIf="selectedJournalDate && !selectedJournalRuns.length", class="empty-state empty-state-panel journal-selected-empty")
+                        i(class="fa-solid fa-book-open empty-state-icon", aria-hidden="true")
+                        div(class="empty-state-title") {{selectedJournalDateText}}에는 저장된 일기가 없어
+                        div(class="empty-state-description") 기록 화면에서 이 날짜에 일기를 저장하면 여기에 표시돼.
 
         div(class="screen-page", [class.active]="activeScreen === 'chat'", id="screen-chat")
             div(class="chat-content")
@@ -2510,19 +2529,6 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             [class.following]="user.is_following",
                             [disabled]="followBusyUserId === user.id",
                             (click)="toggleFollow(user, $event)") {{followButtonText(user)}}
-
-        div(*ngIf="isLocationPermissionPromptVisible", class="location-permission-backdrop", role="presentation")
-            section(class="location-permission-panel", role="dialog", aria-modal="true", aria-label="위치 권한 안내")
-                div(class="location-permission-icon")
-                    i(class="fa-solid fa-location-crosshairs", aria-hidden="true")
-                div(class="location-permission-main")
-                    div(class="location-permission-title") 현재 위치로 날씨를 맞출까요?
-                    div(class="location-permission-body") 러닝 캘린더의 날씨 예보를 가까운 지역 기준으로 보여줘요. 권한은 브라우저 설정에서 다시 변경할 수 있어요.
-                div(class="location-permission-actions")
-                    button(type="button", class="location-permission-secondary", [disabled]="isLocationPermissionPromptBusy", (click)="declineLocationPermission()") 나중에
-                    button(type="button", class="location-permission-primary", [disabled]="isLocationPermissionPromptBusy", (click)="acceptLocationPermission()")
-                        i(class="fa-solid", [ngClass]="isLocationPermissionPromptBusy ? 'fa-spinner' : 'fa-check'", aria-hidden="true")
-                        span 허용
 
         div(*ngIf="isOnboardingVisible", class="onboarding-backdrop", role="dialog", aria-modal="true", aria-label="신규 가입자 온보딩")
             section(

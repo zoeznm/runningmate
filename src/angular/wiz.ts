@@ -1,6 +1,3 @@
-import $ from "jquery";
-import { io } from "socket.io-client";
-
 export default class Wiz {
     public namespace: any;
     public baseuri: any;
@@ -61,7 +58,7 @@ export default class Wiz {
         let socketns = this.baseuri + "/app/" + this.project();
         if (this.namespace)
             socketns = socketns + "/" + this.namespace;
-        return io(socketns);
+        return import("socket.io-client").then(({ io }) => io(socketns));
     };
 
     public url(function_name: string) {
@@ -70,17 +67,35 @@ export default class Wiz {
     }
 
     public call(function_name: string, data = {}, options = {}) {
-        let ajax = {
-            url: this.url(function_name),
-            type: "POST",
-            data: data,
+        const requestOptions: any = {
+            method: "POST",
+            credentials: "same-origin",
             ...options
         };
+        const body = data instanceof FormData
+            ? data
+            : new URLSearchParams(Object.entries(data || {}).reduce((params: Record<string, string>, [key, value]) => {
+                params[key] = typeof value === "string" ? value : JSON.stringify(value);
+                return params;
+            }, {}));
 
-        return new Promise((resolve) => {
-            $.ajax(ajax).always(function (res) {
-                resolve(res);
-            });
+        if (!(body instanceof FormData)) {
+            requestOptions.headers = {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                ...(requestOptions.headers || {})
+            };
+        }
+        requestOptions.body = body as BodyInit;
+
+        return fetch(this.url(function_name), requestOptions).then(async (response) => {
+            const text = await response.text();
+            try {
+                return JSON.parse(text);
+            } catch {
+                return text;
+            }
+        }).catch((error) => {
+            return { code: 0, data: null, error: String(error?.message || error || "request_failed") };
         });
     }
 }

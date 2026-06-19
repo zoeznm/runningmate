@@ -52,6 +52,7 @@ if not user:
 limit = _limit()
 runs = running.load_runs(include_media=False, user_id=user_id)
 visible_runs = [_filter_fields(row) for row in runs[:limit]]
+has_media_history = any(row.get("image_url") for row in runs)
 
 wiz.response.json({
     "success": True,
@@ -61,5 +62,6 @@ wiz.response.json({
         "run_count": len(runs),
         "run_limit": limit,
         "has_more_runs": len(runs) > len(visible_runs),
+        "has_media_history": has_media_history,
     },
 })

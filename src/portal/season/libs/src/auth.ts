@@ -15,7 +15,7 @@ export default class Auth {
 
     public async init() {
         try {
-            const result: any = await this.request.post('/auth/check', {}, { timeout: 10000 });
+            const result: any = await this.request.post('/auth/check', {}, { timeout: 3000 });
             const code = Number(result?.code || 0);
             const data = result?.data || {};
             const { status, session = {} } = data;

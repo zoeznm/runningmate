@@ -50,13 +50,8 @@
                         "assets": [
                             {
                                 "glob": "**/*",
-                                "input": "node_modules/monaco-editor/min/vs",
-                                "output": "/lib/vs"
-                            },
-                            {
-                                "glob": "**/*",
-                                "input": "node_modules/monaco-editor/min-maps/vs",
-                                "output": "/min-maps/vs"
+                                "input": "src/assets",
+                                "output": "/assets"
                             },
                             {
                                 "glob": "**/error.html",
@@ -67,7 +62,6 @@
                         "styles": [
                             "tailwind.min.css",
                             "node_modules/@fortawesome/fontawesome-free/css/all.min.css",
-                            "node_modules/@xterm/xterm/css/xterm.css",
                             "src/styles.scss"
                         ],
                         "scripts": [
