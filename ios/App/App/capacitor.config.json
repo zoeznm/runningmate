@@ -3,6 +3,6 @@
   "appName": "RunMate",
   "webDir": "bundle/www",
   "ios": {
-    "contentInset": "automatic"
+    "contentInset": "never"
   }
 }

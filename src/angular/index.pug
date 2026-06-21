@@ -50,6 +50,8 @@ html(lang="ko")
                 width: 100%;
                 height: 100%;
                 min-height: 100%;
+                height: -webkit-fill-available;
+                min-height: -webkit-fill-available;
                 margin: 0;
                 background: var(--app-shell-bg, #000000);
                 color: var(--app-shell-text, #ffffff);
@@ -116,7 +118,7 @@ html(lang="ko")
 
         script(type="text/javascript").
             if ("serviceWorker" in navigator) {
-                const refreshVersion = "rm-access-landscape-emerald-20260621";
+                const refreshVersion = "rm-native-oauth-fullscreen-20260621";
                 const refreshKey = `runningmate-sw-refresh-${refreshVersion}`;
                 const hadController = Boolean(navigator.serviceWorker.controller);
                 let refreshing = false;

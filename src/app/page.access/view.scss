@@ -2137,3 +2137,70 @@
         border-radius: 19px;
     }
 }
+
+/* Native iOS full-screen polish */
+:host {
+    width: 100vw;
+    max-width: 100vw;
+    height: var(--access-visual-height, 100dvh);
+    min-height: var(--access-visual-height, 100dvh);
+}
+
+.access-page,
+.access-shell {
+    height: var(--access-visual-height, 100dvh);
+    min-height: var(--access-visual-height, 100dvh);
+}
+
+.access-shell--landing {
+    width: 100%;
+    max-width: 430px;
+    min-height: var(--access-visual-height, 100dvh);
+}
+
+.access-shell--landing .access-hero {
+    padding-top: max(58px, calc(env(safe-area-inset-top) + 44px));
+    padding-bottom: 124px;
+}
+
+.access-shell--landing .brand-title {
+    font-size: clamp(40px, 10vw, 46px);
+    line-height: 0.98;
+}
+
+.access-shell--landing .brand-overline {
+    font-size: 13px;
+}
+
+.access-shell--landing .access-landing {
+    bottom: 0;
+    padding: 0 18px max(8px, calc(env(safe-area-inset-bottom) + 6px));
+}
+
+.access-shell--landing .access-landing-panel {
+    padding: 8px;
+}
+
+.access-shell--landing .access-landing-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.access-shell--landing .access-landing-button {
+    min-height: 56px;
+}
+
+@media (max-height: 740px) {
+    .access-shell--landing .access-hero {
+        padding-top: max(38px, calc(env(safe-area-inset-top) + 28px));
+        padding-bottom: 108px;
+    }
+
+    .access-shell--landing .brand-title {
+        font-size: clamp(36px, 9vw, 42px);
+    }
+
+    .access-shell--landing .access-landing-button {
+        min-height: 50px;
+    }
+}

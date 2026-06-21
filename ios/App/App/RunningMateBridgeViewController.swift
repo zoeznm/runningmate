@@ -27,6 +27,9 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
         webView?.isOpaque = false
         webView?.backgroundColor = appBackgroundColor
         webView?.scrollView.backgroundColor = appBackgroundColor
+        webView?.scrollView.contentInsetAdjustmentBehavior = .never
+        webView?.scrollView.contentInset = .zero
+        webView?.scrollView.scrollIndicatorInsets = .zero
         setNeedsStatusBarAppearanceUpdate()
     }
 
@@ -37,5 +40,29 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(RunningMateHealthKitPlugin())
+    }
+
+    func handleOAuthRedirect(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(),
+              ["runmate", "com.myrunningmate.run"].contains(scheme),
+              url.host?.lowercased() == "oauth" else {
+            return false
+        }
+
+        let source = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        var target = URLComponents()
+        target.scheme = "capacitor"
+        target.host = "localhost"
+        target.path = "/access"
+        target.percentEncodedQuery = source?.percentEncodedQuery
+
+        guard let targetURL = target.url else {
+            return false
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.webView?.load(URLRequest(url: targetURL))
+        }
+        return true
     }
 }

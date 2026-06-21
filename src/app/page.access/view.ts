@@ -1,6 +1,7 @@
 import { ChangeDetectorRef, OnDestroy, OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
 import { apiFetch, jsonRequest } from 'src/app/shared/api';
+import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
 import { authenticatedUser, clearAuthTokens, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
 
 export class Component implements OnInit, OnDestroy {
@@ -108,6 +109,13 @@ export class Component implements OnInit, OnDestroy {
     public async ngOnInit() {
         this.installAccessViewportSync();
         this.normalizeLoginFields();
+        const nativeOAuthReturn = this.nativeOAuthReturnFromUrl();
+        if (nativeOAuthReturn) {
+            await this.withTimeout(this.service.init(null as any), this.sessionBootstrapTimeoutMs).catch(() => null);
+            await this.consumeNativeOAuthReturn(nativeOAuthReturn);
+            return;
+        }
+
         const resetToken = this.resetTokenFromUrl();
         const socialError = this.socialErrorFromUrl();
         if (resetToken) {
@@ -394,8 +402,68 @@ export class Component implements OnInit, OnDestroy {
     public forwardOAuthReturn() {
         const target = this.oauthReturnUrl();
         if (!target) return false;
-        location.replace(target);
+        location.replace(resolveApiUrl(target));
         return true;
+    }
+
+    private nativeOAuthReturnFromUrl() {
+        const params = new URLSearchParams(location.search || '');
+        const socialError = params.get('social_error') || '';
+        const accessToken = params.get('oauth_access_token') || '';
+        const refreshToken = params.get('oauth_refresh_token') || '';
+        if (!socialError && !accessToken && !refreshToken) return null;
+        return {
+            socialError,
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            token_type: params.get('oauth_token_type') || 'Bearer',
+            expires_in: Number(params.get('oauth_expires_in') || 0) || undefined,
+            refresh_expires_in: Number(params.get('oauth_refresh_expires_in') || 0) || undefined
+        };
+    }
+
+    private clearNativeOAuthReturnFromUrl() {
+        try {
+            const url = new URL(location.href);
+            [
+                'oauth_access_token',
+                'oauth_refresh_token',
+                'oauth_token_type',
+                'oauth_expires_in',
+                'oauth_refresh_expires_in',
+                'oauth_provider',
+                'social_error'
+            ].forEach((key) => url.searchParams.delete(key));
+            history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+        } catch { }
+    }
+
+    private async consumeNativeOAuthReturn(payload: any) {
+        this.clearNativeOAuthReturnFromUrl();
+        this.showAccessSplash = true;
+        this.isSessionChecking = true;
+
+        if (payload.socialError) {
+            this.showAccessSplash = false;
+            this.isSessionChecking = false;
+            await this.alert(this.socialErrorMessage(payload.socialError), 'error');
+            await this.loadPolicies().catch(() => null);
+            await this.safeRender();
+            return;
+        }
+
+        const authReady = await this.confirmAuthSession(payload, true);
+        if (authReady) {
+            this.goDashboard();
+            return;
+        }
+
+        this.showAccessSplash = false;
+        this.isSessionChecking = false;
+        clearAuthTokens();
+        await this.alert('소셜 로그인 세션을 앱에 연결하지 못했습니다. 다시 시도해주세요.', 'error');
+        await this.loadPolicies().catch(() => null);
+        await this.safeRender();
     }
 
     public socialErrorFromUrl() {
@@ -671,6 +739,10 @@ export class Component implements OnInit, OnDestroy {
         if (!this.socialLoginEnabled) return;
         const normalized = String(provider || '').trim().toLowerCase();
         if (!['naver', 'google', 'apple'].includes(normalized)) return;
+        if (isNativeLocalOrigin()) {
+            location.assign(`${RUNNINGMATE_API_ORIGIN}/api/auth/oauth/${normalized}/start?client=native`);
+            return;
+        }
         const url = `/api/auth/oauth/${normalized}/start`;
         location.assign(url);
     }

@@ -18,6 +18,18 @@
 	<string>RunMate</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.myrunningmate.run.oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>runmate</string>
+				<string>com.myrunningmate.run</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>

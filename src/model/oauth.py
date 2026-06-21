@@ -128,9 +128,31 @@ class OAuth:
         except Exception:
             pass
 
-    def _error_redirect(self, message="social_login_failed"):
+    def _native_client_requested(self):
+        try:
+            request = self._request()
+            value = (
+                request.values.get("client")
+                or request.values.get("native")
+                or request.args.get("client")
+                or request.args.get("native")
+                or ""
+            )
+        except Exception:
+            value = ""
+        return str(value or "").strip().lower() in ("native", "ios", "app", "capacitor", "1", "true")
+
+    def _native_redirect_url(self, params):
+        return f"runmate://oauth/callback?{urllib.parse.urlencode(params)}"
+
+    def _error_redirect(self, message="social_login_failed", native=None):
         message = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(message or "social_login_failed"))[:80]
         query = urllib.parse.urlencode({"social_error": message})
+        if native is None:
+            native = self._native_client_requested()
+        if native:
+            wiz.response.redirect(self._native_redirect_url({"social_error": message}))
+            return
         wiz.response.redirect(f"/access?{query}")
 
     def _state_secret(self):
@@ -153,31 +175,37 @@ class OAuth:
         signature = hmac.new(self._state_secret().encode("utf-8"), raw.encode("ascii"), hashlib.sha256).digest()
         return f"{raw}.{self._b64url(signature)}"
 
-    def _signed_state(self, provider):
+    def _signed_state(self, provider, client="web"):
         return self._sign_state({
+            "client": "native" if str(client or "").strip().lower() == "native" else "web",
             "iat": int(time.time()),
             "nonce": secrets.token_urlsafe(18),
             "provider": provider,
         })
 
-    def _verify_signed_state(self, provider, state):
+    def _signed_state_payload(self, provider, state):
         try:
             raw, signature = str(state or "").rsplit(".", 1)
             expected = hmac.new(self._state_secret().encode("utf-8"), raw.encode("ascii"), hashlib.sha256).digest()
             if not secrets.compare_digest(self._b64url(expected), signature):
-                return False
+                return None
             padding = "=" * ((4 - len(raw) % 4) % 4)
             payload = json.loads(base64.urlsafe_b64decode((raw + padding).encode("ascii")).decode("utf-8"))
             if str(payload.get("provider") or "") != provider:
-                return False
+                return None
             created_at = int(payload.get("iat") or 0)
             try:
                 ttl = wiz.model("security").oauth_state_ttl_seconds()
             except Exception:
                 ttl = 600
-            return bool(created_at and int(time.time()) - created_at <= ttl)
+            if not created_at or int(time.time()) - created_at > ttl:
+                return None
+            return payload
         except Exception:
-            return False
+            return None
+
+    def _verify_signed_state(self, provider, state):
+        return bool(self._signed_state_payload(provider, state))
 
     def _json_request(self, url, data=None, headers=None, method=None):
         encoded = None
@@ -313,8 +341,10 @@ class OAuth:
             self._error_redirect("social_redirect_invalid")
             return
 
-        state = self._signed_state(config["provider"])
+        client = "native" if self._native_client_requested() else "web"
+        state = self._signed_state(config["provider"], client)
         self._session()[self.STATE_KEY] = {
+            "client": client,
             "provider": config["provider"],
             "state": state,
             "created_at": int(time.time()),
@@ -351,6 +381,14 @@ class OAuth:
     def _saved_provider(self):
         saved = self._session().get(self.STATE_KEY) or {}
         return str(saved.get("provider") or "").strip().lower()
+
+    def _callback_client(self, provider, state):
+        saved = self._session().get(self.STATE_KEY) or {}
+        client = str(saved.get("client") or "").strip().lower()
+        if client:
+            return client
+        payload = self._signed_state_payload(provider, state) or {}
+        return str(payload.get("client") or "web").strip().lower()
 
     def _token(self, config, code, state):
         data = {
@@ -454,19 +492,21 @@ class OAuth:
             self._error_redirect("social_provider_invalid")
             return
 
+        state = str(request_values.get("state") or "").strip()
+        native_client = self._callback_client(config["provider"], state) == "native"
+
         if request_values.get("error"):
             error = str(request_values.get("error") or "social_denied")
             description = str(request_values.get("error_description") or "")
             self._log(config["provider"], "provider_denied", f"{error} {description}".strip())
-            self._error_redirect(error)
+            self._error_redirect(error, native_client)
             return
 
         code = str(request_values.get("code") or "").strip()
-        state = str(request_values.get("state") or "").strip()
         if not code or not self._verify_state(config["provider"], state):
             self._session().pop(self.STATE_KEY, None)
             self._log(config["provider"], "state_invalid", f"code={bool(code)} state={bool(state)}")
-            self._error_redirect("social_state_invalid")
+            self._error_redirect("social_state_invalid", native_client)
             return
 
         try:
@@ -474,7 +514,7 @@ class OAuth:
                 token = self._token(config, code, state)
             except Exception as error:
                 self._log(config["provider"], "token_failed", error)
-                self._error_redirect("social_token_failed")
+                self._error_redirect("social_token_failed", native_client)
                 return
 
             access_token = token.get("access_token")
@@ -485,16 +525,16 @@ class OAuth:
                 profile = self._profile(config, access_token, token, request_values)
             except Exception as error:
                 self._log(config["provider"], "profile_failed", error)
-                self._error_redirect("social_profile_failed")
+                self._error_redirect("social_profile_failed", native_client)
                 return
 
             if not profile.get("provider_user_id"):
                 self._log(config["provider"], "profile_missing_id")
-                self._error_redirect("social_profile_missing")
+                self._error_redirect("social_profile_missing", native_client)
                 return
             if config["provider"] in ("google", "apple") and profile.get("email") and not profile.get("email_verified"):
                 self._log(config["provider"], "email_not_verified")
-                self._error_redirect(f"{config['provider']}_email_not_verified")
+                self._error_redirect(f"{config['provider']}_email_not_verified", native_client)
                 return
 
             struct = wiz.model("struct")
@@ -503,12 +543,23 @@ class OAuth:
             user = struct.user.find_or_create_social_user(profile)
             session.set(**auth.session_payload(user))
             self._session().pop(self.STATE_KEY, None)
+            if native_client:
+                tokens = auth.issue_tokens(user)
+                wiz.response.redirect(self._native_redirect_url({
+                    "oauth_access_token": tokens.get("access_token") or "",
+                    "oauth_refresh_token": tokens.get("refresh_token") or "",
+                    "oauth_token_type": tokens.get("token_type") or "Bearer",
+                    "oauth_expires_in": tokens.get("expires_in") or "",
+                    "oauth_refresh_expires_in": tokens.get("refresh_expires_in") or "",
+                    "oauth_provider": config["provider"],
+                }))
+                return
             wiz.response.redirect("/dashboard")
         except Exception as error:
             if error.__class__.__name__ == "ResponseException":
                 raise
             self._log(config["provider"], "callback_failed", error)
-            self._error_redirect("social_login_failed")
+            self._error_redirect("social_login_failed", native_client)
 
 
 Model = OAuth()

@@ -68,6 +68,8 @@ app-root {
     width: 100%;
     height: 100%;
     min-height: 100%;
+    height: -webkit-fill-available;
+    min-height: -webkit-fill-available;
     background: #12121c;
     overflow: hidden;
     display: block;
@@ -86,7 +88,9 @@ body.is-access-page app-root {
     inset: 0;
     width: 100%;
     background: #05070c;
+    height: 100vh;
     height: var(--access-visual-height, 100dvh);
+    min-height: 100vh;
     min-height: var(--access-visual-height, 100dvh);
     overflow: hidden;
 }
