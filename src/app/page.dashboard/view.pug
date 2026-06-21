@@ -1,6 +1,6 @@
 main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!isDark", id="appRoot", aria-label="러닝메이트 디자인 레퍼런스")
     div([class]="phoneClass")
-        wiz-component-loading-fullscreen(*ngIf="isInitialLoading", message="초기 데이터를 불러오는 중", [detail]="initialLoadingDetail")
+        wiz-component-loading-fullscreen(*ngIf="isInitialLoading", message="RunMate", [detail]="initialLoadingDetail", [tips]="initialLoadingTips")
         div(*ngIf="!isInitialLoading && initialErrorMessage", class="dashboard-error-overlay")
             wiz-component-error-state([message]="initialErrorMessage", [onRetry]="retryInitialLoad")
 
@@ -10,7 +10,9 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     div
                         div(class="greeting-name") {{homeTitle}}
                         div(class="greeting-sub") {{goalMessage}}
-                    div(class="avatar") 나
+                    div(class="avatar")
+                        img(*ngIf="homeProfileImage", [src]="homeProfileImage", [attr.alt]="profileNameText")
+                        span(*ngIf="!homeProfileImage") {{homeAvatarText}}
 
                 div(class="month-total-card")
                     div(class="month-label") 이번달 총 거리
@@ -892,7 +894,11 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         i([class]="cycleLegendMarkerClass(phase.id)", aria-hidden="true")
                         | {{phase.label}}
 
-                div(class="cal-grid")
+                div(
+                    class="cal-grid",
+                    (touchstart)="startCalendarSwipe($event)",
+                    (touchend)="endCalendarSwipe($event)",
+                    (touchcancel)="cancelCalendarSwipe()")
                     div(class="cal-day-label") 일
                     div(class="cal-day-label") 월
                     div(class="cal-day-label") 화
@@ -1342,6 +1348,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 class="cycle-flow-btn",
                                 [class.active]="selectedCycleFlowLevel === flow.id",
                                 [attr.aria-checked]="selectedCycleFlowLevel === flow.id",
+                                [disabled]="isCycleSaving || isCycleFormReadOnly",
                                 role="radio",
                                 (click)="selectCycleFlow(flow.id)") {{flow.label}}
                         div(class="cycle-field-label") 몸 상태
@@ -1353,6 +1360,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 [class.active]="selectedCycleConditionEmoji === item.emoji",
                                 [attr.aria-checked]="selectedCycleConditionEmoji === item.emoji",
                                 [attr.aria-label]="item.label",
+                                [disabled]="isCycleSaving || isCycleFormReadOnly",
                                 role="radio",
                                 (click)="selectCycleCondition(item.emoji)")
                                 span {{item.emoji}}
@@ -1812,7 +1820,11 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     div(class="journal-legend-row")
                         span(class="journal-legend-dot")
                         span 일기 작성일
-                    div(class="cal-grid journal-cal-grid")
+                    div(
+                        class="cal-grid journal-cal-grid",
+                        (touchstart)="startCalendarSwipe($event)",
+                        (touchend)="endCalendarSwipe($event)",
+                        (touchcancel)="cancelCalendarSwipe()")
                         div(class="cal-day-label") 일
                         div(class="cal-day-label") 월
                         div(class="cal-day-label") 화
@@ -2311,10 +2323,6 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             span 확인 문구
                             small 아래 입력창에 삭제를 정확히 입력해야 최종 삭제가 가능합니다.
                             input(type="text", [(ngModel)]="accountDeleteForm.confirm_text", placeholder="삭제", autocomplete="off")
-                        label(class="account-delete-field")
-                            span 비밀번호 재입력
-                            small 비밀번호를 입력하면 추가 검증에 사용됩니다.
-                            input(type="password", [(ngModel)]="accountDeleteForm.password", placeholder="선택 입력", autocomplete="current-password")
                         div(class="account-delete-actions")
                             button(type="button", class="account-delete-secondary", [disabled]="deletingAccount", (click)="closeAccountDelete()") 취소
                             button(type="button", class="account-delete-danger", [disabled]="!accountDeleteReady || deletingAccount", (click)="deleteAccount()")
@@ -2354,12 +2362,12 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                 section(class="settings-group")
                     div(class="settings-section-label") 로그아웃
                     div(class="settings-list")
-                        button(type="button", class="settings-list-row danger", (click)="logout()")
+                        button(type="button", class="settings-list-row danger", [disabled]="isLoggingOut", (click)="$event.stopPropagation(); logout()")
                             div(class="settings-row-main")
-                                div(class="settings-row-title") 로그아웃
+                                div(class="settings-row-title") {{isLoggingOut ? '로그아웃 중' : '로그아웃'}}
                                 div(class="settings-row-sub") 현재 계정에서 나가기
                             div(class="settings-row-trail")
-                                i(class="fa-solid fa-arrow-right-from-bracket", aria-hidden="true")
+                                i(class="fa-solid", [ngClass]="isLoggingOut ? 'fa-spinner' : 'fa-arrow-right-from-bracket'", aria-hidden="true")
 
         div(*ngIf="profileSocialPanelTab && !viewedProfile", class="profile-social-page", role="dialog", aria-modal="true", aria-label="프로필 팔로우 목록")
             div(class="profile-page-head")
@@ -2545,6 +2553,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         article(
                             *ngFor="let step of onboardingSteps; let i = index",
                             class="onboarding-slide",
+                            [class.onboarding-slide-scrollable]="step.id === 'profile'",
                             [attr.aria-hidden]="i !== onboardingIndex")
                             div(class="onboarding-icon")
                                 i(class="fa-solid", [ngClass]="step.icon", aria-hidden="true")
@@ -2564,16 +2573,20 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                             i(class="fa-solid", [ngClass]="item.icon", aria-hidden="true")
                                             small {{item.label}}
                                 div(*ngSwitchCase="'menu-record'", class="onboarding-menu-preview")
-                                    div(class="onboarding-menu-tabs")
+                                    div(class="onboarding-menu-tabs onboarding-menu-tabs-four")
                                         span(*ngFor="let item of recordGroupItems", class="onboarding-menu-tab")
                                             i(class="fa-solid", [ngClass]="item.icon", aria-hidden="true")
                                             small {{item.label}}
-                                    div(class="onboarding-upload-preview")
-                                        div(class="onboarding-upload-icon")
+                                    div(class="onboarding-preview-list")
+                                        div(class="onboarding-preview-row")
                                             i(class="fa-solid fa-image", aria-hidden="true")
-                                        div
-                                            strong 운동 기록 사진 업로드
-                                            small 날짜, 거리, 페이스를 분석해서 달력에 저장
+                                            span 운동 기록 사진 업로드
+                                        div(class="onboarding-preview-row")
+                                            i(class="fa-solid fa-calendar-check", aria-hidden="true")
+                                            span 날짜·거리·페이스 자동 저장
+                                        div(class="onboarding-preview-row")
+                                            i(class="fa-solid fa-images", aria-hidden="true")
+                                            span 사진·영상 갤러리 보관
                                 div(*ngSwitchCase="'menu-goal'", class="onboarding-menu-preview")
                                     div(class="onboarding-menu-tabs")
                                         span(*ngFor="let item of goalGroupItems", class="onboarding-menu-tab")
@@ -2590,7 +2603,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                             i(class="fa-solid fa-medal", aria-hidden="true")
                                             span 업적 확인
                                 div(*ngSwitchCase="'menu-community'", class="onboarding-menu-preview")
-                                    div(class="onboarding-menu-tabs")
+                                    div(class="onboarding-menu-tabs onboarding-menu-tabs-four")
                                         span(*ngFor="let item of communityGroupItems", class="onboarding-menu-tab")
                                             i(class="fa-solid", [ngClass]="item.icon", aria-hidden="true")
                                             small {{item.label}}
@@ -2636,6 +2649,18 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                     label(class="onboarding-field")
                                         span 러닝 시작일
                                         input(type="date", [max]="todayDateKey", [(ngModel)]="onboardingProfile.running_start_date")
+                                    div(class="onboarding-gender-note")
+                                        i(class="fa-solid fa-venus-mars", aria-hidden="true")
+                                        span 생리주기와 맞춤 기록 기능을 위해 성별을 선택해주세요.
+                                    div(class="onboarding-gender-options", role="radiogroup", aria-label="성별 선택")
+                                        button(
+                                            *ngFor="let option of onboardingGenderOptions",
+                                            type="button",
+                                            class="onboarding-gender-option",
+                                            [class.active]="onboardingProfile.gender === option.id",
+                                            [attr.aria-pressed]="onboardingProfile.gender === option.id",
+                                            (click)="selectOnboardingGender(option.id)")
+                                            span {{option.label}}
                                 div(*ngSwitchCase="'goal'", class="goal-recommendation-list")
                                     button(
                                         *ngFor="let item of goalRecommendations",
@@ -2652,8 +2677,8 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                     div(class="goal-month-note") {{onboardingGoalMonth}} 월 총 거리 목표로 저장돼.
                                 div(*ngSwitchCase="'complete'", class="complete-panel")
                                     div(class="complete-ring")
-                                        i(class="fa-solid fa-upload", aria-hidden="true")
-                                    div(class="complete-copy") 오늘 날짜 기록 화면으로 이동해.
+                                        i(class="fa-solid fa-person-running", aria-hidden="true")
+                                    div(class="complete-copy") 버튼을 누르면 온보딩이 끝나고 앱을 바로 시작해.
                 div(class="onboarding-status") {{onboardingStatus}}
                 div(class="onboarding-dots", aria-hidden="true")
                     span(*ngFor="let step of onboardingSteps; let i = index", [class.active]="i === onboardingIndex")
@@ -2664,7 +2689,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     button(type="button", class="onboarding-skip", [disabled]="!canSkipOnboardingStep || isOnboardingSaving", (click)="skipOnboardingStep()") 건너뛰기
                     button(type="button", class="onboarding-primary", [disabled]="isOnboardingSaving", (click)="nextOnboardingStep()")
                         span {{onboardingPrimaryText}}
-                        i(class="fa-solid fa-chevron-right", aria-hidden="true")
+                        i(class="fa-solid", [ngClass]="currentOnboardingStep?.id === 'complete' ? 'fa-check' : 'fa-chevron-right'", aria-hidden="true")
             div(*ngIf="isOnboardingSkipConfirmVisible", class="onboarding-skip-confirm-backdrop", role="presentation")
                 section(class="onboarding-skip-confirm", role="dialog", aria-modal="true", aria-label="온보딩 건너뛰기 확인")
                     div(class="onboarding-skip-confirm-icon")
@@ -2689,8 +2714,8 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     h3 {{confirmDialog.title}}
                     p {{confirmDialog.message}}
                     div(class="app-confirm-actions")
-                        button(type="button", class="app-confirm-cancel", (click)="resolveConfirmDialog(false)") {{confirmDialog.cancelLabel}}
-                        button(type="button", class="app-confirm-accept", (click)="resolveConfirmDialog(true)") {{confirmDialog.confirmLabel}}
+                        button(type="button", class="app-confirm-cancel", (click)="$event.stopPropagation(); resolveConfirmDialog(false)") {{confirmDialog.cancelLabel}}
+                        button(type="button", class="app-confirm-accept", (click)="$event.stopPropagation(); resolveConfirmDialog(true)") {{confirmDialog.confirmLabel}}
 
         div(*ngIf="newlyEarnedBadges.length", class="badge-celebration-backdrop", role="dialog", aria-modal="true", aria-label="새 뱃지 획득", (click)="closeBadgeCelebration()")
             div(class="badge-celebration-panel", (click)="$event.stopPropagation()")

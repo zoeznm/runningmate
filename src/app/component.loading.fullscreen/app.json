@@ -6,5 +6,5 @@
     "viewuri": "",
     "category": "",
     "controller": "",
-    "template": "wiz-component-loading-fullscreen([publicmessage]=\"\", [publicdetail]=\"\")"
+    "template": "wiz-component-loading-fullscreen([publicmessage]=\"\", [publicdetail]=\"\", [publictips]=\"\")"
 }

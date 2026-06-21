@@ -674,6 +674,9 @@ class RunningMateData:
     def cycle_logs_path(self):
         return os.path.join(self.data_dir(), "cycle_logs.json")
 
+    def cycle_settings_path(self):
+        return os.path.join(self.data_dir(), "cycle_settings.json")
+
     def chat_history_path(self):
         return os.path.join(self.data_dir(), "chat_history.json")
 
@@ -792,6 +795,7 @@ class RunningMateData:
             self.weight_logs_path(),
             self.weight_settings_path(),
             self.cycle_logs_path(),
+            self.cycle_settings_path(),
             self.chat_history_path(),
             self.ai_usage_path(),
             self.ai_rate_limits_path(),
@@ -894,6 +898,7 @@ class RunningMateData:
                 "weight_logs": 0,
                 "weight_settings": 0,
                 "cycle_logs": 0,
+                "cycle_settings": 0,
                 "monthly_goals": 0,
                 "run_media": 0,
                 "reactions": 0,
@@ -917,6 +922,7 @@ class RunningMateData:
             self._delete_account_collection(self.weight_logs_path(), user_id, include_legacy, "weight_logs", summary)
             self._delete_account_collection(self.weight_settings_path(), user_id, include_legacy, "weight_settings", summary)
             self._delete_account_collection(self.cycle_logs_path(), user_id, include_legacy, "cycle_logs", summary)
+            self._delete_account_collection(self.cycle_settings_path(), user_id, include_legacy, "cycle_settings", summary)
             self._delete_account_collection(self.goals_path(), user_id, include_legacy, "monthly_goals", summary)
             self._delete_account_collection(self.user_badges_path(), user_id, include_legacy, "user_badges", summary)
             self._delete_account_collection(self.chat_history_path(), user_id, include_legacy, "chat_sessions", summary)
@@ -2075,6 +2081,59 @@ class RunningMateData:
 
         return sorted(logs.values(), key=lambda row: row.get("start_date") or "", reverse=True)
 
+    def load_cycle_settings(self, user_id=None, include_legacy=False):
+        rows = self._load_cycle_settings_rows()
+        owner_id = self._text(user_id)
+        if owner_id:
+            rows = [
+                row for row in rows
+                if self._row_belongs_to_user(row, owner_id, include_legacy)
+            ]
+        return sorted(rows, key=lambda row: row.get("updated_at") or "", reverse=True)
+
+    def cycle_setting(self, user_id=None):
+        owner_id = self._text(user_id)
+        rows = self.load_cycle_settings(owner_id) if owner_id else []
+        if not rows:
+            return {
+                "enabled": False,
+                "configured": False,
+                "updated_at": "",
+                "user_id": owner_id,
+            }
+
+        setting = rows[0]
+        return {
+            "enabled": bool(setting.get("enabled")),
+            "configured": True,
+            "updated_at": setting.get("updated_at") or "",
+            "user_id": setting.get("user_id") or owner_id,
+        }
+
+    def save_cycle_setting(self, payload=None, user_id=None):
+        source = payload if isinstance(payload, dict) else {}
+        owner_id = self._text(user_id or source.get("user_id") or source.get("userId"))
+        if not owner_id:
+            return None, "사용자 정보가 없습니다."
+
+        enabled_value = source.get("enabled")
+        if enabled_value is None:
+            enabled_value = source.get("cycle_enabled", source.get("cycleEnabled"))
+
+        setting = {
+            "enabled": self._bool(enabled_value),
+            "updated_at": self._utcnow(),
+            "user_id": owner_id,
+        }
+        rows = self._load_cycle_settings_rows()
+        next_rows = [
+            row for row in rows
+            if self._account_row_user_id(row) and self._account_row_user_id(row) != owner_id
+        ]
+        next_rows.append(setting)
+        self._write_cycle_settings(next_rows)
+        return self.cycle_setting(owner_id), None
+
     def normalize_cycle_log(self, row):
         source = row if isinstance(row, dict) else {}
         start_date = self._date(source.get("start_date", source.get("startDate")))
@@ -2176,7 +2235,10 @@ class RunningMateData:
 
     def cycle_summary(self, user_id=None):
         logs = self.load_cycles(user_id=user_id)
-        menstrual_logs = [row for row in logs if row.get("cycle_phase") == "menstrual"]
+        menstrual_logs = [
+            row for row in logs
+            if row.get("cycle_phase") == "menstrual" and self._cycle_flow_level(row.get("flow_level")) != "none"
+        ]
         menstrual_windows = self._cycle_menstrual_windows(logs)
         cycle_lengths = []
         period_lengths = []
@@ -2186,7 +2248,7 @@ class RunningMateData:
             end = self._date_obj(row.get("end_date"))
             if start and end:
                 period_length = max(1, (end - start).days + 1)
-                if period_length > 1 and end < datetime.date.today():
+                if period_length >= 1 and end < datetime.date.today():
                     period_lengths.append(period_length)
             if index > 0:
                 prev = self._date_obj(menstrual_windows[index - 1].get("start_date"))
@@ -2196,7 +2258,7 @@ class RunningMateData:
                         cycle_lengths.append(length)
 
         average_cycle_days = round(sum(cycle_lengths) / len(cycle_lengths)) if cycle_lengths else 28
-        average_period_days = max(self.DEFAULT_PERIOD_DAYS, round(sum(period_lengths) / len(period_lengths))) if period_lengths else self.DEFAULT_PERIOD_DAYS
+        average_period_days = max(1, min(12, round(sum(period_lengths) / len(period_lengths)))) if period_lengths else self.DEFAULT_PERIOD_DAYS
         latest = menstrual_windows[-1] if menstrual_windows else None
         next_start_date = None
         current_phase = None
@@ -4408,6 +4470,64 @@ class RunningMateData:
         with open(path, "w", encoding="utf-8") as fp:
             json.dump(settings, fp, ensure_ascii=False, indent=2)
 
+    def _load_cycle_settings_rows(self):
+        payload = self._load_account_json(self.cycle_settings_path(), [])
+        if isinstance(payload, dict):
+            if "enabled" in payload or "cycle_enabled" in payload or "cycleEnabled" in payload:
+                payload = [payload]
+            else:
+                rows = []
+                for user_id, value in payload.items():
+                    if isinstance(value, dict):
+                        row = dict(value)
+                        row.setdefault("user_id", user_id)
+                    else:
+                        row = {"user_id": user_id, "enabled": value}
+                    rows.append(row)
+                payload = rows
+        if not isinstance(payload, list):
+            return []
+
+        settings = []
+        for row in payload:
+            setting = self.normalize_cycle_setting(row)
+            if setting:
+                settings.append(setting)
+        return settings
+
+    def normalize_cycle_setting(self, row):
+        source = row if isinstance(row, dict) else {}
+        owner_id = self._text(source.get("user_id") or source.get("userId"))
+        if not owner_id:
+            return None
+
+        enabled_value = source.get("enabled")
+        if enabled_value is None:
+            enabled_value = source.get("cycle_enabled", source.get("cycleEnabled"))
+
+        return {
+            "enabled": self._bool(enabled_value),
+            "updated_at": self._text(source.get("updated_at") or source.get("updatedAt")) or self._utcnow(),
+            "user_id": owner_id,
+        }
+
+    def _write_cycle_settings(self, rows):
+        path = self.cycle_settings_path()
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        settings_by_user = {}
+        for row in rows:
+            setting = self.normalize_cycle_setting(row)
+            if not setting:
+                continue
+            owner_id = setting.get("user_id")
+            current = settings_by_user.get(owner_id)
+            if not current or (setting.get("updated_at") or "") >= (current.get("updated_at") or ""):
+                settings_by_user[owner_id] = setting
+
+        settings = sorted(settings_by_user.values(), key=lambda row: row.get("updated_at") or "", reverse=True)
+        with open(path, "w", encoding="utf-8") as fp:
+            json.dump(settings, fp, ensure_ascii=False, indent=2)
+
     def _write_cycles(self, rows):
         path = self.cycle_logs_path()
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -6020,6 +6140,13 @@ class RunningMateData:
 
         key = re.sub(r"[\s\-_]+", "", text.strip().lower())
         aliases = {
+            "none": "none",
+            "no": "none",
+            "없음": "none",
+            "안함": "none",
+            "안해": "none",
+            "안해요": "none",
+            "무": "none",
             "light": "light",
             "low": "light",
             "small": "light",
@@ -6048,20 +6175,38 @@ class RunningMateData:
                 continue
             if end_date < start_date:
                 start_date, end_date = end_date, start_date
-            ranges.append({"start_date": start_date, "end_date": end_date})
+            ranges.append({
+                "start_date": start_date,
+                "end_date": end_date,
+                "is_none": self._cycle_flow_level(row.get("flow_level")) == "none",
+            })
 
-        ranges = sorted(ranges, key=lambda row: row.get("start_date") or "")
+        ranges = sorted(ranges, key=lambda row: (row.get("start_date") or "", 1 if row.get("is_none") else 0))
         windows = []
         for row in ranges:
+            if row.get("is_none"):
+                if not windows:
+                    continue
+                current = windows[-1]
+                none_start = self._date_obj(row.get("start_date"))
+                if not none_start:
+                    continue
+                cutoff = (none_start - datetime.timedelta(days=1)).isoformat()
+                if cutoff < current.get("start_date"):
+                    windows.pop()
+                elif cutoff < current.get("end_date"):
+                    current["end_date"] = cutoff
+                continue
+
             if not windows:
-                windows.append(dict(row))
+                windows.append({"start_date": row.get("start_date"), "end_date": row.get("end_date")})
                 continue
 
             current = windows[-1]
             current_end = self._date_obj(current.get("end_date"))
             row_start = self._date_obj(row.get("start_date"))
             if not current_end or not row_start or row_start > current_end + datetime.timedelta(days=1):
-                windows.append(dict(row))
+                windows.append({"start_date": row.get("start_date"), "end_date": row.get("end_date")})
                 continue
 
             if row.get("end_date") > current.get("end_date"):
@@ -6104,6 +6249,8 @@ class RunningMateData:
         for row in logs or []:
             if self._cycle_phase(row.get("cycle_phase")) != phase:
                 continue
+            if self._cycle_flow_level(row.get("flow_level")) == "none":
+                continue
             emoji = self._cycle_condition_emoji(row.get("condition_emoji"))
             if not emoji:
                 continue
@@ -6125,6 +6272,8 @@ class RunningMateData:
 
     def _direct_cycle_phase(self, date, logs):
         for row in logs:
+            if self._cycle_flow_level(row.get("flow_level")) == "none":
+                continue
             start = self._date_obj(row.get("start_date"))
             end = self._date_obj(row.get("end_date"))
             phase = self._cycle_phase(row.get("cycle_phase"))

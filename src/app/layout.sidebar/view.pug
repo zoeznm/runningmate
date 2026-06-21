@@ -19,5 +19,5 @@ div(class="h-screen bg-[#f4f5f5] overflow-hidden")
         router-outlet
 
 wiz-portal-season-modal
-div(*ngIf="service.status.loading", class="fixed w-full h-full top-0 left-0 z-50 flex justify-center items-center bg-black/20 backdrop-blur-md")
-    wiz-component-loading-fullscreen(message="초기 데이터를 불러오는 중")
+div(*ngIf="service.status.loading", class="fixed inset-0 z-50 bg-black")
+    wiz-component-loading-fullscreen(message="RunMate")

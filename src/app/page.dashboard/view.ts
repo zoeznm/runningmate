@@ -26,7 +26,7 @@ type RunMediaType = 'photo' | 'video';
 type ReactionType = 'like' | 'fire' | 'clap' | 'strong';
 type CyclePhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal';
 type CycleSource = 'manual' | 'predicted';
-type CycleFlowLevel = 'light' | 'normal' | 'heavy';
+type CycleFlowLevel = 'none' | 'light' | 'normal' | 'heavy';
 type ThemeMode = 'dark' | 'light' | 'system';
 type DistanceUnit = 'km' | 'mile';
 type PaceDisplayMode = 'pace' | 'speed';
@@ -195,6 +195,8 @@ interface UserProfile {
     profile_image: string;
     onboarded: boolean;
     is_public: boolean;
+    cycle_enabled?: boolean;
+    cycle_enabled_configured?: boolean;
 }
 
 interface ProfileEditDraft {
@@ -212,6 +214,11 @@ interface OnboardingStep {
     body: string;
     icon: string;
     required?: boolean;
+}
+
+interface GenderOption {
+    id: 'male' | 'female' | 'unspecified';
+    label: string;
 }
 
 interface GoalRecommendation {
@@ -622,6 +629,12 @@ interface CycleLog {
     note?: string;
 }
 
+interface CycleWindow {
+    start_date: string;
+    end_date: string;
+    ended_by_none?: boolean;
+}
+
 interface CycleSummary {
     average_cycle_days: number;
     average_period_days: number;
@@ -1025,8 +1038,8 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     {
         id: 'complete',
         eyebrow: 'READY',
-        title: '이제 첫 러닝을 기록해볼까?',
-        body: '완료하면 오늘 날짜 기록 화면으로 이동해 바로 운동 기록 사진을 올릴 수 있어.',
+        title: '러닝을 시작해보세요.',
+        body: '준비가 끝났어요. RunMate와 함께 오늘의 러닝을 시작해보세요.',
         icon: 'fa-flag-checkered'
     }
 ];
@@ -1051,6 +1064,7 @@ const CYCLE_CONDITION_OPTIONS: CycleConditionOption[] = [
 ];
 
 const CYCLE_FLOW_OPTIONS: CycleFlowOption[] = [
+    { id: 'none', label: '없음' },
     { id: 'light', label: '적음' },
     { id: 'normal', label: '보통' },
     { id: 'heavy', label: '많음' }
@@ -1193,6 +1207,13 @@ export class Component implements AfterViewInit, OnDestroy {
     public pacerPersonaDraft: PacerPersona = DEFAULT_APP_SETTINGS.pacerPersona;
     public isInitialLoading: boolean = true;
     public initialLoadingDetail: string = '러닝 기록을 불러오는 중';
+    public readonly initialLoadingTips: string[] = [
+        '오늘의 러닝 기록을 한곳에 모으고 있어요.',
+        '목표 달성률을 계산하고 다음 러닝을 준비하고 있어요.',
+        '친구 피드와 랭킹을 최신 상태로 맞추고 있어요.',
+        'AI 페이서가 최근 흐름을 읽고 있어요.',
+        '캘린더와 기록 메모를 정리하고 있어요.'
+    ];
     public initialErrorMessage: string = '';
     public profile: UserProfile | null = null;
     public isProfileEditOpen: boolean = false;
@@ -1212,11 +1233,17 @@ export class Component implements AfterViewInit, OnDestroy {
     public isOnboardingSkipConfirmVisible: boolean = false;
     public onboardingIndex: number = 0;
     public onboardingStatus: string = '';
-    public onboardingProfile: Pick<UserProfile, 'name' | 'running_start_date' | 'profile_image'> = {
+    public onboardingProfile: Pick<UserProfile, 'name' | 'running_start_date' | 'profile_image' | 'gender'> = {
         name: '',
         running_start_date: this.dateKey(new Date()),
-        profile_image: ''
+        profile_image: '',
+        gender: ''
     };
+    public readonly onboardingGenderOptions: GenderOption[] = [
+        { id: 'male', label: '남성' },
+        { id: 'female', label: '여성' },
+        { id: 'unspecified', label: '선택 안함' }
+    ];
     public onboardingGoalKm: number = 30;
     public notificationPermissionState: NotificationPermission | 'unsupported' = 'unsupported';
     public healthKitAcknowledged: boolean = false;
@@ -1441,9 +1468,9 @@ export class Component implements AfterViewInit, OnDestroy {
     public deleteStep: number = 0;
     public deletingAccount: boolean = false;
     public accountDeleted: boolean = false;
-    public accountDeleteForm: { confirm_text: string; password: string } = {
-        confirm_text: '',
-        password: ''
+    public isLoggingOut: boolean = false;
+    public accountDeleteForm: { confirm_text: string } = {
+        confirm_text: ''
     };
     public passwordForm = {
         currentPassword: '',
@@ -1473,6 +1500,8 @@ export class Component implements AfterViewInit, OnDestroy {
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
     private deferredDashboardDataStarted: boolean = false;
+    private initialCoreDataLoaded: boolean = false;
+    private agreementModalVisibleForLoading: boolean = false;
     private activeYearMonth: string = this.yearMonthKey(new Date());
     private activeWeightYearMonth: string = this.yearMonthKey(new Date());
     private readonly cleanupHandlers: Array<() => void> = [];
@@ -1504,6 +1533,8 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly appleMusicUserTokenStorageKey: string = 'runningmate-apple-music-user-token-v1';
     private readonly weightTargetStorageKey: string = 'runningmate-weight-target-v1';
     private readonly weatherPositionStorageKey: string = 'runningmate-weather-position-v1';
+    private readonly agreementModalBodyClass: string = 'runningmate-agreement-modal-visible';
+    private readonly agreementModalEventName: string = 'runningmate:agreement-modal';
     private readonly onboardingScreenMap: Partial<Record<OnboardingStepKey, ScreenKey>> = {
         welcome: 'home',
         'menu-record': 'calendar',
@@ -1517,6 +1548,7 @@ export class Component implements AfterViewInit, OnDestroy {
     };
     private readonly weatherRefreshIntervalMs: number = 30 * 60 * 1000;
     private readonly initialDashboardTaskTimeoutMs: number = 9000;
+    private isCyclePreferenceSaving: boolean = false;
     private readonly initialLoadingStepPriority: string[] = [
         'auth',
         'location',
@@ -1545,6 +1577,9 @@ export class Component implements AfterViewInit, OnDestroy {
     private weatherRequestSeq: number = 0;
     private weatherRefreshTimer: number | null = null;
     private weatherPosition: WeatherPosition | null = null;
+    private calendarSwipeStartX: number | null = null;
+    private calendarSwipeStartY: number | null = null;
+    private calendarDateClickSuppressUntil: number = 0;
     private accountDeleteRedirectTimer: number | null = null;
     private lastWeatherLoadedAt: number = 0;
     private systemThemeQuery: MediaQueryList | null = null;
@@ -1599,6 +1634,12 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private refreshInitialLoadingDetail(): void {
+        if (this.agreementModalVisibleForLoading) {
+            this.initialLoadingDetail = '이용 약관 동의 중';
+            this.cdr.detectChanges();
+            return;
+        }
+
         const activeKey = this.initialLoadingStepPriority.find((key) => this.initialLoadingSteps.has(key));
         this.initialLoadingDetail = activeKey
             ? this.initialLoadingSteps.get(activeKey) || '초기 데이터를 준비하는 중'
@@ -1672,6 +1713,49 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
+    private async loadDeferredDashboardExtras(): Promise<void> {
+        await Promise.all([
+            this.runDeferredDashboardTask(() => this.loadWeights(), '체중 설정을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadBadges(), '업적을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadChatHistory(true), 'AI 대화 기록을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadAiConnection(), 'AI 설정을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadAppleMusicConnection(), '음악 설정을 불러오는 중'),
+            this.runDeferredDashboardTask(() => this.loadTrainingLoad(), '분석 데이터를 불러오는 중')
+        ]);
+
+        if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+            await this.runDeferredDashboardTask(() => this.loadCycles(), '주기 설정을 불러오는 중');
+        }
+    }
+
+    private async loadInitialDashboardCoreData(): Promise<void> {
+        if (this.initialRunsTruncated) {
+            const allRunsLoaded = await this.runInitialLoadingStep('runs', '전체 러닝 기록을 정리하는 중', () => (
+                this.loadRuns(true, false, true, this.runsUrl({ includeMedia: false }), false)
+            ));
+            if (!allRunsLoaded) return;
+            this.initialRunsTruncated = false;
+        }
+
+        const coreTasks: Array<Promise<void>> = [
+            this.runInitialDashboardTask('dayNotes', '기록 메모를 정리하는 중', () => this.loadDayNotes()),
+            this.runInitialDashboardTask('restDays', '휴식일을 확인하는 중', () => this.loadRestDays()),
+            this.runInitialDashboardTask('weather', '기록 달력 날씨를 확인하는 중', () => this.loadWeatherForActiveMonth()),
+            this.runInitialDashboardTask('goals', '목표 달성률을 계산하는 중', () => this.loadGoalsForActiveMonth()),
+            this.runInitialDashboardTask('challenges', '챌린지를 확인하는 중', () => this.loadChallenges()),
+            this.runInitialDashboardTask('feed', '커뮤니티 피드를 불러오는 중', () => this.loadFeed(true)),
+            this.runInitialDashboardTask('friends', '친구 목록을 불러오는 중', () => this.loadFriendLists(true)),
+            this.runInitialDashboardTask('friendCode', '친구 코드를 준비하는 중', () => this.loadFriendCode()),
+            this.runInitialDashboardTask('notifications', '알림을 확인하는 중', () => this.loadCommunityNotifications(true)),
+            this.runInitialDashboardTask('ranking', '랭킹을 계산하는 중', () => this.loadRanking())
+        ];
+        if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+            coreTasks.push(this.runInitialDashboardTask('cycles', '주기 기록을 정리하는 중', () => this.loadCycles()));
+        }
+        await Promise.all(coreTasks);
+        this.initialCoreDataLoaded = true;
+    }
+
     private async deferredDashboardYield(delayMs: number = 80): Promise<void> {
         if (typeof window === 'undefined') return;
         await new Promise<void>((resolve) => window.setTimeout(resolve, delayMs));
@@ -1694,7 +1778,11 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async loadDeferredDashboardData(): Promise<void> {
-        await this.loadDeferredDashboardEssentials();
+        if (this.initialCoreDataLoaded) {
+            await this.loadDeferredDashboardExtras();
+        } else {
+            await this.loadDeferredDashboardEssentials();
+        }
         await this.deferredDashboardYield();
 
         if (this.initialRunsTruncated) {
@@ -1774,12 +1862,14 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get canSkipOnboardingStep(): boolean {
-        return this.currentOnboardingStep?.id !== 'complete';
+        if (this.currentOnboardingStep?.id === 'complete') return false;
+        const profileIndex = this.onboardingSteps.findIndex((step) => step.id === 'profile');
+        return profileIndex >= 0 && this.onboardingIndex > profileIndex;
     }
 
     public get onboardingPrimaryText(): string {
         if (this.isOnboardingSaving) return '저장 중';
-        if (this.currentOnboardingStep?.id === 'complete') return '업로드하러 가기';
+        if (this.currentOnboardingStep?.id === 'complete') return 'RunMate와 시작하기';
         return '다음';
     }
 
@@ -2399,10 +2489,16 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.selectedCalendarCycleLog ? 'fa-pen-to-square' : 'fa-floppy-disk';
     }
 
+    public get isCycleFormReadOnly(): boolean {
+        return Boolean(this.selectedCalendarCycleLog && !this.isCycleNoteEditing);
+    }
+
     public get selectedCalendarCycleText(): string {
         const info = this.selectedCalendarDate ? this.cycleDayMap.get(this.selectedCalendarDate) : null;
         if (info?.phase === 'menstrual' && info.source === 'predicted') return '생리 예정';
-        return info ? info.label : '주기 예측 대기';
+        if (info) return info.label;
+        const log = this.selectedCalendarCycleLog;
+        return log?.flow_level === 'none' ? '생리 없음' : '주기 예측 대기';
     }
 
     public get selectedCalendarCyclePhase(): CyclePhase | null {
@@ -2413,8 +2509,17 @@ export class Component implements AfterViewInit, OnDestroy {
     public get selectedCalendarCycleLog(): CycleLog | null {
         const date = this.selectedCalendarDate;
         if (!date) return null;
+        const noneLog = this.cycleLogs.find((log) => (
+            log.cycle_phase === 'menstrual' &&
+            log.flow_level === 'none' &&
+            log.start_date <= date &&
+            log.end_date >= date
+        ));
+        if (noneLog) return noneLog;
+
         return this.cycleLogs.find((log) => (
             log.cycle_phase === 'menstrual' &&
+            log.flow_level !== 'none' &&
             log.start_date <= date &&
             log.end_date >= date
         )) || null;
@@ -2806,6 +2911,14 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get profileAvatarText(): string {
         return this.avatarText(this.profile?.name);
+    }
+
+    public get homeProfileImage(): string {
+        return this.profile?.profile_image || '';
+    }
+
+    public get homeAvatarText(): string {
+        return this.avatarText(this.profile?.name || this.profile?.display_name || this.profile?.username || '나');
     }
 
     public get monthlyGoalSettingsText(): string {
@@ -3459,14 +3572,14 @@ export class Component implements AfterViewInit, OnDestroy {
     public openAccountDelete(): void {
         if (this.deletingAccount) return;
         this.deleteStep = 1;
-        this.accountDeleteForm = { confirm_text: '', password: '' };
+        this.accountDeleteForm = { confirm_text: '' };
         this.cdr.detectChanges();
     }
 
     public closeAccountDelete(): void {
         if (this.deletingAccount) return;
         this.deleteStep = 0;
-        this.accountDeleteForm = { confirm_text: '', password: '' };
+        this.accountDeleteForm = { confirm_text: '' };
         this.cdr.detectChanges();
     }
 
@@ -3499,24 +3612,19 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch('/api/auth/account', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    confirm_text: this.accountDeleteForm.confirm_text,
-                    password: this.accountDeleteForm.password || ''
-                })
-            });
-            const payload = await response.json().catch(() => null);
+            const result = await jsonRequest<any>('/api/auth/account', 'DELETE', {
+                confirm_text: this.accountDeleteForm.confirm_text
+            }, { retries: 0, timeoutMs: 30000 });
 
-            if (!response.ok || !payload?.success) {
-                this.showToast(payload?.message || payload?.data?.message || '계정 삭제에 실패했어.', 'error');
+            if (!result.success) {
+                this.showToast(result.error?.message || result.message || '계정 삭제에 실패했어.', 'error');
                 return;
             }
 
+            clearAuthTokens();
             this.deleteStep = 0;
             this.accountDeleted = true;
-            this.accountDeleteForm = { confirm_text: '', password: '' };
+            this.accountDeleteForm = { confirm_text: '' };
             this.accountDeleteRedirectTimer = window.setTimeout(() => {
                 window.location.href = '/access?account_deleted=1';
             }, 1200);
@@ -3529,21 +3637,24 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async logout(): Promise<void> {
-        if (!(await this.openConfirmDialog('로그아웃 하시겠습니까?', {
-            title: '로그아웃',
-            confirmLabel: '로그아웃',
-            tone: 'danger',
-            iconClass: 'fa-right-from-bracket'
-        }))) return;
+        if (this.isLoggingOut) return;
+        this.isLoggingOut = true;
+        this.cdr.detectChanges();
 
         try {
-            await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+            await apiFetch('/api/auth/logout', {
+                method: 'POST',
+                cache: 'no-store',
+                credentials: 'include',
+                retries: 0,
+                timeoutMs: 5000
+            });
         } catch {
             // Local auth state is cleared below even if the server request fails.
         }
 
         clearAuthTokens();
-        window.location.href = '/access';
+        window.location.replace('/access');
     }
 
     public async nextOnboardingStep(): Promise<void> {
@@ -3667,6 +3778,12 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public clearOnboardingPhoto(): void {
         this.onboardingProfile.profile_image = '';
+        this.cdr.detectChanges();
+    }
+
+    public selectOnboardingGender(gender: string): void {
+        this.onboardingProfile.gender = gender === 'unspecified' ? 'unspecified' : this.normalizeGender(gender);
+        this.onboardingStatus = '';
         this.cdr.detectChanges();
     }
 
@@ -5244,6 +5361,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public selectJournalDate(cell: JournalCalendarCell): void {
         if (!cell.day) return;
+        if (Date.now() < this.calendarDateClickSuppressUntil) return;
 
         this.selectedJournalDate = cell.key;
         this.selectedJournalRuns = this.buildSelectedJournalRuns();
@@ -5263,6 +5381,43 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
         void this.loadGoalsForActiveMonth();
         void this.loadWeatherForActiveMonth();
+    }
+
+    public startCalendarSwipe(event: TouchEvent): void {
+        if (event.touches.length !== 1) {
+            this.cancelCalendarSwipe();
+            return;
+        }
+
+        const touch = event.touches[0];
+        this.calendarSwipeStartX = touch.clientX;
+        this.calendarSwipeStartY = touch.clientY;
+    }
+
+    public endCalendarSwipe(event: TouchEvent): void {
+        if (this.calendarSwipeStartX === null || this.calendarSwipeStartY === null) return;
+        const touch = event.changedTouches[0];
+        if (!touch) {
+            this.cancelCalendarSwipe();
+            return;
+        }
+
+        const deltaX = touch.clientX - this.calendarSwipeStartX;
+        const deltaY = touch.clientY - this.calendarSwipeStartY;
+        this.cancelCalendarSwipe();
+
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        if (absX < 48 || absX < absY * 1.35) return;
+
+        event.preventDefault();
+        this.calendarDateClickSuppressUntil = Date.now() + 350;
+        this.changeCalendarMonth(deltaX < 0 ? 1 : -1);
+    }
+
+    public cancelCalendarSwipe(): void {
+        this.calendarSwipeStartX = null;
+        this.calendarSwipeStartY = null;
     }
 
     public async toggleRestDay(): Promise<void> {
@@ -5460,11 +5615,26 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async toggleCycleFeature(): Promise<void> {
-        if (!this.shouldShowCycleFeature) return;
+        if (!this.shouldShowCycleFeature || this.isCyclePreferenceSaving) return;
 
+        const previousEnabled = this.isCycleFeatureEnabled;
         const nextEnabled = !this.isCycleFeatureEnabled;
         this.isCycleFeatureEnabled = nextEnabled;
         this.persistCycleLocalSettings();
+        this.isCyclePreferenceSaving = true;
+        this.cycleStatus = nextEnabled ? '생리주기 설정 저장 중' : '생리주기 연동 끄는 중';
+        this.cdr.detectChanges();
+
+        const saved = await this.saveCycleFeaturePreference(nextEnabled);
+        this.isCyclePreferenceSaving = false;
+        if (!saved) {
+            this.isCycleFeatureEnabled = previousEnabled;
+            this.persistCycleLocalSettings();
+            this.cycleStatus = '생리주기 설정을 저장하지 못했어. 다시 시도해줘.';
+            this.showToast(this.cycleStatus, 'error');
+            this.cdr.detectChanges();
+            return;
+        }
 
         if (!nextEnabled) {
             this.cycleLogs = [];
@@ -5521,6 +5691,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public selectCycleFlow(level: CycleFlowLevel): void {
+        if (this.isCycleFormReadOnly || this.isCycleSaving) return;
         if (!CYCLE_FLOW_OPTIONS.some((item) => item.id === level)) return;
         this.selectedCycleFlowLevel = level;
         this.cycleStatus = '';
@@ -5528,6 +5699,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public selectCycleCondition(emoji: string): void {
+        if (this.isCycleFormReadOnly || this.isCycleSaving) return;
         if (!this.normalizeCycleConditionEmoji(emoji)) return;
         this.selectedCycleConditionEmoji = emoji;
         this.cycleStatus = '';
@@ -6035,8 +6207,28 @@ export class Component implements AfterViewInit, OnDestroy {
         window.open(this.aiLoginDeviceUrl, '_blank', 'noopener,noreferrer');
     }
 
+    private installAgreementLoadingMessageSync(): void {
+        if (typeof window === 'undefined') return;
+
+        this.agreementModalVisibleForLoading = typeof document !== 'undefined'
+            ? !!document.body?.classList.contains(this.agreementModalBodyClass)
+            : false;
+
+        const handleAgreementModalState = (event: Event): void => {
+            const detail = (event as CustomEvent<{ visible?: boolean }>).detail;
+            this.agreementModalVisibleForLoading = !!detail?.visible;
+            if (this.isInitialLoading) {
+                this.refreshInitialLoadingDetail();
+            }
+        };
+
+        window.addEventListener(this.agreementModalEventName, handleAgreementModalState);
+        this.cleanupHandlers.push(() => window.removeEventListener(this.agreementModalEventName, handleAgreementModalState));
+    }
+
     public ngAfterViewInit(): void {
         this.installDashboardViewportSync();
+        this.installAgreementLoadingMessageSync();
 
         this.bindNativeClick('[data-screen]', (target) => {
             const screen = target.dataset.screen as ScreenKey | undefined;
@@ -6092,8 +6284,9 @@ export class Component implements AfterViewInit, OnDestroy {
     public async loadInitialDashboardData(): Promise<void> {
         this.isInitialLoading = true;
         this.deferredDashboardDataStarted = false;
+        this.initialCoreDataLoaded = false;
         this.initialLoadingSteps.clear();
-        this.initialLoadingDetail = '초기 데이터를 불러오는 중';
+        this.initialLoadingDetail = this.agreementModalVisibleForLoading ? '이용 약관 동의 중' : '초기 데이터를 불러오는 중';
         this.initialErrorMessage = '';
         this.cdr.detectChanges();
         let shouldStartDeferredData = false;
@@ -6117,6 +6310,9 @@ export class Component implements AfterViewInit, OnDestroy {
                 }
 
                 runLoaded = await this.runInitialLoadingStep('runs', '러닝 기록을 불러오는 중', () => this.loadRuns(true, false, false, this.initialRunsUrl(), false));
+                if (runLoaded) {
+                    this.initialRunsTruncated = true;
+                }
                 await this.runInitialLoadingStep('profile', '프로필을 확인하는 중', () => this.loadProfile());
             }
 
@@ -6125,7 +6321,8 @@ export class Component implements AfterViewInit, OnDestroy {
             }
 
             if (runLoaded) {
-                shouldStartDeferredData = true;
+                await this.loadInitialDashboardCoreData();
+                shouldStartDeferredData = !this.initialErrorMessage;
             }
         } catch (error) {
             this.initialErrorMessage = error instanceof Error && error.message
@@ -6477,7 +6674,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.profile = profile;
         this.syncWeightTargetLocalForProfile();
         this.syncPacerPersonaLocalForProfile();
-        this.applyCycleAvailability();
+        this.applyCyclePreferenceFromProfile(profile);
         if (!profile.onboarded) {
             this.openOnboarding(profile);
         }
@@ -6486,11 +6683,10 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private async loadProfile(): Promise<void> {
         try {
-            const response = await fetch('/api/profile', { cache: 'no-store' });
-            const payload = await response.json().catch(() => null);
-            if (!response.ok || !payload?.success || !payload.data) return;
+            const result = await apiFetch<UserProfile>('/api/profile', { retries: 0, timeoutMs: 8000 });
+            if (!result.success || !result.data) return;
 
-            this.applyProfilePayload(payload.data);
+            this.applyProfilePayload(result.data);
         } catch {
             return;
         } finally {
@@ -6499,6 +6695,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private normalizeProfile(source: Partial<UserProfile> | null | undefined): UserProfile {
+        const raw = (source || {}) as Record<string, unknown>;
         return {
             id: typeof source?.id === 'string' ? source.id : '',
             username: typeof source?.username === 'string' ? source.username : '',
@@ -6511,7 +6708,9 @@ export class Component implements AfterViewInit, OnDestroy {
             running_start_date: this.normalizeDateKey(source?.running_start_date) || this.dateKey(new Date()),
             profile_image: typeof source?.profile_image === 'string' ? source.profile_image : '',
             onboarded: Boolean(source?.onboarded),
-            is_public: source?.is_public !== false
+            is_public: source?.is_public !== false,
+            cycle_enabled: raw['cycle_enabled'] === true || raw['cycleEnabled'] === true,
+            cycle_enabled_configured: raw['cycle_enabled_configured'] === true || raw['cycleEnabledConfigured'] === true
         };
     }
 
@@ -6538,6 +6737,63 @@ export class Component implements AfterViewInit, OnDestroy {
         this.refreshDerivedState();
     }
 
+    private applyCyclePreferenceFromProfile(profile: UserProfile): void {
+        if (!this.shouldShowCycleFeature) {
+            this.applyCycleAvailability();
+            return;
+        }
+
+        if (profile.cycle_enabled_configured) {
+            this.isCycleFeatureEnabled = profile.cycle_enabled === true;
+        } else if (this.isCycleFeatureEnabled) {
+            void this.saveCycleFeaturePreference(true, true);
+        }
+
+        if (!this.isCycleFeatureEnabled) {
+            this.cycleLogs = [];
+            this.cycleSummary = { ...EMPTY_CYCLE_SUMMARY };
+            this.cycleDayMap.clear();
+            this.cyclePatternStats = [];
+            this.cycleStatus = '';
+        }
+
+        this.persistCycleLocalSettings();
+        this.syncCycleDraftWithSelectedDate();
+        this.refreshDerivedState();
+    }
+
+    private async saveCycleFeaturePreference(enabled: boolean, silent: boolean = false): Promise<boolean> {
+        try {
+            const result = await jsonRequest<UserProfile>('/api/profile', 'PATCH', {
+                cycle_enabled: enabled
+            }, { retries: 0, timeoutMs: 8000 });
+
+            if (!result.success) {
+                if (!silent) {
+                    this.cycleStatus = apiErrorMessage(result.error) || result.message || '생리주기 설정을 저장하지 못했어.';
+                }
+                return false;
+            }
+
+            const profile = this.normalizeProfile(result.data as Partial<UserProfile>);
+            if (profile.id) {
+                this.profile = profile;
+            } else if (this.profile) {
+                this.profile = {
+                    ...this.profile,
+                    cycle_enabled: enabled,
+                    cycle_enabled_configured: true
+                };
+            }
+            return true;
+        } catch {
+            if (!silent) {
+                this.cycleStatus = '생리주기 설정을 저장하지 못했어.';
+            }
+            return false;
+        }
+    }
+
     private effectiveRunningStartDate(profile: UserProfile | null): string {
         return this.firstRunDate() || profile?.running_start_date || this.todayDateKey;
     }
@@ -6553,7 +6809,8 @@ export class Component implements AfterViewInit, OnDestroy {
         this.onboardingProfile = {
             name: profile.name || '',
             running_start_date: profile.running_start_date || this.dateKey(new Date()),
-            profile_image: profile.profile_image || ''
+            profile_image: profile.profile_image || '',
+            gender: this.normalizeGender(profile.gender)
         };
         this.onboardingGoalKm = 30;
         this.onboardingIndex = 0;
@@ -6587,6 +6844,8 @@ export class Component implements AfterViewInit, OnDestroy {
         if (stepId === 'profile') {
             const name = this.onboardingProfile.name.trim();
             const startDate = this.normalizeDateKey(this.onboardingProfile.running_start_date);
+            const genderChoice = String(this.onboardingProfile.gender || '').trim();
+            const gender = genderChoice === 'unspecified' ? 'unspecified' : this.normalizeGender(genderChoice);
             if (!name) {
                 this.onboardingStatus = '닉네임을 입력해줘.';
                 return false;
@@ -6599,8 +6858,13 @@ export class Component implements AfterViewInit, OnDestroy {
                 this.onboardingStatus = '러닝 시작일은 오늘 이전 날짜로 선택해줘.';
                 return false;
             }
+            if (!gender) {
+                this.onboardingStatus = '생리주기와 맞춤 기능을 위해 성별을 선택해줘.';
+                return false;
+            }
             this.onboardingProfile.name = name;
             this.onboardingProfile.running_start_date = startDate;
+            this.onboardingProfile.gender = gender;
         }
 
         if (stepId === 'goal' && (!Number.isFinite(this.onboardingGoalKm) || this.onboardingGoalKm <= 0)) {
@@ -6625,33 +6889,31 @@ export class Component implements AfterViewInit, OnDestroy {
                 if (!goalSaved) return;
             }
 
+            const profileStepIndex = this.onboardingSteps.findIndex((step) => step.id === 'profile');
+            const shouldSaveProfile = !skipGuide || (profileStepIndex >= 0 && this.onboardingIndex > profileStepIndex);
             const profilePayload: Record<string, unknown> = { onboarded: true };
-            if (!skipGuide) {
+            if (shouldSaveProfile) {
                 profilePayload['name'] = this.onboardingProfile.name.trim();
                 profilePayload['running_start_date'] = this.onboardingProfile.running_start_date;
                 profilePayload['profile_image'] = this.onboardingProfile.profile_image;
+                if (this.onboardingProfile.gender !== 'unspecified') {
+                    profilePayload['gender'] = this.onboardingProfile.gender;
+                }
             }
 
-            const response = await fetch('/api/profile', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(profilePayload)
-            });
-            const payload = await response.json().catch(() => null);
-            if (!response.ok || !payload?.success) {
-                this.onboardingStatus = payload?.message || (skipGuide ? '온보딩 건너뛰기를 저장하지 못했어.' : '온보딩 완료 정보를 저장하지 못했어.');
+            const result = await jsonRequest<UserProfile>('/api/profile', 'PATCH', profilePayload, { retries: 0, timeoutMs: 10000 });
+            if (!result.success || !result.data) {
+                this.onboardingStatus = result.error?.message || result.message || (skipGuide ? '온보딩 건너뛰기를 저장하지 못했어.' : '온보딩 완료 정보를 저장하지 못했어.');
                 return;
             }
 
-            this.profile = this.normalizeProfile(payload.data);
+            this.profile = this.normalizeProfile(result.data);
+            this.applyCyclePreferenceFromProfile(this.profile);
             this.syncPacerPersonaLocalForProfile();
             this.isOnboardingVisible = false;
             this.isOnboardingSkipConfirmVisible = false;
             this.onboardingStatus = '';
             this.showToast(skipGuide ? '온보딩을 건너뛰었어.' : '온보딩을 완료했어.', 'success');
-            if (!skipGuide) {
-                this.openTodayUpload();
-            }
         } catch {
             this.onboardingStatus = skipGuide ? '온보딩 건너뛰기 중 오류가 발생했어.' : '온보딩 저장 중 오류가 발생했어.';
         } finally {
@@ -10142,10 +10404,10 @@ export class Component implements AfterViewInit, OnDestroy {
             predictionHistory,
             Math.max(15, Math.min(60, this.cycleSummary.average_cycle_days || 28))
         );
-        const averagePeriodDays = Math.max(7, Math.min(12, this.cycleSummary.average_period_days || 7));
+        const averagePeriodDays = Math.max(1, Math.min(12, this.cycleSummary.average_period_days || 7));
         const predictedCycleCount = 6;
         const predictedStarts = this.predictedCycleStarts(predictionHistory, averageCycleDays, predictedCycleCount);
-        const projectionWindows = [
+        const projectionWindows: CycleWindow[] = [
             ...menstrualWindows,
             ...predictedStarts.map((date) => ({ start_date: date, end_date: date }))
         ].sort((a, b) => a.start_date.localeCompare(b.start_date));
@@ -10165,7 +10427,10 @@ export class Component implements AfterViewInit, OnDestroy {
                 if (map.has(key)) continue;
 
                 const phaseOffset = explicitNext ? Math.min(offset, averageCycleDays - 1) : offset % averageCycleDays;
-                const phase = this.cyclePhaseForOffset(phaseOffset, averageCycleDays, averagePeriodDays);
+                const windowPeriodDays = projectionWindows[index].ended_by_none
+                    ? this.cycleWindowLength(projectionWindows[index], averagePeriodDays)
+                    : averagePeriodDays;
+                const phase = this.cyclePhaseForOffset(phaseOffset, averageCycleDays, windowPeriodDays);
                 map.set(key, {
                     phase,
                     label: this.cyclePhaseLabel(phase),
@@ -10177,7 +10442,7 @@ export class Component implements AfterViewInit, OnDestroy {
         return map;
     }
 
-    private cyclePredictionHistory(windows: { start_date: string; end_date: string }[]): HistoryInput {
+    private cyclePredictionHistory(windows: CycleWindow[]): HistoryInput {
         return {
             periodStarts: windows
                 .map((window) => this.normalizeDateKey(window.start_date))
@@ -10230,27 +10495,49 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private menstrualCycleWindows(logs: CycleLog[]): { start_date: string; end_date: string }[] {
+    private menstrualCycleWindows(logs: CycleLog[]): CycleWindow[] {
         const ranges = logs
             .filter((log) => log.cycle_phase === 'menstrual')
             .map((log) => ({
                 start_date: log.start_date <= log.end_date ? log.start_date : log.end_date,
-                end_date: log.end_date >= log.start_date ? log.end_date : log.start_date
+                end_date: log.end_date >= log.start_date ? log.end_date : log.start_date,
+                is_none: log.flow_level === 'none'
             }))
-            .sort((a, b) => a.start_date.localeCompare(b.start_date));
-        const windows: { start_date: string; end_date: string }[] = [];
+            .sort((a, b) => {
+                const dateOrder = a.start_date.localeCompare(b.start_date);
+                if (dateOrder) return dateOrder;
+                return Number(a.is_none) - Number(b.is_none);
+            });
+        const windows: CycleWindow[] = [];
 
         for (const range of ranges) {
+            if (range.is_none) {
+                const current = windows[windows.length - 1];
+                const noneStart = this.parseDate(range.start_date);
+                if (!current || !noneStart) continue;
+
+                const cutoff = this.dateKey(this.addDays(noneStart, -1));
+                if (cutoff < current.start_date) {
+                    windows.pop();
+                } else if (cutoff < current.end_date) {
+                    current.end_date = cutoff;
+                    current.ended_by_none = true;
+                } else if (cutoff === current.end_date) {
+                    current.ended_by_none = true;
+                }
+                continue;
+            }
+
             const current = windows[windows.length - 1];
             if (!current) {
-                windows.push({ ...range });
+                windows.push({ start_date: range.start_date, end_date: range.end_date });
                 continue;
             }
 
             const currentEnd = this.parseDate(current.end_date);
             const rangeStart = this.parseDate(range.start_date);
             if (!currentEnd || !rangeStart || rangeStart.getTime() > this.addDays(currentEnd, 1).getTime()) {
-                windows.push({ ...range });
+                windows.push({ start_date: range.start_date, end_date: range.end_date });
                 continue;
             }
 
@@ -10260,6 +10547,13 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         return windows;
+    }
+
+    private cycleWindowLength(window: CycleWindow, fallback: number): number {
+        const start = this.parseDate(window.start_date);
+        const end = this.parseDate(window.end_date);
+        if (!start || !end) return fallback;
+        return Math.max(1, Math.min(12, Math.round((end.getTime() - start.getTime()) / 86400000) + 1));
     }
 
     private fillCycleRange(map: Map<string, CycleDayInfo>, startDate: string, endDate: string, phase: CyclePhase, source: CycleSource, overwrite: boolean): void {
@@ -10477,6 +10771,7 @@ export class Component implements AfterViewInit, OnDestroy {
         const counts = new Map<string, number>();
         for (const log of this.cycleLogs) {
             if (log.cycle_phase !== phase) continue;
+            if (log.flow_level === 'none') continue;
             const emoji = this.normalizeCycleConditionEmoji(log.condition_emoji);
             if (!emoji) continue;
             counts.set(emoji, (counts.get(emoji) || 0) + 1);
@@ -10499,6 +10794,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private normalizeCycleFlowLevel(value: unknown): CycleFlowLevel | '' {
         const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+        if (text === 'none' || text === 'no' || text === '없음' || text === '안함' || text === '안 함') return 'none';
         if (text === 'light' || text === 'normal' || text === 'heavy') return text;
         return '';
     }
@@ -10518,9 +10814,9 @@ export class Component implements AfterViewInit, OnDestroy {
                 ? 'fa-solid fa-heart'
             : phase === 'ovulation'
                 ? 'fa-solid fa-star'
-                : phase === 'luteal'
-                    ? 'fa-solid fa-moon'
-                    : 'fa-solid fa-circle';
+            : phase === 'luteal'
+                ? 'fa-solid fa-moon'
+                    : 'fa-solid fa-seedling';
         return `cycle-day-marker cycle-marker-${phase} ${iconClass}`;
     }
 
@@ -11734,6 +12030,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private selectCalendarDateKey(date: string): void {
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+        if (Date.now() < this.calendarDateClickSuppressUntil) return;
 
         if (this.selectedCalendarDate !== date && !this.isUploading) {
             this.uploadProgress = 0;

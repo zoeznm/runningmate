@@ -3,49 +3,76 @@
 }
 
 .fullscreen-loader {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    justify-items: center;
+    position: fixed;
     inset: 0;
-    z-index: 80;
-    background: color-mix(in srgb, var(--screen-bg, #12121c) 88%, transparent);
-    backdrop-filter: blur(10px);
-    color: var(--text, #e8e8f0);
+    z-index: 120;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: max(32px, env(safe-area-inset-top)) 24px max(42px, calc(env(safe-area-inset-bottom) + 34px));
+    background: #000000;
+    color: #ffffff;
+    font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    overflow: hidden;
 }
 
-.fullscreen-loader-panel {
+.fullscreen-loader-brand {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    width: min(260px, calc(100% - 48px));
-    gap: 10px;
+    align-self: center;
+    gap: 16px;
+    text-align: center;
+    transform: translateY(18px);
+}
+
+.fullscreen-loader-logo {
+    display: block;
+    width: 92px;
+    height: 92px;
+    border-radius: 24px;
+    background: #000000;
+    object-fit: cover;
+    box-shadow:
+        0 26px 54px rgba(0, 0, 0, 0.55),
+        0 0 44px rgba(36, 214, 181, 0.22);
+}
+
+.fullscreen-loader-title {
+    color: #ffffff;
+    font-size: clamp(28px, 7vw, 34px);
+    font-weight: 900;
+    line-height: 1.1;
+}
+
+.fullscreen-loader-bottom {
+    width: min(330px, 100%);
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    gap: 14px;
     text-align: center;
 }
 
-.fullscreen-loader-message {
-    color: var(--text, #e8e8f0);
+.fullscreen-loader-tip {
+    min-height: 42px;
+    color: rgba(255, 255, 255, 0.74);
     font-size: 14px;
     font-weight: 800;
-    line-height: 1.35;
-}
-
-.fullscreen-loader-detail {
-    min-height: 18px;
-    color: var(--text-muted, var(--muted, rgba(232, 232, 240, 0.68)));
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.45;
+    line-height: 1.5;
 }
 
 .fullscreen-loader-bar {
     position: relative;
-    width: 148px;
+    width: 156px;
     height: 5px;
     overflow: hidden;
     border-radius: 999px;
-    background: var(--line, rgba(255, 255, 255, 0.08));
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .fullscreen-loader-bar span {
@@ -53,7 +80,7 @@
     inset: 0 auto 0 0;
     width: 44%;
     border-radius: inherit;
-    background: var(--primary, #a0a8d0);
+    background: #24d6b5;
     animation: fullscreen-loader-slide 1.1s ease-in-out infinite;
 }
 

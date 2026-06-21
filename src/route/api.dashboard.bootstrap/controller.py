@@ -53,11 +53,15 @@ limit = _limit()
 runs = running.load_runs(include_media=False, user_id=user_id)
 visible_runs = [_filter_fields(row) for row in runs[:limit]]
 has_media_history = any(row.get("image_url") for row in runs)
+profile = auth.public_user(user)
+cycle_setting = running.cycle_setting(user_id)
+profile["cycle_enabled"] = bool(cycle_setting.get("enabled"))
+profile["cycle_enabled_configured"] = bool(cycle_setting.get("configured"))
 
 wiz.response.json({
     "success": True,
     "data": {
-        "profile": auth.public_user(user),
+        "profile": profile,
         "runs": visible_runs,
         "run_count": len(runs),
         "run_limit": limit,

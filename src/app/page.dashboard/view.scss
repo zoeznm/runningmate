@@ -68,18 +68,18 @@ button span {
     --screen-bg: #12121c;
     --surface: #1e1e30;
     --surface-2: #2a2a40;
-    --primary: #78d6b3;
-    --primary-rgb: 120, 214, 179;
-    --primary-fill: #78d6b3;
-    --primary-fill-rgb: 120, 214, 179;
-    --primary-deep: #173e35;
-    --primary-ink: #10201a;
+    --primary: #24d6b5;
+    --primary-rgb: 36, 214, 181;
+    --primary-fill: #24d6b5;
+    --primary-fill-rgb: 36, 214, 181;
+    --primary-deep: #021513;
+    --primary-ink: #021513;
     --text: #e8e8f0;
     --text-muted: rgba(232, 232, 240, 0.68);
     --muted: #666;
     --line: rgba(255, 255, 255, 0.08);
     --line-soft: rgba(255, 255, 255, 0.06);
-    --bar-muted: #22463d;
+    --bar-muted: rgba(36, 214, 181, 0.28);
     border-color: rgba(255, 255, 255, 0.08);
     background: #12121c;
 }
@@ -89,18 +89,18 @@ button span {
     --screen-bg: #f7f7f9;
     --surface: #ffffff;
     --surface-2: #f0f0f6;
-    --primary: #1b7f65;
-    --primary-rgb: 27, 127, 101;
-    --primary-fill: #78d6b3;
-    --primary-fill-rgb: 120, 214, 179;
-    --primary-deep: #10201a;
-    --primary-ink: #10201a;
+    --primary: #0e7490;
+    --primary-rgb: 14, 116, 144;
+    --primary-fill: #0e7490;
+    --primary-fill-rgb: 14, 116, 144;
+    --primary-deep: #021513;
+    --primary-ink: #ffffff;
     --text: #1a1a2e;
     --text-muted: rgba(26, 26, 46, 0.62);
     --muted: #888;
     --line: rgba(0, 0, 0, 0.1);
     --line-soft: rgba(0, 0, 0, 0.08);
-    --bar-muted: #bcebd9;
+    --bar-muted: #b9f6ec;
     border-color: rgba(0, 0, 0, 0.08);
     background: #f7f7f9;
 }
@@ -244,11 +244,26 @@ button span {
     justify-content: center;
     width: 40px;
     height: 40px;
+    overflow: hidden;
     border-radius: 50%;
     background: var(--primary-deep);
     color: var(--primary-fill);
     font-size: 16px;
     font-weight: 500;
+}
+
+.avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
 }
 
 .month-total-card {
@@ -441,8 +456,8 @@ button span {
 .home-goal-mini-card.achieved,
 .home-goal-progress-row.achieved,
 .goal-setup-card.achieved {
-    border-color: rgba(76, 175, 80, 0.72);
-    box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.22);
+    border-color: rgba(var(--primary-fill-rgb), 0.72);
+    box-shadow: inset 0 0 0 1px rgba(var(--primary-fill-rgb), 0.22);
 }
 
 .home-goal-mini-head {
@@ -457,7 +472,7 @@ button span {
 .goal-check,
 .home-goal-progress-row.achieved .home-goal-progress-top i,
 .goal-setup-card.achieved .goal-setup-state {
-    color: #4caf50;
+    color: var(--primary-fill);
 }
 
 .home-goal-mini-label,
@@ -543,7 +558,7 @@ button span {
 
 .home-goal-progress-row.achieved .home-goal-progress-fill,
 .goal-setup-card.achieved .home-goal-progress-fill {
-    background: #4caf50;
+    background: var(--primary-fill);
 }
 
 .home-weight-entry,
@@ -796,9 +811,9 @@ button span {
 }
 
 .run-type-chip.run-type-jogging {
-    border-color: rgba(76, 175, 80, 0.32);
-    background: rgba(76, 175, 80, 0.14);
-    color: #81c784;
+    border-color: rgba(var(--primary-fill-rgb), 0.32);
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
 }
 
 .run-type-chip.run-type-long {
@@ -838,13 +853,13 @@ button span {
 }
 
 .run-type-chip.run-type-home_training {
-    border-color: rgba(45, 212, 191, 0.36);
-    background: rgba(45, 212, 191, 0.14);
-    color: #5eead4;
+    border-color: rgba(var(--primary-fill-rgb), 0.36);
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
 }
 
 .light-screen .run-type-chip.run-type-jogging {
-    color: #2e7d32;
+    color: #0e7490;
 }
 
 .light-screen .run-type-chip.run-type-long {
@@ -872,7 +887,7 @@ button span {
 }
 
 .light-screen .run-type-chip.run-type-home_training {
-    color: #0f766e;
+    color: #0e7490;
 }
 
 .achievement-heading {
@@ -1234,6 +1249,7 @@ button span {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 4px;
+    touch-action: pan-y;
 }
 
 .cal-day-label {
@@ -1391,7 +1407,7 @@ button span {
 }
 
 .cycle-marker-follicular {
-    color: #60a5fa;
+    color: #2dd4bf;
 }
 
 .cycle-marker-ovulation {
@@ -1414,7 +1430,7 @@ button span {
 }
 
 .dot-green {
-    background: #4caf50;
+    background: var(--primary-fill);
 }
 
 .dot-red {
@@ -1640,8 +1656,8 @@ button span {
 }
 
 .cycle-secondary-btn.active {
-    background: rgba(52, 211, 153, 0.14);
-    color: #6ee7b7;
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
 }
 
 .cycle-danger-btn {
@@ -1651,7 +1667,7 @@ button span {
 
 .cycle-primary-btn {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .cycle-danger-btn:disabled,
@@ -1709,7 +1725,7 @@ button span {
 .cycle-phase-pill-follicular,
 .cycle-phase-btn-follicular.active,
 .cycle-pattern-follicular .cycle-pattern-name {
-    color: #93c5fd;
+    color: #5eead4;
 }
 
 .cycle-phase-pill-ovulation,
@@ -1830,6 +1846,12 @@ button span {
 .cycle-condition-btn.active {
     background: rgba(var(--primary-fill-rgb), 0.12);
     color: var(--primary);
+}
+
+.cycle-flow-btn:disabled,
+.cycle-condition-btn:disabled {
+    cursor: default;
+    opacity: 0.58;
 }
 
 .cycle-note-input {
@@ -2508,7 +2530,7 @@ button span {
 .music-fetch-btn {
     flex: 1 1 auto;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .music-clear-btn {
@@ -2796,7 +2818,7 @@ button span {
 
 .run-record-reupload-btn {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .run-record-manual-btn {
@@ -3181,7 +3203,7 @@ button span {
 
 .run-journal-primary-btn {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .upload-journal-head-save {
@@ -3290,7 +3312,7 @@ button span {
 
 .group-switcher-btn.active {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .group-switcher-btn i {
@@ -3328,7 +3350,7 @@ button span {
 }
 
 .ai-connect-card.connected {
-    border-color: rgba(76, 175, 80, 0.28);
+    border-color: rgba(var(--primary-fill-rgb), 0.28);
 }
 
 .ai-connect-top {
@@ -3374,7 +3396,7 @@ button span {
 }
 
 .ai-status-dot.connected {
-    background: #4caf50;
+    background: var(--primary-fill);
 }
 
 .ai-connect-meta {
@@ -3634,7 +3656,7 @@ button span {
 .upload-progress-fill {
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(to right, #4caf50, var(--primary-fill));
+    background: linear-gradient(to right, var(--primary-fill), var(--primary-fill));
     transition: width 180ms ease;
 }
 
@@ -3823,7 +3845,7 @@ button span {
     border: 0;
     border-radius: 14px;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
     cursor: pointer;
     font-size: 14px;
     font-weight: 800;
@@ -4423,7 +4445,7 @@ button span {
 
 .challenge-tab-btn.active {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .challenge-list {
@@ -4524,7 +4546,7 @@ button span {
 }
 
 .challenge-status-pill.active {
-    background: rgba(76, 175, 80, 0.14);
+    background: rgba(var(--primary-fill-rgb), 0.14);
     color: var(--primary);
 }
 
@@ -4556,7 +4578,7 @@ button span {
 .challenge-rank-fill {
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(to right, #4caf50, var(--primary-fill));
+    background: linear-gradient(to right, var(--primary-fill), var(--primary-fill));
     transition: width 180ms ease;
 }
 
@@ -4590,7 +4612,7 @@ button span {
     min-height: 42px;
     border-radius: 12px;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
     font-size: 13px;
 }
 
@@ -4631,7 +4653,7 @@ button span {
 }
 
 .challenge-detail-card.achieved {
-    border-color: rgba(76, 175, 80, 0.32);
+    border-color: rgba(var(--primary-fill-rgb), 0.32);
 }
 
 .challenge-detail-card.missed {
@@ -4722,7 +4744,7 @@ button span {
 }
 
 .challenge-result-row.achieved i {
-    color: #4caf50;
+    color: var(--primary-fill);
 }
 
 .challenge-result-row.missed i {
@@ -4887,7 +4909,7 @@ button span {
     width: 100%;
     margin-top: 12px;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .challenge-secondary-btn {
@@ -5188,7 +5210,7 @@ button span {
     border: 0;
     border-radius: 50%;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
     cursor: pointer;
     font-size: 12px;
 }
@@ -5279,7 +5301,7 @@ button span {
 
 .friend-tab-btn.active {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .friend-list {
@@ -5746,7 +5768,7 @@ button span {
 
 .feed-reaction-btn.active {
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .feed-reaction-emoji {
@@ -5854,7 +5876,7 @@ button span {
     height: 38px;
     border-radius: 12px;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
     font-size: 11px;
 }
 
@@ -6024,7 +6046,7 @@ button span {
     gap: 8px;
     margin-bottom: 12px;
     border-radius: 14px;
-    background: rgba(76, 175, 80, 0.12);
+    background: rgba(var(--primary-fill-rgb), 0.12);
     padding: 11px 12px;
     color: var(--text);
     font-size: 13px;
@@ -6033,7 +6055,7 @@ button span {
 }
 
 .ranking-motivation i {
-    color: #4caf50;
+    color: var(--primary-fill);
 }
 
 .ranking-status {
@@ -6065,8 +6087,8 @@ button span {
 }
 
 .ranking-row.me {
-    border-color: rgba(76, 175, 80, 0.42);
-    box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.14);
+    border-color: rgba(var(--primary-fill-rgb), 0.42);
+    box-shadow: inset 0 0 0 1px rgba(var(--primary-fill-rgb), 0.14);
 }
 
 .ranking-row.top-three {
@@ -6155,9 +6177,9 @@ button span {
 .ranking-name em {
     flex: 0 0 auto;
     border-radius: 999px;
-    background: rgba(76, 175, 80, 0.14);
+    background: rgba(var(--primary-fill-rgb), 0.14);
     padding: 3px 6px;
-    color: #4caf50;
+    color: var(--primary-fill);
     font-size: 10px;
     font-style: normal;
     font-weight: 900;
@@ -6187,7 +6209,7 @@ button span {
 .ranking-bar-fill {
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(to right, #4caf50, var(--primary-fill));
+    background: linear-gradient(to right, var(--primary-fill), var(--primary-fill));
     transition: width 180ms ease;
 }
 
@@ -6955,9 +6977,9 @@ button span {
 .training-load-status {
     flex: 0 0 auto;
     border-radius: 999px;
-    background: rgba(34, 197, 94, 0.14);
+    background: rgba(var(--primary-fill-rgb), 0.14);
     padding: 7px 10px;
-    color: #86efac;
+    color: var(--primary-fill);
     font-size: 12px;
     font-weight: 900;
     line-height: 1;
@@ -6974,7 +6996,7 @@ button span {
 }
 
 .light-screen .training-load-status {
-    color: #15803d;
+    color: #0e7490;
 }
 
 .light-screen .training-load-card.load-caution .training-load-status {
@@ -7000,7 +7022,7 @@ button span {
 }
 
 .training-load-zone.zone-safe {
-    background: #22c55e;
+    background: var(--primary-fill);
 }
 
 .training-load-zone.zone-caution {
@@ -7207,7 +7229,7 @@ button span {
 }
 
 .goal-history-row.achieved {
-    box-shadow: inset 0 0 0 1px rgba(76, 175, 80, 0.42);
+    box-shadow: inset 0 0 0 1px rgba(var(--primary-fill-rgb), 0.42);
 }
 
 .goal-history-month,
@@ -7227,7 +7249,7 @@ button span {
 
 .goal-history-row.achieved .goal-history-month i,
 .goal-history-chip.achieved {
-    color: #4caf50;
+    color: var(--primary-fill);
 }
 
 .goal-history-items {
@@ -7469,7 +7491,7 @@ button span {
 
 .run-type-ratio-segment.run-type-jogging,
 .run-type-bar-fill.run-type-jogging {
-    background: #4caf50;
+    background: var(--primary-fill);
 }
 
 .run-type-ratio-segment.run-type-long,
@@ -7508,7 +7530,7 @@ button span {
 }
 
 .positive-text {
-    color: #4caf50;
+    color: var(--primary-fill);
 }
 
 .gallery-heading {
@@ -7857,7 +7879,7 @@ button span {
     height: 14px;
     border-radius: 999px;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
     font-size: 8px;
     font-weight: 900;
     line-height: 14px;
@@ -9106,8 +9128,8 @@ button span {
 }
 
 .profile-edit-field input:focus {
-    border-color: rgba(120, 214, 179, 0.76);
-    box-shadow: 0 0 0 2px rgba(120, 214, 179, 0.14);
+    border-color: rgba(var(--primary-fill-rgb), 0.76);
+    box-shadow: 0 0 0 2px rgba(var(--primary-fill-rgb), 0.14);
 }
 
 .profile-edit-public-row {
@@ -9283,7 +9305,7 @@ button span {
 }
 
 .ai-settings-panel.connected {
-    border-color: rgba(76, 175, 80, 0.28);
+    border-color: rgba(var(--primary-fill-rgb), 0.28);
 }
 
 .ai-settings-top {
@@ -9448,7 +9470,7 @@ button span {
 .ai-refresh-btn {
     margin-top: 12px;
     background: var(--primary);
-    color: #ffffff;
+    color: var(--primary-ink);
 }
 
 .ai-auth-link-btn {
@@ -9695,7 +9717,7 @@ button span {
 }
 
 .light-screen .settings-switch.active {
-    background: #1b7f65;
+    background: #0e7490;
 }
 
 .light-screen .settings-switch.active span {
@@ -9725,13 +9747,13 @@ button span {
 }
 
 .settings-connect-btn.connected {
-    border-color: rgba(52, 199, 89, 0.36);
-    background: rgba(52, 199, 89, 0.14);
-    color: #8ef0a2;
+    border-color: rgba(var(--primary-fill-rgb), 0.36);
+    background: rgba(var(--primary-fill-rgb), 0.14);
+    color: var(--primary-fill);
 }
 
 .light-screen .settings-connect-btn.connected {
-    color: #15803d;
+    color: #0e7490;
 }
 
 .settings-segment {
@@ -9766,14 +9788,14 @@ button span {
 }
 
 .settings-segment button.active {
-    background: var(--primary-deep);
-    color: #ffffff;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
 }
 
 .light-screen .settings-segment button.active {
-    background: #1b7f65;
+    background: #0e7490;
     color: #ffffff;
-    box-shadow: 0 6px 16px rgba(27, 127, 101, 0.18);
+    box-shadow: 0 6px 16px rgba(14, 116, 144, 0.20);
 }
 
 .settings-inline-panel {
@@ -9817,8 +9839,8 @@ button span {
 }
 
 .light-screen .settings-inline-panel .cycle-secondary-btn.active {
-    background: #dcf1e9;
-    color: #13795b;
+    background: rgba(14, 116, 144, 0.14);
+    color: #0e7490;
 }
 
 .light-screen .settings-inline-panel .cycle-danger-btn {
@@ -9859,8 +9881,8 @@ button span {
 }
 
 .password-settings-field input:focus {
-    border-color: rgba(120, 214, 179, 0.76);
-    box-shadow: 0 0 0 2px rgba(120, 214, 179, 0.14);
+    border-color: rgba(var(--primary-fill-rgb), 0.76);
+    box-shadow: 0 0 0 2px rgba(var(--primary-fill-rgb), 0.14);
 }
 
 .password-settings-field small,
@@ -9876,7 +9898,7 @@ button span {
 }
 
 .light-screen .password-settings-field small.ok {
-    color: #047857;
+    color: #0e7490;
 }
 
 .password-settings-field small.warn {
@@ -9911,8 +9933,8 @@ button span {
     min-height: 42px;
     border: 0;
     border-radius: 12px;
-    background: var(--primary-deep);
-    color: #ffffff;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
     cursor: pointer;
     font-size: 13px;
     font-weight: 850;
@@ -9967,8 +9989,8 @@ button span {
 
 .settings-day-chip.active {
     border-color: transparent;
-    background: var(--primary-deep);
-    color: #ffffff;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
 }
 
 .settings-time-field {
@@ -10065,7 +10087,7 @@ button span {
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: rgba(120, 214, 179, 0.12);
+    background: rgba(var(--primary-fill-rgb), 0.12);
     color: var(--primary-fill);
     font-size: 15px;
 }
@@ -10299,7 +10321,7 @@ button span {
     height: 44px;
     margin: 0 auto 12px;
     border-radius: 50%;
-    background: rgba(120, 214, 179, 0.14);
+    background: rgba(var(--primary-fill-rgb), 0.14);
     color: var(--primary-fill);
     font-size: 20px;
 }
@@ -10335,7 +10357,7 @@ button span {
     flex: 0 0 auto;
     flex-direction: column;
     width: 100%;
-    max-height: min(620px, calc(100% - 94px));
+    max-height: min(700px, calc(100% - 72px));
     min-width: 0;
     min-height: 0;
     border-top: 0.5px solid var(--line);
@@ -10395,8 +10417,16 @@ button span {
     flex-direction: column;
     justify-content: flex-start;
     min-width: 0;
+    overflow: hidden;
+    padding: 12px 0 8px;
+}
+
+.onboarding-slide-scrollable {
     overflow-y: auto;
-    padding: 14px 0 10px;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+    padding-bottom: 20px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .onboarding-icon {
@@ -10490,6 +10520,11 @@ button span {
     gap: 7px;
 }
 
+.onboarding-menu-tabs-four {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
 .onboarding-nav-chip,
 .onboarding-menu-tab {
     display: grid;
@@ -10499,7 +10534,7 @@ button span {
     border: 0.5px solid var(--line);
     border-radius: 14px;
     background: var(--surface);
-    padding: 10px 6px;
+    padding: 9px 5px;
     color: var(--text);
 }
 
@@ -10514,7 +10549,7 @@ button span {
     overflow: hidden;
     max-width: 100%;
     color: var(--muted);
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 800;
     line-height: 1.1;
     text-overflow: ellipsis;
@@ -10526,11 +10561,11 @@ button span {
     display: flex;
     align-items: center;
     gap: 11px;
-    min-height: 52px;
+    min-height: 48px;
     border: 0.5px solid var(--line);
     border-radius: 15px;
     background: var(--surface);
-    padding: 0 13px;
+    padding: 0 12px;
     color: var(--text);
 }
 
@@ -10543,7 +10578,7 @@ button span {
     height: 32px;
     flex: 0 0 32px;
     border-radius: 11px;
-    background: rgba(120, 214, 179, 0.14);
+    background: rgba(var(--primary-fill-rgb), 0.14);
     color: var(--primary-fill);
 }
 
@@ -10667,6 +10702,56 @@ button span {
     font-size: 14px;
 }
 
+.onboarding-gender-note {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    border: 0.5px solid color-mix(in srgb, var(--primary) 28%, var(--line));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--primary-fill) 12%, var(--surface));
+    padding: 11px 12px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.35;
+}
+
+.onboarding-gender-note i {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border-radius: 10px;
+    background: rgba(var(--primary-fill-rgb), 0.16);
+    color: var(--primary-fill);
+}
+
+.onboarding-gender-options {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 7px;
+}
+
+.onboarding-gender-option {
+    min-height: 44px;
+    border: 0.5px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    color: var(--text);
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.onboarding-gender-option.active {
+    border-color: transparent;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+}
+
 .goal-recommendation-list {
     display: grid;
     gap: 9px;
@@ -10687,8 +10772,8 @@ button span {
 }
 
 .goal-recommendation.active {
-    border-color: rgba(120, 214, 179, 0.68);
-    background: rgba(120, 214, 179, 0.12);
+    border-color: rgba(var(--primary-fill-rgb), 0.68);
+    background: rgba(var(--primary-fill-rgb), 0.12);
 }
 
 .goal-recommendation > i {
@@ -10870,7 +10955,7 @@ button span {
     width: 48px;
     height: 48px;
     border-radius: 16px;
-    background: rgba(120, 214, 179, 0.14);
+    background: rgba(var(--primary-fill-rgb), 0.14);
     color: var(--primary-fill);
     font-size: 20px;
 }
