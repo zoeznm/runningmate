@@ -1,21 +1,35 @@
 div.access-page
-    main.access-shell([ngClass]="view === 'signup' ? 'access-shell--signup' : ''")
-        header.app-brand
-            img.brand-icon(src="/assets/brand/icon-192.png", alt="RunningMate")
-            div.brand-text
-                p.brand-overline RUNNINGMATE
-                h1.brand-title 러닝메이트
+    div.access-splash(*ngIf="showAccessSplash", role="status", aria-live="polite", aria-label="RunMate")
+        img.access-splash-logo(src="/assets/brand/running_logo_main_app.svg?v=rm-main-logo-20260620", alt="", aria-hidden="true")
+        div.access-splash-title RunMate
 
-        section.auth-panel
+    main.access-shell(*ngIf="!showAccessSplash", [ngClass]="accessShellClass")
+        section.access-hero([ngClass]="view !== 'landing' ? 'access-hero--compact' : ''")
+            button.access-back-button(*ngIf="showAccessBackButton", type="button", (click)="goAccessBack()", aria-label="뒤로가기")
+                i(class="fa-solid fa-chevron-left", aria-hidden="true")
+            header.app-brand
+                div.brand-icon-shell
+                    img.brand-icon(src="/assets/brand/running_logo_main_app.svg?v=rm-main-logo-20260620", alt="RunMate")
+                div.brand-text
+                    h1.brand-title RunMate
+                    p.brand-overline 러닝을 더 가볍게 기록하세요
+
+        section.access-landing(*ngIf="!isSessionChecking && view === 'landing'")
+            div.access-landing-panel
+                div.access-landing-handle(aria-hidden="true")
+                div.access-landing-actions
+                    button.access-landing-button.access-landing-button--primary(type="button", (click)="showLogin()") 로그인
+                    button.access-landing-button.access-landing-button--secondary(type="button", (click)="showEmailSignup()") 회원가입
+
+        section.auth-panel(*ngIf="view !== 'landing'")
             div.auth-card([ngClass]="view === 'signup' ? 'auth-card--signup' : ''")
-                div(*ngIf="isSessionChecking", class="session-check-card", role="status")
-                    wiz-component-loading-spinner(size="md", label="자동 로그인 확인 중")
-                    div(class="session-check-title") 자동 로그인 확인 중
-                    div(class="session-check-sub") 저장된 로그인 상태를 확인하고 있어요.
+                div.session-check-card(*ngIf="isSessionChecking")
+                    wiz-component-loading-spinner(size="md", label="세션 확인 중")
+                    div.session-check-title 로그인 상태를 확인하는 중
+                    div.session-check-sub 잠시만 기다려주세요.
 
                 ng-container(*ngIf="!isSessionChecking")
                     header.auth-header
-                        p.auth-eyebrow {{view === 'login' ? 'WELCOME' : 'ACCOUNT'}}
                         h2.auth-title {{pageTitle}}
                         p.auth-description {{pageDescription}}
 
@@ -28,14 +42,18 @@ div.access-page
                             [(ngModel)]="data.username",
                             placeholder="아이디 또는 이메일 입력")
 
-                    label.auth-field
+                    label.auth-field.auth-field--password
                         span.field-label 비밀번호
-                        input.field-input(
-                            type="password",
-                            autocomplete="current-password",
-                            [(ngModel)]="data.password",
-                            (keyup.enter)="login()",
-                            placeholder="비밀번호 입력")
+                        div.password-input-wrap
+                            input.field-input(
+                                [type]="passwordInputType('login')",
+                                autocomplete="current-password",
+                                [(ngModel)]="data.password",
+                                (keyup.enter)="login()",
+                                placeholder="비밀번호 입력")
+                            button.password-toggle(type="button", (click)="togglePasswordVisibility('login')", [attr.aria-label]="passwordToggleLabel('login')")
+                                i(*ngIf="!passwordVisibility.login", class="fa-solid fa-eye-slash", aria-hidden="true")
+                                i(*ngIf="passwordVisibility.login", class="fa-solid fa-eye", aria-hidden="true")
 
                     div.auth-row
                         label.check-row
@@ -52,17 +70,35 @@ div.access-page
                         wiz-component-loading-spinner(*ngIf="isLoginLoading", size="sm", label="로그인 중")
                         span {{isLoginLoading ? '로그인 중' : '로그인'}}
 
-                    div.social-stack(*ngIf="socialLoginEnabled")
-                        button.social-button.social-button--naver(type="button", (click)="startSocialSignup('naver')")
-                            span.social-mark N
-                            span 네이버로 계속하기
-                        button.social-button.social-button--google(type="button", (click)="startSocialSignup('google')")
-                            span.social-mark G
-                            span 구글로 계속하기
+                    div.auth-social(*ngIf="socialLoginEnabled")
+                        div.auth-social-title
+                            span sign in with
+                        div.social-circle-row
+                            button(
+                                *ngFor="let provider of socialProviders",
+                                type="button",
+                                [class]="'social-circle social-circle--' + provider.id + (provider.id === 'google' ? ' gsi-material-button' : '')",
+                                [attr.aria-label]="provider.label + '로 계속하기'",
+                                (click)="startSocialSignup(provider.id)")
+                                img(*ngIf="provider.id === 'naver'", class="social-provider-img", src="/assets/brand/social-naver.png?v=rm-social-icons-20260621", alt="", aria-hidden="true")
+                                ng-container(*ngIf="provider.id === 'google'")
+                                    div(class="gsi-material-button-state")
+                                    div(class="gsi-material-button-content-wrapper")
+                                        div(class="gsi-material-button-icon")
+                                            svg(version="1.1", xmlns="http://www.w3.org/2000/svg", viewBox="0 0 48 48", style="display: block;")
+                                                path(fill="#EA4335", d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z")
+                                                path(fill="#4285F4", d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z")
+                                                path(fill="#FBBC05", d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z")
+                                                path(fill="#34A853", d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z")
+                                                path(fill="none", d="M0 0h48v48H0z")
+                                        span(class="social-hidden-text") Sign in with Google
+                                picture(*ngIf="provider.id === 'apple'", class="social-apple-picture")
+                                    source(srcset="/assets/brand/social-apple-light.png?v=rm-social-icons-20260621", media="(prefers-color-scheme: light)")
+                                    img(class="social-provider-img", src="/assets/brand/social-apple-dark.png?v=rm-social-icons-20260621", alt="", aria-hidden="true")
 
                     div.auth-switch
                         span 아직 계정이 없나요?
-                        button.link-button(type="button", (click)="showSignup()") 회원가입
+                        button.link-button(type="button", (click)="showEmailSignup()") 회원가입
 
                 div.auth-form(*ngIf="!isSessionChecking && view === 'forgot'")
                     label.auth-field
@@ -91,23 +127,31 @@ div.access-page
                     button.secondary-button(type="button", (click)="showForgotPassword()") 이메일 다시 입력
 
                 div.auth-form(*ngIf="!isSessionChecking && view === 'reset'")
-                    label.auth-field
+                    label.auth-field.auth-field--password
                         span.field-label 새 비밀번호
-                        input.field-input(
-                            type="password",
-                            autocomplete="new-password",
-                            [(ngModel)]="resetData.newPassword",
-                            placeholder="8자 이상 입력")
+                        div.password-input-wrap
+                            input.field-input(
+                                [type]="passwordInputType('resetNew')",
+                                autocomplete="new-password",
+                                [(ngModel)]="resetData.newPassword",
+                                placeholder="8자 이상 입력")
+                            button.password-toggle(type="button", (click)="togglePasswordVisibility('resetNew')", [attr.aria-label]="passwordToggleLabel('resetNew')")
+                                i(*ngIf="!passwordVisibility.resetNew", class="fa-solid fa-eye-slash", aria-hidden="true")
+                                i(*ngIf="passwordVisibility.resetNew", class="fa-solid fa-eye", aria-hidden="true")
                         span.field-hint([ngClass]="resetData.newPassword && resetData.newPassword.length < 8 ? 'is-danger' : ''") 8자 이상 입력해주세요.
 
-                    label.auth-field
+                    label.auth-field.auth-field--password
                         span.field-label 새 비밀번호 확인
-                        input.field-input(
-                            type="password",
-                            autocomplete="new-password",
-                            [(ngModel)]="resetData.confirmPassword",
-                            (keyup.enter)="resetPassword()",
-                            placeholder="비밀번호 다시 입력")
+                        div.password-input-wrap
+                            input.field-input(
+                                [type]="passwordInputType('resetConfirm')",
+                                autocomplete="new-password",
+                                [(ngModel)]="resetData.confirmPassword",
+                                (keyup.enter)="resetPassword()",
+                                placeholder="비밀번호 다시 입력")
+                            button.password-toggle(type="button", (click)="togglePasswordVisibility('resetConfirm')", [attr.aria-label]="passwordToggleLabel('resetConfirm')")
+                                i(*ngIf="!passwordVisibility.resetConfirm", class="fa-solid fa-eye-slash", aria-hidden="true")
+                                i(*ngIf="passwordVisibility.resetConfirm", class="fa-solid fa-eye", aria-hidden="true")
 
                     button.primary-button(
                         type="button",
@@ -117,19 +161,6 @@ div.access-page
                         span {{isResetLoading ? '재설정 중' : '비밀번호 재설정'}}
 
                     button.secondary-button(type="button", (click)="showLogin()") 로그인으로 돌아가기
-
-                div.auth-form(*ngIf="!isSessionChecking && view === 'signupOptions'")
-                    div.social-stack(*ngIf="socialLoginEnabled")
-                        button.social-button.social-button--naver(type="button", (click)="startSocialSignup('naver')")
-                            span.social-mark N
-                            span 네이버로 시작
-                        button.social-button.social-button--google(type="button", (click)="startSocialSignup('google')")
-                            span.social-mark G
-                            span 구글로 시작
-                    button.primary-button(type="button", (click)="showEmailSignup()") 이메일로 회원가입
-                    div.auth-switch
-                        span 이미 계정이 있나요?
-                        button.link-button(type="button", (click)="showLogin()") 로그인
 
                 div.auth-form.auth-form--dense(*ngIf="!isSessionChecking && view === 'signup'")
                     div.signup-progress
@@ -143,7 +174,7 @@ div.access-page
                             label.auth-field.auth-field--full
                                 div.field-row
                                     span.field-label 아이디
-                                    div.field-status(*ngIf="usernameStatus.message", [ngClass]="statusClass(usernameStatus)")
+                                    div.field-status(*ngIf="usernameStatus.message && usernameStatus.state !== 'duplicate'", [ngClass]="statusClass(usernameStatus)")
                                         span.status-spinner(*ngIf="usernameStatus.state === 'checking'")
                                         span(*ngIf="usernameStatus.state === 'available'") ✓
                                         span(*ngIf="usernameStatus.state === 'duplicate' || usernameStatus.state === 'invalid' || usernameStatus.state === 'error'") ×
@@ -154,6 +185,7 @@ div.access-page
                                     [ngModel]="signupData.username",
                                     (ngModelChange)="onUsernameInput($event)",
                                     placeholder="3자 이상 영문/숫자")
+                                span.field-error(*ngIf="usernameStatus.state === 'duplicate'") 중복됩니다.
 
                             label.auth-field.auth-field--full
                                 div.field-row
@@ -189,26 +221,60 @@ div.access-page
                                         (click)="selectSignupGender(option.id)",
                                         [ngClass]="signupData.gender === option.id ? 'is-selected' : ''") {{option.label}}
 
-                            label.auth-field
+                            label.auth-field.auth-field--password
                                 span.field-label 비밀번호
-                                input.field-input(
-                                    type="password",
-                                    autocomplete="new-password",
-                                    [(ngModel)]="signupData.password",
-                                    placeholder="8자 이상 입력")
+                                div.password-input-wrap
+                                    input.field-input(
+                                        [type]="passwordInputType('signup')",
+                                        autocomplete="new-password",
+                                        [(ngModel)]="signupData.password",
+                                        placeholder="8자 이상 입력")
+                                    button.password-toggle(type="button", (click)="togglePasswordVisibility('signup')", [attr.aria-label]="passwordToggleLabel('signup')")
+                                        i(*ngIf="!passwordVisibility.signup", class="fa-solid fa-eye-slash", aria-hidden="true")
+                                        i(*ngIf="passwordVisibility.signup", class="fa-solid fa-eye", aria-hidden="true")
                                 span.field-hint([ngClass]="signupData.password && signupData.password.length < 8 ? 'is-danger' : ''") 8자 이상 입력해주세요.
 
-                            label.auth-field
+                            label.auth-field.auth-field--password
                                 span.field-label 비밀번호 확인
-                                input.field-input(
-                                    type="password",
-                                    autocomplete="new-password",
-                                    [(ngModel)]="signupData.confirm_password",
-                                    (keyup.enter)="nextSignupStep()",
-                                    placeholder="비밀번호 다시 입력")
+                                div.password-input-wrap
+                                    input.field-input(
+                                        [type]="passwordInputType('signupConfirm')",
+                                        autocomplete="new-password",
+                                        [(ngModel)]="signupData.confirm_password",
+                                        (keyup.enter)="nextSignupStep()",
+                                        placeholder="비밀번호 다시 입력")
+                                    button.password-toggle(type="button", (click)="togglePasswordVisibility('signupConfirm')", [attr.aria-label]="passwordToggleLabel('signupConfirm')")
+                                        i(*ngIf="!passwordVisibility.signupConfirm", class="fa-solid fa-eye-slash", aria-hidden="true")
+                                        i(*ngIf="passwordVisibility.signupConfirm", class="fa-solid fa-eye", aria-hidden="true")
+
+                        div.auth-social(*ngIf="socialLoginEnabled")
+                            div.auth-social-title
+                                span sign up with
+                            div.social-circle-row
+                                button(
+                                    *ngFor="let provider of socialProviders",
+                                    type="button",
+                                    [class]="'social-circle social-circle--' + provider.id + (provider.id === 'google' ? ' gsi-material-button' : '')",
+                                    [attr.aria-label]="provider.label + '로 시작하기'",
+                                    (click)="startSocialSignup(provider.id)")
+                                    img(*ngIf="provider.id === 'naver'", class="social-provider-img", src="/assets/brand/social-naver.png?v=rm-social-icons-20260621", alt="", aria-hidden="true")
+                                    ng-container(*ngIf="provider.id === 'google'")
+                                        div(class="gsi-material-button-state")
+                                        div(class="gsi-material-button-content-wrapper")
+                                            div(class="gsi-material-button-icon")
+                                                svg(version="1.1", xmlns="http://www.w3.org/2000/svg", viewBox="0 0 48 48", style="display: block;")
+                                                    path(fill="#EA4335", d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z")
+                                                    path(fill="#4285F4", d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z")
+                                                    path(fill="#FBBC05", d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z")
+                                                    path(fill="#34A853", d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z")
+                                                    path(fill="none", d="M0 0h48v48H0z")
+                                            span(class="social-hidden-text") Sign up with Google
+                                    picture(*ngIf="provider.id === 'apple'", class="social-apple-picture")
+                                        source(srcset="/assets/brand/social-apple-light.png?v=rm-social-icons-20260621", media="(prefers-color-scheme: light)")
+                                        img(class="social-provider-img", src="/assets/brand/social-apple-dark.png?v=rm-social-icons-20260621", alt="", aria-hidden="true")
 
                         div.form-actions
-                            button.secondary-button(type="button", (click)="showSignup()") 가입 방법
+                            button.secondary-button(type="button", (click)="showLanding()") 처음으로
                             button.primary-button(type="button", (click)="nextSignupStep()", [disabled]="!identityChecksReady") 다음
 
                     div(*ngIf="signupStep === 2", class="step-panel")

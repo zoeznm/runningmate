@@ -6,7 +6,7 @@ import { authenticatedUser, clearAuthTokens, refreshAuthTokens, saveAuthTokens }
 export class Component implements OnInit, OnDestroy {
     constructor(public service: Service, public ref: ChangeDetectorRef) { }
 
-    public view: string = 'login';
+    public view: string = 'landing';
     public signupStep: number = 1;
     public policies: any = {
         terms: null,
@@ -67,7 +67,20 @@ export class Component implements OnInit, OnDestroy {
     public isSignupLoading: boolean = false;
     public isForgotLoading: boolean = false;
     public isResetLoading: boolean = false;
+    public showAccessSplash: boolean = true;
     public socialLoginEnabled: boolean = true;
+    public socialProviders: Array<{ id: string; label: string; mark: string }> = [
+        { id: 'naver', label: '네이버', mark: 'N' },
+        { id: 'google', label: '구글', mark: 'G' },
+        { id: 'apple', label: 'Apple', mark: '' }
+    ];
+    public passwordVisibility: Record<string, boolean> = {
+        login: false,
+        resetNew: false,
+        resetConfirm: false,
+        signup: false,
+        signupConfirm: false
+    };
     private readonly accessViewportProperty: string = '--access-visual-height';
     private readonly accessViewportClass: string = 'is-access-page';
     private readonly updateAccessViewportHeight = () => {
@@ -76,7 +89,7 @@ export class Component implements OnInit, OnDestroy {
     };
     private readonly accessFocusOutHandler = () => this.scheduleAccessScrollReset(60);
     private readonly accessTouchMoveHandler = (event: TouchEvent) => {
-        if (this.view === 'signup' || this.activePolicy) return;
+        if (this.view === 'signup' || this.activePolicy || this.accessShellCanScroll()) return;
         event.preventDefault();
     };
     private accessScrollResetTimer: number = 0;
@@ -89,21 +102,27 @@ export class Component implements OnInit, OnDestroy {
     private readonly mediaAccessNoticeAcceptedKey: string = 'runningmate-media-access-notice-accepted-v1';
     private readonly locationInfoConsentKey: string = 'runningmate-location-info-consent-v1';
     private readonly sessionBootstrapTimeoutMs: number = 10000;
+    private readonly accessSplashMinimumMs: number = 2000;
+    private accessSplashStartedAt: number = Date.now();
 
     public async ngOnInit() {
         this.installAccessViewportSync();
+        this.normalizeLoginFields();
         const resetToken = this.resetTokenFromUrl();
         const socialError = this.socialErrorFromUrl();
         if (resetToken) {
             this.resetData.token = resetToken;
             this.view = 'reset';
             this.isSessionChecking = false;
+            this.showAccessSplash = false;
         }
         if (!resetToken && this.forwardOAuthReturn()) return;
 
         await this.withTimeout(this.service.init(null as any), this.sessionBootstrapTimeoutMs).catch(() => null);
         if (!resetToken) {
             if (await this.resumeAuthenticatedSession()) return;
+            await this.waitForAccessSplashMinimum();
+            this.showAccessSplash = false;
             this.isSessionChecking = false;
             await this.safeRender();
         }
@@ -179,9 +198,18 @@ export class Component implements OnInit, OnDestroy {
     }
 
     private scheduleAccessScrollReset(delay: number = 0) {
-        if (this.view === 'signup' || this.activePolicy) return;
+        if (this.view === 'signup' || this.activePolicy || this.accessShellCanScroll()) return;
         window.clearTimeout(this.accessScrollResetTimer);
         this.accessScrollResetTimer = window.setTimeout(() => this.resetAccessScrollPosition(), delay);
+    }
+
+    private accessShellCanScroll() {
+        const shell = document.querySelector('.access-shell') as HTMLElement | null;
+        const authPanel = document.querySelector('.auth-panel') as HTMLElement | null;
+        return [shell, authPanel].some((element) => {
+            if (!element) return false;
+            return element.scrollHeight > element.clientHeight + 2;
+        });
     }
 
     private isAccessFormControlFocused() {
@@ -191,7 +219,7 @@ export class Component implements OnInit, OnDestroy {
     }
 
     private resetAccessScrollPosition() {
-        if (this.view === 'signup' || this.activePolicy) return;
+        if (this.view === 'signup' || this.activePolicy || this.accessShellCanScroll()) return;
         const elements = [
             document.documentElement,
             document.body,
@@ -255,6 +283,14 @@ export class Component implements OnInit, OnDestroy {
             this.refreshAgreementControls();
         }
         this.scheduleAccessScrollReset();
+    }
+
+    private async waitForAccessSplashMinimum(): Promise<void> {
+        if (typeof window === 'undefined') return;
+        const elapsed = Date.now() - this.accessSplashStartedAt;
+        const remaining = Math.max(0, this.accessSplashMinimumMs - elapsed);
+        if (!remaining) return;
+        await new Promise<void>((resolve) => window.setTimeout(resolve, remaining));
     }
 
     private async resumeAuthenticatedSession() {
@@ -378,6 +414,7 @@ export class Component implements OnInit, OnDestroy {
             social_profile_failed: '소셜 계정 정보를 불러오지 못했습니다.',
             social_profile_missing: '소셜 계정 식별 정보를 확인하지 못했습니다.',
             google_email_not_verified: '인증된 구글 이메일 계정만 사용할 수 있습니다.',
+            apple_email_not_verified: '인증된 Apple 이메일 계정만 사용할 수 있습니다.',
             social_login_failed: '소셜 회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.'
         };
         return messages[normalized] || '소셜 회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.';
@@ -392,7 +429,6 @@ export class Component implements OnInit, OnDestroy {
     }
 
     public get pageTitle() {
-        if (this.view === 'signupOptions') return '회원가입';
         if (this.view === 'signup') return '이메일로 회원가입';
         if (this.view === 'forgot') return '비밀번호 찾기';
         if (this.view === 'forgotSent') return '메일을 확인해주세요';
@@ -401,12 +437,40 @@ export class Component implements OnInit, OnDestroy {
     }
 
     public get pageDescription() {
-        if (this.view === 'signupOptions') return '이메일로 러닝메이트를 시작하세요.';
-        if (this.view === 'signup') return '아이디와 이메일을 확인하고 바로 시작하세요.';
+        if (this.view === 'signup') return 'RunMate 계정을 만들고 바로 시작하세요.';
         if (this.view === 'forgot') return '가입한 이메일로 재설정 링크를 보내드립니다.';
         if (this.view === 'forgotSent') return '메일함에서 비밀번호 재설정 링크를 확인해주세요.';
         if (this.view === 'reset') return '새 비밀번호를 8자 이상으로 입력해주세요.';
-        return '아이디 또는 이메일로 러닝 기록에 로그인하세요.';
+        return '아이디 또는 이메일로 RunMate에 로그인하세요.';
+    }
+
+    public get accessShellClass() {
+        return {
+            'access-shell--landing': this.view === 'landing',
+            'access-shell--sheet': this.view !== 'landing',
+            'access-shell--signup': this.view === 'signup',
+            'access-shell--reset': this.view === 'reset'
+        };
+    }
+
+    public get showAccessBackButton() {
+        return this.view !== 'landing' && !this.isSessionChecking;
+    }
+
+    public passwordInputType(key: string) {
+        return this.passwordVisibility[key] ? 'text' : 'password';
+    }
+
+    public togglePasswordVisibility(key: string) {
+        this.passwordVisibility = {
+            ...this.passwordVisibility,
+            [key]: !this.passwordVisibility[key]
+        };
+        this.ref.detectChanges();
+    }
+
+    public passwordToggleLabel(key: string) {
+        return this.passwordVisibility[key] ? '비밀번호 숨기기' : '비밀번호 보기';
     }
 
     public statusClass(status: any) {
@@ -510,6 +574,7 @@ export class Component implements OnInit, OnDestroy {
 
     public async login() {
         if (this.isLoginLoading) return;
+        this.normalizeLoginFields();
         let user = JSON.parse(JSON.stringify(this.data));
         user.username = this.normalizeUsername(user.username);
         if (!user.username) {
@@ -550,6 +615,7 @@ export class Component implements OnInit, OnDestroy {
     }
 
     public async showLogin() {
+        this.normalizeLoginFields();
         this.view = 'login';
         this.signupStep = 1;
         this.resetData.newPassword = '';
@@ -558,9 +624,20 @@ export class Component implements OnInit, OnDestroy {
         this.scheduleAccessScrollReset();
     }
 
+    private normalizeLoginFields() {
+        this.data.username = typeof this.data.username === 'string' ? this.data.username : '';
+        this.data.password = typeof this.data.password === 'string' ? this.data.password : '';
+        this.data.autoLogin = this.data.autoLogin === true;
+    }
+
     public async showSignup() {
-        this.view = 'signupOptions';
+        await this.showEmailSignup();
+    }
+
+    public async showLanding() {
+        this.view = 'landing';
         this.signupStep = 1;
+        this.activePolicy = '';
         await this.service.render();
         this.scheduleAccessScrollReset();
     }
@@ -569,12 +646,31 @@ export class Component implements OnInit, OnDestroy {
         this.view = 'signup';
         this.signupStep = 1;
         await this.service.render();
+        this.scheduleAccessScrollReset();
+    }
+
+    public async goAccessBack() {
+        if (this.view === 'forgotSent') {
+            await this.showForgotPassword();
+            return;
+        }
+        if (this.view === 'forgot' || this.view === 'reset') {
+            await this.showLogin();
+            return;
+        }
+        if (this.view === 'signup' && this.signupStep > 1) {
+            this.signupStep = 1;
+            await this.service.render();
+            this.scheduleAccessScrollReset();
+            return;
+        }
+        await this.showLanding();
     }
 
     public startSocialSignup(provider: string) {
         if (!this.socialLoginEnabled) return;
         const normalized = String(provider || '').trim().toLowerCase();
-        if (!['naver', 'google'].includes(normalized)) return;
+        if (!['naver', 'google', 'apple'].includes(normalized)) return;
         const url = `/api/auth/oauth/${normalized}/start`;
         location.assign(url);
     }

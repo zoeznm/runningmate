@@ -367,7 +367,7 @@ class User:
     def find_or_create_social_user(self, profile):
         provider = str(profile.get("provider") or "").strip().lower()
         provider_user_id = str(profile.get("provider_user_id") or "").strip()
-        if provider not in ("naver", "google") or not provider_user_id:
+        if provider not in ("naver", "google", "apple") or not provider_user_id:
             raise ValueError("지원하지 않는 소셜 계정입니다.")
 
         user = self.get_by_social_account(provider, provider_user_id)

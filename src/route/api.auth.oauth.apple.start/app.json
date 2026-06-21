@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.oauth.apple.start",
+    "title": "/api/auth/oauth/apple/start",
+    "route": "/api/auth/oauth/apple/start",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

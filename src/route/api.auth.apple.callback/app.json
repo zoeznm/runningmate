@@ -1,0 +1,8 @@
+{
+    "id": "api.auth.apple.callback",
+    "title": "/api/auth/apple/callback",
+    "route": "/api/auth/apple/callback",
+    "viewuri": "",
+    "category": "",
+    "controller": ""
+}

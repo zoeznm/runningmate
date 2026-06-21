@@ -1,7 +1,11 @@
+import base64
+import hashlib
+import hmac
 import json
 import os
 import re
 import secrets
+import subprocess
 import time
 import urllib.error
 import urllib.parse
@@ -30,6 +34,15 @@ class OAuth:
             "token_url": "https://oauth2.googleapis.com/token",
             "profile_url": "https://openidconnect.googleapis.com/v1/userinfo",
             "scope": "openid email profile",
+        },
+        "apple": {
+            "client_id": "APPLE_CLIENT_ID",
+            "client_secret": "APPLE_CLIENT_SECRET",
+            "authorize_url": "https://appleid.apple.com/auth/authorize",
+            "token_url": "https://appleid.apple.com/auth/token",
+            "profile_url": "",
+            "scope": "name email",
+            "response_mode": "form_post",
         },
     }
 
@@ -105,7 +118,8 @@ class OAuth:
         config = dict(self.PROVIDERS[provider])
         config["provider"] = provider
         config["client_id_value"] = os.environ.get(config["client_id"], "").strip()
-        config["client_secret_value"] = os.environ.get(config["client_secret"], "").strip()
+        client_secret_key = config.get("client_secret")
+        config["client_secret_value"] = os.environ.get(client_secret_key, "").strip() if client_secret_key else ""
         return config
 
     def _log(self, provider, message, detail=""):
@@ -118,6 +132,52 @@ class OAuth:
         message = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(message or "social_login_failed"))[:80]
         query = urllib.parse.urlencode({"social_error": message})
         wiz.response.redirect(f"/access?{query}")
+
+    def _state_secret(self):
+        try:
+            secret = self._flask().current_app.config.get("SECRET_KEY")
+            if secret:
+                return str(secret)
+        except Exception:
+            pass
+        return (
+            os.environ.get("RUNNINGMATE_OAUTH_STATE_SECRET")
+            or os.environ.get("WIZ_SECRET_KEY")
+            or os.environ.get("FLASK_SECRET_KEY")
+            or os.environ.get("SECRET_KEY")
+            or "runningmate-oauth-state"
+        )
+
+    def _sign_state(self, payload):
+        raw = self._jwt_json(payload)
+        signature = hmac.new(self._state_secret().encode("utf-8"), raw.encode("ascii"), hashlib.sha256).digest()
+        return f"{raw}.{self._b64url(signature)}"
+
+    def _signed_state(self, provider):
+        return self._sign_state({
+            "iat": int(time.time()),
+            "nonce": secrets.token_urlsafe(18),
+            "provider": provider,
+        })
+
+    def _verify_signed_state(self, provider, state):
+        try:
+            raw, signature = str(state or "").rsplit(".", 1)
+            expected = hmac.new(self._state_secret().encode("utf-8"), raw.encode("ascii"), hashlib.sha256).digest()
+            if not secrets.compare_digest(self._b64url(expected), signature):
+                return False
+            padding = "=" * ((4 - len(raw) % 4) % 4)
+            payload = json.loads(base64.urlsafe_b64decode((raw + padding).encode("ascii")).decode("utf-8"))
+            if str(payload.get("provider") or "") != provider:
+                return False
+            created_at = int(payload.get("iat") or 0)
+            try:
+                ttl = wiz.model("security").oauth_state_ttl_seconds()
+            except Exception:
+                ttl = 600
+            return bool(created_at and int(time.time()) - created_at <= ttl)
+        except Exception:
+            return False
 
     def _json_request(self, url, data=None, headers=None, method=None):
         encoded = None
@@ -136,13 +196,115 @@ class OAuth:
             raise RuntimeError(f"http_{error.code}:{body[:300]}")
         return json.loads(body)
 
+    def _b64url(self, value):
+        return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+
+    def _jwt_json(self, value):
+        raw = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
+        return self._b64url(raw)
+
+    def _decode_jwt_payload(self, token):
+        parts = str(token or "").split(".")
+        if len(parts) < 2:
+            raise RuntimeError("jwt_payload_missing")
+        payload = parts[1]
+        padding = "=" * ((4 - len(payload) % 4) % 4)
+        return json.loads(base64.urlsafe_b64decode((payload + padding).encode("ascii")).decode("utf-8"))
+
+    def _der_length(self, data, offset):
+        if offset >= len(data):
+            raise RuntimeError("der_length_missing")
+        first = data[offset]
+        offset += 1
+        if first < 0x80:
+            return first, offset
+        size = first & 0x7F
+        if size == 0 or size > 4 or offset + size > len(data):
+            raise RuntimeError("der_length_invalid")
+        length = int.from_bytes(data[offset:offset + size], "big")
+        return length, offset + size
+
+    def _der_integer(self, data, offset):
+        if offset >= len(data) or data[offset] != 0x02:
+            raise RuntimeError("der_integer_missing")
+        length, offset = self._der_length(data, offset + 1)
+        value = data[offset:offset + length].lstrip(b"\x00") or b"\x00"
+        return value, offset + length
+
+    def _ecdsa_der_to_raw(self, signature):
+        if not signature or signature[0] != 0x30:
+            raise RuntimeError("ecdsa_signature_invalid")
+        length, offset = self._der_length(signature, 1)
+        end = offset + length
+        if end > len(signature):
+            raise RuntimeError("ecdsa_signature_truncated")
+        r, offset = self._der_integer(signature, offset)
+        s, offset = self._der_integer(signature, offset)
+        return r[-32:].rjust(32, b"\x00") + s[-32:].rjust(32, b"\x00")
+
+    def _apple_private_key_path(self):
+        return os.environ.get("APPLE_PRIVATE_KEY_PATH", "").strip().strip('"').strip("'")
+
+    def _apple_config_ready(self):
+        if os.environ.get("APPLE_CLIENT_SECRET", "").strip():
+            return True
+        return all([
+            os.environ.get("APPLE_TEAM_ID", "").strip(),
+            os.environ.get("APPLE_KEY_ID", "").strip(),
+            self._apple_private_key_path(),
+            os.path.exists(self._apple_private_key_path()),
+        ])
+
+    def _apple_client_secret(self, config):
+        if config.get("client_secret_value"):
+            return config["client_secret_value"]
+        team_id = os.environ.get("APPLE_TEAM_ID", "").strip()
+        key_id = os.environ.get("APPLE_KEY_ID", "").strip()
+        key_path = self._apple_private_key_path()
+        client_id = config["client_id_value"]
+        if not team_id or not key_id or not key_path or not os.path.exists(key_path):
+            raise RuntimeError("apple_config_missing")
+
+        now = int(time.time())
+        header = {"alg": "ES256", "kid": key_id, "typ": "JWT"}
+        payload = {
+            "aud": "https://appleid.apple.com",
+            "exp": now + 86400 * 180,
+            "iat": now,
+            "iss": team_id,
+            "sub": client_id,
+        }
+        signing_input = f"{self._jwt_json(header)}.{self._jwt_json(payload)}"
+        try:
+            result = subprocess.run(
+                ["openssl", "dgst", "-sha256", "-sign", key_path],
+                input=signing_input.encode("utf-8"),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=8,
+                check=False,
+            )
+        except Exception as error:
+            raise RuntimeError(f"apple_client_secret_sign_error:{error}")
+        if result.returncode != 0:
+            raise RuntimeError("apple_client_secret_sign_failed")
+        signature = self._ecdsa_der_to_raw(result.stdout)
+        return f"{signing_input}.{self._b64url(signature)}"
+
     def start(self, provider):
         try:
             wiz.model("security").auth_headers()
         except Exception:
             pass
         config = self._provider(provider)
-        if not config or not config["client_id_value"] or not config["client_secret_value"]:
+        if not config or not config["client_id_value"]:
+            self._error_redirect("social_config_missing")
+            return
+        if config["provider"] == "apple":
+            if not self._apple_config_ready():
+                self._error_redirect("social_config_missing")
+                return
+        elif not config["client_secret_value"]:
             self._error_redirect("social_config_missing")
             return
 
@@ -151,7 +313,7 @@ class OAuth:
             self._error_redirect("social_redirect_invalid")
             return
 
-        state = secrets.token_urlsafe(24)
+        state = self._signed_state(config["provider"])
         self._session()[self.STATE_KEY] = {
             "provider": config["provider"],
             "state": state,
@@ -166,6 +328,8 @@ class OAuth:
         }
         if config["scope"]:
             params["scope"] = config["scope"]
+        if config.get("response_mode"):
+            params["response_mode"] = config["response_mode"]
 
         wiz.response.redirect(f"{config['authorize_url']}?{urllib.parse.urlencode(params)}")
 
@@ -175,7 +339,7 @@ class OAuth:
         expected_state = str(saved.get("state") or "")
         actual_state = str(state or "")
         if saved.get("provider") != provider or not expected_state or not secrets.compare_digest(expected_state, actual_state):
-            return False
+            return self._verify_signed_state(provider, actual_state)
         try:
             ttl = wiz.model("security").oauth_state_ttl_seconds()
         except Exception:
@@ -192,16 +356,66 @@ class OAuth:
         data = {
             "grant_type": "authorization_code",
             "client_id": config["client_id_value"],
-            "client_secret": config["client_secret_value"],
             "code": code,
         }
-        if config["provider"] == "naver":
+        if config["provider"] == "apple":
+            data["client_secret"] = self._apple_client_secret(config)
+            data["redirect_uri"] = self._redirect_uri(config["provider"])
+        elif config["provider"] == "naver":
+            data["client_secret"] = config["client_secret_value"]
             data["state"] = state
         else:
+            data["client_secret"] = config["client_secret_value"]
             data["redirect_uri"] = self._redirect_uri(config["provider"])
         return self._json_request(config["token_url"], data=data)
 
-    def _profile(self, config, access_token):
+    def _profile(self, config, access_token=None, token=None, request_values=None):
+        if config["provider"] == "apple":
+            token = token or {}
+            claims = self._decode_jwt_payload(token.get("id_token"))
+            if claims.get("iss") != "https://appleid.apple.com":
+                raise RuntimeError("apple_issuer_invalid")
+            audience = claims.get("aud")
+            if isinstance(audience, list):
+                audience_valid = config["client_id_value"] in audience
+            else:
+                audience_valid = audience == config["client_id_value"]
+            if not audience_valid:
+                raise RuntimeError("apple_audience_invalid")
+            if int(claims.get("exp") or 0) and int(claims.get("exp") or 0) + 300 < int(time.time()):
+                raise RuntimeError("apple_token_expired")
+
+            user_info = {}
+            raw_user = ""
+            try:
+                raw_user = (request_values or {}).get("user") or ""
+            except Exception:
+                raw_user = ""
+            if raw_user:
+                try:
+                    user_info = json.loads(raw_user)
+                except Exception:
+                    user_info = {}
+
+            name = ""
+            name_info = user_info.get("name") if isinstance(user_info, dict) else None
+            if isinstance(name_info, dict):
+                name = " ".join(
+                    [str(name_info.get("firstName") or "").strip(), str(name_info.get("lastName") or "").strip()]
+                ).strip()
+            email_verified = claims.get("email_verified")
+            if isinstance(email_verified, str):
+                email_verified = email_verified.lower() == "true"
+
+            return {
+                "provider": "apple",
+                "provider_user_id": str(claims.get("sub") or ""),
+                "email": claims.get("email") or (user_info.get("email") if isinstance(user_info, dict) else "") or "",
+                "name": name,
+                "profile_image": "",
+                "email_verified": bool(email_verified),
+            }
+
         payload = self._json_request(
             config["profile_url"],
             headers={"Authorization": f"Bearer {access_token}"},
@@ -233,21 +447,22 @@ class OAuth:
         except Exception:
             pass
         request = self._request()
+        request_values = request.values
         provider = str(provider or self._saved_provider() or "").strip().lower()
         config = self._provider(provider)
         if not config:
             self._error_redirect("social_provider_invalid")
             return
 
-        if request.args.get("error"):
-            error = str(request.args.get("error") or "social_denied")
-            description = str(request.args.get("error_description") or "")
+        if request_values.get("error"):
+            error = str(request_values.get("error") or "social_denied")
+            description = str(request_values.get("error_description") or "")
             self._log(config["provider"], "provider_denied", f"{error} {description}".strip())
             self._error_redirect(error)
             return
 
-        code = str(request.args.get("code") or "").strip()
-        state = str(request.args.get("state") or "").strip()
+        code = str(request_values.get("code") or "").strip()
+        state = str(request_values.get("state") or "").strip()
         if not code or not self._verify_state(config["provider"], state):
             self._session().pop(self.STATE_KEY, None)
             self._log(config["provider"], "state_invalid", f"code={bool(code)} state={bool(state)}")
@@ -263,11 +478,11 @@ class OAuth:
                 return
 
             access_token = token.get("access_token")
-            if not access_token:
+            if not access_token and config["provider"] != "apple":
                 raise RuntimeError("missing_access_token")
 
             try:
-                profile = self._profile(config, access_token)
+                profile = self._profile(config, access_token, token, request_values)
             except Exception as error:
                 self._log(config["provider"], "profile_failed", error)
                 self._error_redirect("social_profile_failed")
@@ -277,9 +492,9 @@ class OAuth:
                 self._log(config["provider"], "profile_missing_id")
                 self._error_redirect("social_profile_missing")
                 return
-            if config["provider"] == "google" and profile.get("email") and not profile.get("email_verified"):
+            if config["provider"] in ("google", "apple") and profile.get("email") and not profile.get("email_verified"):
                 self._log(config["provider"], "email_not_verified")
-                self._error_redirect("google_email_not_verified")
+                self._error_redirect(f"{config['provider']}_email_not_verified")
                 return
 
             struct = wiz.model("struct")

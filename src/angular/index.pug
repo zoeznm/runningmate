@@ -2,51 +2,37 @@ doctype html
 html(lang="ko")
     head
         meta(charset="utf-8")
-        title 러닝메이트
+        title RunMate
         base(href="/")
         
         meta(name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover')
         meta(http-equiv='X-UA-Compatible' content='ie=edge')
 
         // pwa config
-        meta(name='application-name' content='러닝메이트')
-        meta(name='msapplication-TileColor' content='#12121c')
-        meta(name='theme-color' content='#12121c')
+        meta(name='application-name' content='RunMate')
+        meta(name='msapplication-TileColor' content='#000000')
+        meta(name='theme-color' content='#000000')
         meta(name='apple-mobile-web-app-capable' content='yes')
-        meta(name='apple-mobile-web-app-title' content='러닝메이트')
+        meta(name='apple-mobile-web-app-title' content='RunMate')
         meta(name='apple-mobile-web-app-status-bar-style' content='black-translucent')
         meta(name='mobile-web-app-capable' content='yes')
         meta(name='HandheldFriendly' content='True')
         meta(name='MobileOptimized' content='320')
         meta(name='format-detection' content='telephone=no')
-        link(rel="shortcut icon", href="/favicon.ico")
+        link(rel="shortcut icon", href="/favicon.ico?v=rm-main-logo-20260620")
 
-        link(rel="icon" type="image/png" sizes="192x192" href="/assets/brand/icon-192.png?v=rm-run-icon-20260522")
-        link(rel="icon" type="image/png" sizes="512x512" href="/assets/brand/icon-512.png?v=rm-run-icon-20260522")
-        link(rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png?v=rm-run-icon-20260522")
+        link(rel="icon" type="image/png" sizes="192x192" href="/assets/brand/icon-192.png?v=rm-main-logo-20260620")
+        link(rel="icon" type="image/png" sizes="512x512" href="/assets/brand/icon-512.png?v=rm-main-logo-20260620")
+        link(rel="apple-touch-icon" sizes="180x180" href="/assets/brand/apple-touch-icon.png?v=rm-main-logo-20260620")
 
-        link(rel="icon" sizes="72x72" href="/favicon.ico")
+        link(rel="icon" sizes="72x72" href="/favicon.ico?v=rm-main-logo-20260620")
 
         link(rel="manifest" href="/manifest.json")
 
         script(type="text/javascript").
             (function () {
-                var background = "#12121c";
-                var text = "#e8e8f0";
-
-                try {
-                    var rawSettings = window.localStorage && window.localStorage.getItem("runningmate-settings-v1");
-                    var settings = rawSettings ? JSON.parse(rawSettings) : {};
-                    var themeMode = settings && settings.themeMode;
-                    var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
-                    var useLight = themeMode === "light" || (themeMode === "system" && prefersLight);
-
-                    if (useLight) {
-                        background = "#f7f7f9";
-                        text = "#1a1a2e";
-                    }
-                } catch (error) {}
-
+                var background = "#000000";
+                var text = "#ffffff";
                 document.documentElement.style.setProperty("--app-shell-bg", background);
                 document.documentElement.style.setProperty("--app-shell-text", text);
                 document.documentElement.style.background = background;
@@ -65,8 +51,8 @@ html(lang="ko")
                 height: 100%;
                 min-height: 100%;
                 margin: 0;
-                background: var(--app-shell-bg, #12121c);
-                color: var(--app-shell-text, #e8e8f0);
+                background: var(--app-shell-bg, #000000);
+                color: var(--app-shell-text, #ffffff);
                 overflow: hidden;
                 display: block;
             }
@@ -102,68 +88,35 @@ html(lang="ko")
                 min-height: 100dvh;
                 gap: 10px;
                 padding: 24px;
-                background: var(--app-shell-bg, #12121c);
-                color: var(--app-shell-text, #e8e8f0);
+                background: var(--app-shell-bg, #000000);
+                color: var(--app-shell-text, #ffffff);
                 font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 text-align: center;
             }
 
             .app-shell-loader-mark {
                 display: block;
-                width: 52px;
-                height: 52px;
-                border-radius: 18px;
-                background: #10201a;
+                width: 92px;
+                height: 92px;
+                border-radius: 24px;
+                background: #000000;
                 object-fit: cover;
-                box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+                box-shadow:
+                    0 26px 54px rgba(0, 0, 0, 0.55),
+                    0 0 44px rgba(36, 214, 181, 0.22);
             }
 
             .app-shell-loader-title {
-                margin-top: 2px;
-                font-size: 16px;
+                margin-top: 6px;
+                color: #ffffff;
+                font-size: clamp(28px, 7vw, 34px);
                 font-weight: 900;
-                line-height: 1.3;
-            }
-
-            .app-shell-loader-detail {
-                min-height: 17px;
-                color: color-mix(in srgb, var(--app-shell-text, #e8e8f0) 62%, transparent);
-                font-size: 12px;
-                font-weight: 700;
-                line-height: 1.4;
-            }
-
-            .app-shell-loader-bar {
-                position: relative;
-                width: 148px;
-                height: 5px;
-                overflow: hidden;
-                border-radius: 999px;
-                background: color-mix(in srgb, var(--app-shell-text, #e8e8f0) 12%, transparent);
-            }
-
-            .app-shell-loader-bar::after {
-                content: "";
-                position: absolute;
-                inset: 0 auto 0 0;
-                width: 44%;
-                border-radius: inherit;
-                background: #78d6b3;
-                animation: app-shell-loader-slide 1.1s ease-in-out infinite;
-            }
-
-            @keyframes app-shell-loader-slide {
-                0% {
-                    transform: translateX(-105%);
-                }
-                100% {
-                    transform: translateX(230%);
-                }
+                line-height: 1.1;
             }
 
         script(type="text/javascript").
             if ("serviceWorker" in navigator) {
-                const refreshVersion = "rm-social-login-buttons-20260619";
+                const refreshVersion = "rm-access-landscape-emerald-20260621";
                 const refreshKey = `runningmate-sw-refresh-${refreshVersion}`;
                 const hadController = Boolean(navigator.serviceWorker.controller);
                 let refreshing = false;
@@ -218,7 +171,5 @@ html(lang="ko")
     body
         app-root
             div(class="app-shell-loader", role="status", aria-live="polite")
-                img(class="app-shell-loader-mark", src="/assets/brand/icon-192.png?v=rm-run-icon-20260522", alt="", aria-hidden="true")
-                div(class="app-shell-loader-title") 러닝메이트
-                div(class="app-shell-loader-detail") 앱을 불러오는 중
-                div(class="app-shell-loader-bar", aria-hidden="true")
+                img(class="app-shell-loader-mark", src="/assets/brand/running_logo_main_app.svg?v=rm-main-logo-20260620", alt="", aria-hidden="true")
+                div(class="app-shell-loader-title") RunMate

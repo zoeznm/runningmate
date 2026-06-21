@@ -1,14 +1,14 @@
 :host {
     --access-viewport-height: var(--access-visual-height, 100dvh);
-    --access-bg: #020406;
-    --access-screen: #05070c;
-    --access-sheet: #0b1118;
-    --access-field: #111923;
-    --access-line: rgba(255, 255, 255, 0.10);
-    --access-muted: #96a6b8;
+    --access-bg: #000403;
+    --access-screen: #020807;
+    --access-sheet: #07110f;
+    --access-field: #10191d;
+    --access-line: rgba(36, 214, 181, 0.16);
+    --access-muted: #8ea6a2;
     --access-text: #f8fafc;
-    --access-accent: #74f56a;
-    --access-aqua: #49d6c8;
+    --access-accent: #24d6b5;
+    --access-aqua: #24d6b5;
 
     display: block;
     position: fixed;
@@ -18,12 +18,12 @@
     min-height: var(--access-viewport-height);
     overflow: hidden;
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.11), rgba(116, 245, 106, 0) 38%),
-        linear-gradient(125deg, rgba(73, 214, 200, 0.10), rgba(73, 214, 200, 0) 46%),
+        linear-gradient(180deg, rgba(36, 214, 181, 0.12), rgba(36, 214, 181, 0) 38%),
+        linear-gradient(125deg, rgba(36, 214, 181, 0.08), rgba(36, 214, 181, 0) 46%),
         var(--access-bg);
     isolation: isolate;
     overscroll-behavior: none;
-    touch-action: none;
+    touch-action: pan-y;
 }
 
 @supports not (height: 100dvh) {
@@ -47,11 +47,11 @@
     overflow-x: hidden;
     overflow-y: hidden;
     overscroll-behavior-y: none;
-    touch-action: none;
+    touch-action: pan-y;
     color: var(--access-text);
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.10), rgba(116, 245, 106, 0) 35%),
-        linear-gradient(122deg, rgba(73, 214, 200, 0.08), rgba(73, 214, 200, 0) 48%),
+        linear-gradient(180deg, rgba(36, 214, 181, 0.11), rgba(36, 214, 181, 0) 35%),
+        linear-gradient(122deg, rgba(36, 214, 181, 0.07), rgba(36, 214, 181, 0) 48%),
         var(--access-bg);
 }
 
@@ -61,9 +61,43 @@
     inset: 0;
     pointer-events: none;
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.12), transparent 24%),
-        linear-gradient(148deg, transparent 0%, rgba(73, 214, 200, 0.08) 42%, transparent 72%);
+        linear-gradient(180deg, rgba(36, 214, 181, 0.14), transparent 24%),
+        linear-gradient(148deg, transparent 0%, rgba(36, 214, 181, 0.07) 42%, transparent 72%);
     opacity: 0.84;
+}
+
+.access-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px;
+    background: #000000;
+    color: #ffffff;
+    text-align: center;
+}
+
+.access-splash-logo {
+    display: block;
+    width: 92px;
+    height: 92px;
+    border-radius: 24px;
+    background: #000000;
+    object-fit: cover;
+    box-shadow:
+        0 26px 54px rgba(0, 0, 0, 0.55),
+        0 0 44px rgba(36, 214, 181, 0.22);
+}
+
+.access-splash-title {
+    color: #ffffff;
+    font-size: clamp(28px, 7vw, 34px);
+    font-weight: 900;
+    line-height: 1.1;
 }
 
 .access-shell {
@@ -74,19 +108,20 @@
     height: 100%;
     max-height: 100%;
     overflow-x: hidden;
-    overflow-y: hidden;
+    overflow-y: auto;
     overscroll-behavior-y: none;
-    touch-action: none;
+    touch-action: pan-y;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    padding: max(28px, calc(env(safe-area-inset-top) + 18px)) 22px max(22px, calc(env(safe-area-inset-bottom) + 18px));
+    padding: max(24px, calc(env(safe-area-inset-top) + 14px)) 22px max(78px, calc(env(safe-area-inset-bottom) + 66px));
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.13), rgba(116, 245, 106, 0) 30%),
-        linear-gradient(158deg, rgba(73, 214, 200, 0.10), rgba(73, 214, 200, 0) 42%),
+        linear-gradient(180deg, rgba(36, 214, 181, 0.15), rgba(36, 214, 181, 0) 30%),
+        linear-gradient(158deg, rgba(36, 214, 181, 0.09), rgba(36, 214, 181, 0) 42%),
         var(--access-screen);
     box-shadow: 0 0 80px rgba(0, 0, 0, 0.34);
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
 }
 
 .access-shell::-webkit-scrollbar {
@@ -118,7 +153,7 @@
 .app-brand {
     flex: 0 0 auto;
     display: flex;
-    min-height: clamp(176px, 30vh, 252px);
+    min-height: clamp(132px, 22vh, 206px);
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-end;
@@ -140,7 +175,10 @@
     height: 74px;
     flex: 0 0 auto;
     border-radius: 20px;
-    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.30);
+    background: #000000;
+    box-shadow:
+        0 22px 46px rgba(0, 0, 0, 0.36),
+        0 0 36px rgba(36, 214, 181, 0.18);
 }
 
 .access-shell--signup .brand-icon {
@@ -316,9 +354,48 @@
 }
 
 .field-input:focus {
-    border-color: rgba(116, 245, 106, 0.86);
-    background: #131f2b;
-    box-shadow: 0 0 0 3px rgba(116, 245, 106, 0.14);
+    border-color: rgba(36, 214, 181, 0.88);
+    background: #0f1b1e;
+    box-shadow: 0 0 0 3px rgba(36, 214, 181, 0.16);
+}
+
+.password-input-wrap {
+    position: relative;
+}
+
+.auth-field--password .field-input {
+    padding-right: 52px;
+}
+
+.password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    color: #94a3b8;
+    background: transparent;
+    font-size: 16px;
+    transform: translateY(-50%);
+}
+
+.password-toggle:active {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.field-error {
+    display: block;
+    margin-top: 6px;
+    color: #fb7185;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.3;
 }
 
 .field-status {
@@ -345,7 +422,7 @@
     height: 12px;
     flex: 0 0 auto;
     border: 2px solid rgba(142, 160, 183, 0.35);
-    border-top-color: #74f56a;
+    border-top-color: #24d6b5;
     border-radius: 50%;
     animation: access-spin 780ms linear infinite;
 }
@@ -410,7 +487,7 @@
     width: 16px;
     height: 16px;
     flex: 0 0 auto;
-    accent-color: #74f56a;
+    accent-color: #24d6b5;
 }
 
 .check-row input {
@@ -466,9 +543,9 @@
 }
 
 .primary-button {
-    color: #041108;
+    color: #001611;
     background: var(--access-accent);
-    box-shadow: 0 14px 34px rgba(116, 245, 106, 0.22);
+    box-shadow: 0 14px 34px rgba(36, 214, 181, 0.26);
 }
 
 .secondary-button {
@@ -497,7 +574,7 @@
     border: 0;
     border-radius: 8px;
     padding: 5px 2px;
-    color: #a7ff8a;
+    color: #7ff8df;
     background: transparent;
     font-size: 13px;
     font-weight: 900;
@@ -512,13 +589,20 @@
 
 .social-button--naver {
     color: #ffffff;
-    background: #03c75a;
+    background: #10c99b;
+    box-shadow: 0 12px 30px rgba(36, 214, 181, 0.16);
 }
 
 .social-button--google {
     border: 1px solid #dbe4ef;
     color: #172033;
     background: #ffffff;
+}
+
+.social-button--apple {
+    border: 1px solid rgba(255, 255, 255, 0.20);
+    color: #ffffff;
+    background: #05070d;
 }
 
 .social-mark {
@@ -540,6 +624,11 @@
     background: #ffffff;
 }
 
+.social-button--apple .social-mark {
+    color: #05070d;
+    background: #ffffff;
+}
+
 .notice-card {
     border: 1px solid var(--access-line);
     border-radius: 8px;
@@ -548,8 +637,8 @@
 }
 
 .notice-card--success {
-    border-color: rgba(116, 245, 106, 0.28);
-    background: rgba(116, 245, 106, 0.10);
+    border-color: rgba(36, 214, 181, 0.30);
+    background: rgba(36, 214, 181, 0.10);
 }
 
 .notice-card p {
@@ -592,7 +681,7 @@
 }
 
 .progress-track span.is-active {
-    background: #74f56a;
+    background: #24d6b5;
 }
 
 .form-grid {
@@ -623,7 +712,7 @@
 
 .segment-option.is-selected {
     border-color: var(--access-accent);
-    color: #041108;
+    color: #001611;
     background: var(--access-accent);
 }
 
@@ -645,8 +734,8 @@
 
 .agreement-all {
     color: #ffffff;
-    background: rgba(116, 245, 106, 0.10);
-    border-color: rgba(116, 245, 106, 0.24);
+    background: rgba(36, 214, 181, 0.10);
+    border-color: rgba(36, 214, 181, 0.24);
 }
 
 .agreement-list {
@@ -782,7 +871,7 @@
 }
 
 .status-good {
-    color: #a7ff8a;
+    color: #7ff8df;
 }
 
 .status-bad {
@@ -810,10 +899,58 @@
     }
 }
 
+@media (max-width: 480px) and (max-height: 900px) {
+    .access-shell {
+        padding-top: max(20px, calc(env(safe-area-inset-top) + 12px));
+        padding-bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
+    }
+
+    .app-brand {
+        min-height: clamp(118px, 19vh, 164px);
+        gap: 12px;
+        padding-top: 10px;
+        padding-bottom: 16px;
+    }
+
+    .brand-icon {
+        width: 66px;
+        height: 66px;
+        border-radius: 18px;
+    }
+
+    .brand-title {
+        font-size: 28px;
+    }
+
+    .auth-panel {
+        padding-top: 18px;
+        padding-bottom: 0;
+    }
+
+    .auth-header {
+        margin-bottom: 14px;
+    }
+
+    .auth-form,
+    .step-panel,
+    .social-stack {
+        gap: 12px;
+    }
+
+    .field-input,
+    .primary-button,
+    .secondary-button,
+    .social-button {
+        height: 52px;
+        min-height: 52px;
+        border-radius: 14px;
+    }
+}
+
 @media (max-height: 760px) {
     .access-shell {
         padding-top: max(20px, calc(env(safe-area-inset-top) + 12px));
-        padding-bottom: max(18px, calc(env(safe-area-inset-bottom) + 12px));
+        padding-bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
     }
 
     .app-brand {
@@ -935,5 +1072,1068 @@
 
     .auth-title {
         font-size: 28px;
+    }
+}
+
+/* Landing + bottom-sheet auth layout */
+.access-shell {
+    position: relative;
+    height: var(--access-viewport-height);
+    min-height: var(--access-viewport-height);
+    max-height: var(--access-viewport-height);
+    overflow: hidden;
+    padding: 0;
+    background:
+        linear-gradient(160deg, rgba(36, 214, 181, 0.16), rgba(36, 214, 181, 0) 32%),
+        linear-gradient(20deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 46%),
+        linear-gradient(180deg, #020706 0%, #000000 100%);
+}
+
+.access-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 34px 34px;
+    opacity: 0.32;
+    mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 100%);
+}
+
+.access-shell::after {
+    display: none;
+}
+
+.access-hero {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: max(28px, calc(env(safe-area-inset-top) + 18px)) 22px 18px;
+}
+
+.access-hero--compact {
+    flex: 0 0 clamp(96px, 17vh, 150px);
+    align-items: flex-start;
+    padding-top: max(18px, calc(env(safe-area-inset-top) + 12px));
+    padding-bottom: 8px;
+}
+
+.access-back-button {
+    position: absolute;
+    top: max(18px, calc(env(safe-area-inset-top) + 12px));
+    left: 20px;
+    z-index: 2;
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
+.app-brand,
+.access-shell--signup .app-brand {
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 0;
+    text-align: center;
+}
+
+.access-hero--compact .app-brand {
+    gap: 8px;
+    transform: translateY(2px);
+}
+
+.brand-icon,
+.access-shell--signup .brand-icon {
+    width: 92px;
+    height: 92px;
+    border-radius: 24px;
+}
+
+.brand-icon-shell {
+    position: relative;
+    width: 122px;
+    height: 122px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 36px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
+        rgba(255, 255, 255, 0.035);
+    box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.46),
+        0 0 42px rgba(36, 214, 181, 0.18);
+}
+
+.brand-icon-shell::before {
+    content: "";
+    position: absolute;
+    inset: 9px;
+    border: 1px solid rgba(36, 214, 181, 0.22);
+    border-radius: 28px;
+    pointer-events: none;
+}
+
+.access-hero--compact .brand-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+}
+
+.access-hero--compact .brand-icon-shell {
+    width: 64px;
+    height: 64px;
+    border-radius: 18px;
+    background: transparent;
+    box-shadow: none;
+}
+
+.access-hero--compact .brand-icon-shell::before {
+    display: none;
+}
+
+.brand-title,
+.access-shell--signup .brand-title {
+    margin: 0;
+    font-size: clamp(34px, 9vw, 42px);
+    line-height: 1.05;
+}
+
+.access-hero--compact .brand-title {
+    font-size: 22px;
+}
+
+.brand-overline {
+    margin: 7px 0 0;
+    color: rgba(226, 242, 239, 0.76);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.access-hero--compact .brand-overline {
+    display: none;
+}
+
+.access-landing {
+    flex: 0 0 auto;
+    width: 100%;
+    padding: 0 18px max(22px, calc(env(safe-area-inset-bottom) + 16px));
+}
+
+.access-landing-panel {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 32px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.055)),
+        rgba(7, 17, 15, 0.78);
+    box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(18px);
+}
+
+.access-landing-handle {
+    width: 38px;
+    height: 4px;
+    margin: 0 auto 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.24);
+}
+
+.access-landing-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.access-landing-button {
+    min-height: 58px;
+    border: 1px solid transparent;
+    border-radius: 21px;
+    padding: 0 14px;
+    font-size: 15px;
+    font-weight: 900;
+    box-shadow: 0 15px 36px rgba(0, 0, 0, 0.22);
+    transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.access-landing-button:active {
+    transform: scale(0.985);
+}
+
+.access-landing-button--primary {
+    color: #001611;
+    background: linear-gradient(180deg, #7ff8df 0%, #24d6b5 100%);
+    box-shadow: 0 18px 40px rgba(36, 214, 181, 0.22);
+}
+
+.access-landing-button--secondary {
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #f8fafc;
+    background: rgba(255, 255, 255, 0.075);
+}
+
+.auth-panel,
+.access-shell--signup .auth-panel {
+    flex: 0 0 auto;
+    width: 100%;
+    max-height: calc(var(--access-viewport-height) - 86px);
+    margin-top: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding: 26px 22px max(24px, calc(env(safe-area-inset-bottom) + 20px));
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 30px 30px 0 0;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+        #07110f;
+    box-shadow: 0 -22px 58px rgba(0, 0, 0, 0.44);
+    animation: access-sheet-up 260ms ease-out both;
+}
+
+.auth-panel::-webkit-scrollbar {
+    display: none;
+}
+
+@keyframes access-sheet-up {
+    from {
+        opacity: 0;
+        transform: translateY(34px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.auth-card,
+.access-shell--signup .auth-card {
+    background: transparent;
+}
+
+.auth-header {
+    margin-bottom: 18px;
+    text-align: center;
+}
+
+.auth-title {
+    font-size: 28px;
+}
+
+.auth-description {
+    margin-top: 7px;
+}
+
+.auth-form,
+.step-panel {
+    gap: 14px;
+}
+
+.field-input,
+.primary-button,
+.secondary-button {
+    height: 52px;
+    min-height: 52px;
+    border-radius: 15px;
+}
+
+.auth-social {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.auth-social-title {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #7d8b9c;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+}
+
+.auth-social-title::before,
+.auth-social-title::after {
+    content: "";
+    height: 1px;
+    flex: 1 1 auto;
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.social-circle-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+}
+
+.social-circle {
+    width: 44px;
+    height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 17px;
+    font-weight: 900;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.social-circle--naver {
+    color: #ffffff;
+    background: #03c75a;
+}
+
+.social-circle--google {
+    color: #4285f4;
+    background: #ffffff;
+}
+
+.social-circle--apple {
+    color: #ffffff;
+    background: #05070d;
+}
+
+.auth-switch {
+    padding-top: 0;
+}
+
+@media (max-height: 700px) {
+    .access-hero--compact {
+        flex-basis: 82px;
+    }
+
+    .access-hero--compact .brand-icon {
+        display: none;
+    }
+
+    .auth-panel,
+    .access-shell--signup .auth-panel {
+        max-height: calc(var(--access-viewport-height) - 66px);
+        padding-top: 22px;
+    }
+}
+
+.access-shell--signup .access-hero--compact {
+    flex-basis: clamp(50px, 8vh, 72px);
+    padding-top: max(12px, calc(env(safe-area-inset-top) + 8px));
+    padding-bottom: 4px;
+}
+
+.access-shell--signup .access-back-button {
+    top: max(12px, calc(env(safe-area-inset-top) + 8px));
+    width: 38px;
+    height: 38px;
+}
+
+.access-shell--signup .brand-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+}
+
+.access-shell--signup .brand-title {
+    font-size: 20px;
+}
+
+.access-shell--signup .auth-panel {
+    max-height: calc(var(--access-viewport-height) - 34px);
+    padding: 20px 20px max(18px, calc(env(safe-area-inset-bottom) + 14px));
+}
+
+.access-shell--signup .auth-header {
+    margin-bottom: 10px;
+}
+
+.access-shell--signup .auth-title {
+    font-size: 24px;
+}
+
+.access-shell--signup .auth-description {
+    display: none;
+}
+
+.access-shell--signup .auth-form--dense,
+.access-shell--signup .auth-form--dense .step-panel {
+    gap: 10px;
+}
+
+.access-shell--signup .signup-progress {
+    gap: 9px;
+    font-size: 11px;
+}
+
+.access-shell--signup .progress-track span {
+    height: 5px;
+}
+
+.access-shell--signup .form-grid {
+    gap: 10px;
+}
+
+.access-shell--signup .field-row {
+    min-height: 18px;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.access-shell--signup .field-label {
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+
+.access-shell--signup .field-status {
+    font-size: 10px;
+}
+
+.access-shell--signup .field-input {
+    height: 47px;
+    min-height: 47px;
+    border-radius: 13px;
+    padding: 0 14px;
+    font-size: 14px;
+}
+
+.access-shell--signup .auth-field--password .field-input {
+    padding-right: 48px;
+}
+
+.access-shell--signup .password-toggle {
+    right: 6px;
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+}
+
+.access-shell--signup .field-hint {
+    margin-top: 3px;
+    font-size: 10px;
+    line-height: 1.2;
+}
+
+.access-shell--signup .segmented {
+    gap: 8px;
+}
+
+.access-shell--signup .segment-option {
+    height: 47px;
+    border-radius: 13px;
+    font-size: 13px;
+}
+
+.access-shell--signup .auth-social {
+    gap: 9px;
+    padding: 2px 0 0;
+}
+
+.access-shell--signup .auth-social-title {
+    gap: 9px;
+    font-size: 11px;
+}
+
+.access-shell--signup .social-circle-row {
+    gap: 16px;
+}
+
+.access-shell--signup .social-circle {
+    width: 42px;
+    height: 42px;
+    font-size: 15px;
+}
+
+.access-shell--signup .form-actions {
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.access-shell--signup .primary-button,
+.access-shell--signup .secondary-button {
+    height: 49px;
+    min-height: 49px;
+    border-radius: 13px;
+}
+
+@media (max-height: 760px) {
+    .access-shell--signup .access-hero--compact {
+        flex-basis: 36px;
+    }
+
+    .access-shell--signup .brand-icon,
+    .access-shell--signup .brand-icon-shell {
+        display: none;
+    }
+
+    .access-shell--signup .auth-panel {
+        max-height: calc(var(--access-viewport-height) - 26px);
+        padding-top: 18px;
+    }
+
+    .access-shell--signup .auth-title {
+        font-size: 22px;
+    }
+}
+
+.social-circle {
+    overflow: hidden;
+    padding: 0;
+}
+
+.social-provider-img,
+.social-apple-picture {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+}
+
+.social-provider-img {
+    object-fit: contain;
+}
+
+.social-hidden-text {
+    display: none;
+}
+
+.gsi-material-button,
+.access-shell--signup .gsi-material-button {
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -webkit-appearance: none;
+    width: 40px;
+    min-width: min-content;
+    max-width: 400px;
+    height: 40px;
+    min-height: 40px;
+    border: 1px solid #747775;
+    border-radius: 20px;
+    box-sizing: border-box;
+    padding: 0;
+    color: #1f1f1f;
+    background-color: #ffffff;
+    background-image: none;
+    cursor: pointer;
+    font-family: Roboto, Arial, sans-serif;
+    font-size: 14px;
+    letter-spacing: 0.25px;
+    line-height: normal;
+    outline: none;
+    overflow: hidden;
+    position: relative;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    transition: background-color 218ms, border-color 218ms, box-shadow 218ms;
+}
+
+.gsi-material-button-state {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+}
+
+.gsi-material-button-content-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gsi-material-button-icon {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gsi-material-button-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* Premium landing reset */
+.access-shell--landing {
+    background:
+        linear-gradient(180deg, rgba(36, 214, 181, 0.10) 0%, rgba(36, 214, 181, 0) 32%),
+        linear-gradient(180deg, #050908 0%, #000000 100%);
+}
+
+.access-shell--landing::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 24%),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 82px);
+    opacity: 0.42;
+    mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, 0.62) 42%, transparent 78%);
+}
+
+.access-shell--landing::after {
+    content: "";
+    position: absolute;
+    top: 15%;
+    left: 50%;
+    width: min(76vw, 310px);
+    height: min(76vw, 310px);
+    display: block;
+    border: 1px solid rgba(36, 214, 181, 0.16);
+    border-bottom-color: transparent;
+    border-left-color: rgba(255, 255, 255, 0.05);
+    border-radius: 999px;
+    transform: translateX(-50%) rotate(-18deg);
+    pointer-events: none;
+}
+
+.access-shell--landing .access-hero {
+    align-items: flex-start;
+    padding-top: max(92px, calc(env(safe-area-inset-top) + 74px));
+    padding-bottom: 20px;
+}
+
+.access-shell--landing .app-brand {
+    gap: 18px;
+}
+
+.access-shell--landing .brand-icon-shell {
+    width: 116px;
+    height: 116px;
+    border: 0;
+    border-radius: 30px;
+    background: transparent;
+    box-shadow: none;
+}
+
+.access-shell--landing .brand-icon-shell::before {
+    display: none;
+}
+
+.access-shell--landing .brand-icon {
+    width: 112px;
+    height: 112px;
+    border-radius: 30px;
+    box-shadow:
+        0 28px 76px rgba(0, 0, 0, 0.56),
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 0 46px rgba(36, 214, 181, 0.18);
+}
+
+.access-shell--landing .brand-title {
+    font-size: clamp(44px, 11vw, 54px);
+    font-weight: 950;
+    line-height: 1;
+}
+
+.access-shell--landing .brand-overline {
+    margin-top: 10px;
+    color: rgba(230, 246, 242, 0.72);
+    font-size: 14px;
+    font-weight: 850;
+}
+
+.access-shell--landing .access-landing {
+    padding: 0 22px max(28px, calc(env(safe-area-inset-bottom) + 22px));
+}
+
+.access-shell--landing .access-landing-panel {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.access-shell--landing .access-landing-handle {
+    display: none;
+}
+
+.access-shell--landing .access-landing-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+}
+
+.access-shell--landing .access-landing-button {
+    min-height: 60px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: 950;
+}
+
+.access-shell--landing .access-landing-button--primary {
+    color: #001611;
+    background: linear-gradient(180deg, #8ffbe6 0%, #24d6b5 100%);
+    box-shadow:
+        0 20px 44px rgba(36, 214, 181, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.46);
+}
+
+.access-shell--landing .access-landing-button--secondary {
+    border-color: rgba(255, 255, 255, 0.16);
+    color: #eefaf7;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.045)),
+        rgba(255, 255, 255, 0.035);
+    box-shadow:
+        0 18px 42px rgba(0, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+@media (max-height: 740px) {
+    .access-shell--landing .access-hero {
+        padding-top: max(60px, calc(env(safe-area-inset-top) + 44px));
+    }
+
+    .access-shell--landing .brand-icon {
+        width: 96px;
+        height: 96px;
+        border-radius: 26px;
+    }
+
+    .access-shell--landing .brand-title {
+        font-size: clamp(38px, 10vw, 46px);
+    }
+}
+
+/* Refined editorial launch screen */
+.access-shell--landing {
+    padding: 0;
+    overflow: hidden;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 34%),
+        linear-gradient(145deg, rgba(36, 214, 181, 0.14), rgba(36, 214, 181, 0) 38%),
+        linear-gradient(20deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 44%),
+        #020403;
+}
+
+.access-shell--landing::before {
+    background:
+        linear-gradient(128deg, transparent 0 34%, rgba(255, 255, 255, 0.055) 34.2% 34.45%, transparent 34.7% 100%),
+        linear-gradient(38deg, transparent 0 58%, rgba(36, 214, 181, 0.11) 58.2% 58.55%, transparent 58.8% 100%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 22%);
+    opacity: 1;
+    mask-image: none;
+}
+
+.access-shell--landing::after {
+    display: none;
+}
+
+.access-shell--landing .access-hero {
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    padding: max(58px, calc(env(safe-area-inset-top) + 46px)) 30px 198px;
+}
+
+.access-shell--landing .app-brand {
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 0;
+    text-align: center;
+}
+
+.access-shell--landing .brand-icon-shell {
+    width: 120px;
+    height: 120px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 34px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
+        rgba(255, 255, 255, 0.035);
+    box-shadow:
+        0 32px 80px rgba(0, 0, 0, 0.48),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.access-shell--landing .brand-icon-shell::before {
+    display: none;
+}
+
+.access-shell--landing .brand-icon {
+    width: 104px;
+    height: 104px;
+    border-radius: 30px;
+    background: #000000;
+    box-shadow:
+        0 18px 48px rgba(0, 0, 0, 0.46),
+        0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.access-shell--landing .brand-title {
+    margin-top: 0;
+    font-size: 50px;
+    font-weight: 950;
+    line-height: 0.96;
+}
+
+.access-shell--landing .brand-overline {
+    max-width: 220px;
+    margin: 11px auto 0;
+    color: rgba(238, 250, 247, 0.70);
+    font-size: 14px;
+    font-weight: 850;
+    line-height: 1.35;
+}
+
+.access-shell--landing .access-landing {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    padding: 0 18px max(18px, calc(env(safe-area-inset-bottom) + 14px));
+}
+
+.access-shell--landing .access-landing-panel {
+    position: relative;
+    padding: 18px 14px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 34px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.07)),
+        rgba(4, 9, 8, 0.74);
+    box-shadow:
+        0 28px 70px rgba(0, 0, 0, 0.44),
+        inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(20px);
+}
+
+.access-shell--landing .access-landing-handle {
+    display: block;
+    width: 42px;
+    height: 4px;
+    margin: 0 auto 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.access-shell--landing .access-landing-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+.access-shell--landing .access-landing-button {
+    min-height: 58px;
+    border-radius: 21px;
+    font-size: 16px;
+    font-weight: 950;
+    box-shadow: none;
+}
+
+.access-shell--landing .access-landing-button--primary {
+    color: #06110f;
+    background: #ffffff;
+    box-shadow:
+        0 16px 38px rgba(0, 0, 0, 0.28),
+        inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.access-shell--landing .access-landing-button--secondary {
+    border-color: rgba(36, 214, 181, 0.42);
+    color: #dffff8;
+    background:
+        linear-gradient(180deg, rgba(36, 214, 181, 0.18), rgba(36, 214, 181, 0.08)),
+        rgba(36, 214, 181, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+@media (max-height: 740px) {
+    .access-shell--landing .access-hero {
+        padding-top: max(42px, calc(env(safe-area-inset-top) + 30px));
+        padding-bottom: 168px;
+    }
+
+    .access-shell--landing .brand-icon-shell {
+        width: 100px;
+        height: 100px;
+        border-radius: 30px;
+    }
+
+    .access-shell--landing .brand-icon {
+        width: 86px;
+        height: 86px;
+        border-radius: 25px;
+    }
+
+    .access-shell--landing .brand-title {
+        font-size: 42px;
+    }
+
+    .access-shell--landing .brand-overline {
+        font-size: 13px;
+    }
+
+    .access-shell--landing .access-landing-panel {
+        padding: 14px 12px 12px;
+    }
+
+    .access-shell--landing .access-landing-handle {
+        margin-bottom: 10px;
+    }
+
+    .access-shell--landing .access-landing-button {
+        min-height: 52px;
+        border-radius: 19px;
+    }
+}
+
+/* Illustrated landscape trial */
+.access-shell--landing {
+    background:
+        linear-gradient(180deg, rgba(2, 4, 3, 0.08) 0%, rgba(2, 4, 3, 0.12) 42%, rgba(2, 4, 3, 0.86) 82%, #020403 100%),
+        url("/assets/brand/access-landscape-20260621.png?v=rm-access-landscape-20260621") center top / cover no-repeat,
+        #020403;
+}
+
+.access-shell--landing::before {
+    background:
+        linear-gradient(180deg, rgba(2, 4, 3, 0.08) 0%, rgba(2, 4, 3, 0.02) 30%, rgba(2, 4, 3, 0.58) 70%, rgba(2, 4, 3, 0.94) 100%),
+        linear-gradient(90deg, rgba(2, 4, 3, 0.38), transparent 34%, transparent 66%, rgba(2, 4, 3, 0.42));
+    opacity: 1;
+    mask-image: none;
+}
+
+.access-shell--landing .access-hero {
+    padding-top: max(66px, calc(env(safe-area-inset-top) + 54px));
+}
+
+.access-shell--landing .brand-icon-shell {
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05)),
+        rgba(2, 4, 3, 0.48);
+    backdrop-filter: blur(12px);
+}
+
+.access-shell--landing .brand-title,
+.access-shell--landing .brand-overline {
+    text-shadow: 0 2px 22px rgba(0, 0, 0, 0.72);
+}
+
+/* Emerald landscape landing adjustments */
+.access-shell--landing {
+    background:
+        linear-gradient(180deg, rgba(2, 4, 3, 0.03) 0%, rgba(2, 4, 3, 0.12) 42%, rgba(2, 4, 3, 0.76) 78%, #020403 100%),
+        url("/assets/brand/access-landscape-emerald-20260621.png?v=rm-access-landscape-emerald-20260621") center top / cover no-repeat,
+        #020403;
+}
+
+.access-shell--landing::before {
+    background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.10) 0%, rgba(0, 0, 0, 0.02) 34%, rgba(0, 0, 0, 0.60) 76%, rgba(0, 0, 0, 0.92) 100%),
+        linear-gradient(90deg, rgba(0, 24, 20, 0.32), transparent 31%, transparent 69%, rgba(0, 24, 20, 0.32));
+    opacity: 1;
+}
+
+.access-shell--landing .access-hero {
+    padding-bottom: 138px;
+}
+
+.access-shell--landing .brand-icon-shell {
+    width: 110px;
+    height: 110px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+}
+
+.access-shell--landing .brand-icon {
+    width: 108px;
+    height: 108px;
+    border-radius: 30px;
+    box-shadow: none;
+}
+
+.access-shell--landing .access-landing-panel {
+    padding: 8px;
+    border-radius: 30px;
+    background: rgba(2, 8, 7, 0.48);
+    box-shadow:
+        0 22px 56px rgba(0, 0, 0, 0.36),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+.access-shell--landing .access-landing-handle {
+    display: none;
+}
+
+.access-shell--landing .access-landing-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.access-shell--landing .access-landing-button {
+    min-height: 58px;
+    border-radius: 22px;
+    font-size: 15px;
+}
+
+.access-shell--landing .access-landing-button--secondary {
+    border-color: rgba(36, 214, 181, 0.52);
+}
+
+@media (max-height: 740px) {
+    .access-shell--landing .access-hero {
+        padding-bottom: 116px;
+    }
+
+    .access-shell--landing .brand-icon-shell {
+        width: 92px;
+        height: 92px;
+    }
+
+    .access-shell--landing .brand-icon {
+        width: 90px;
+        height: 90px;
+        border-radius: 25px;
+    }
+
+    .access-shell--landing .access-landing-button {
+        min-height: 52px;
+        border-radius: 19px;
     }
 }
