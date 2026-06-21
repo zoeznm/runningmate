@@ -11,7 +11,6 @@ export class Component implements OnInit {
     public isDark: boolean = true;
     public user: any = null;
     public confirmText: string = '';
-    public password: string = '';
     public acknowledged: boolean = false;
     public deleting: boolean = false;
     public accountDeleted: boolean = false;
@@ -87,8 +86,7 @@ export class Component implements OnInit {
 
         try {
             const result = await jsonRequest<any>('/api/auth/account', 'DELETE', {
-                confirm_text: this.confirmText,
-                password: this.password || ''
+                confirm_text: this.confirmText
             }, { retries: 0, timeoutMs: 30000 });
 
             if (!result.success) {

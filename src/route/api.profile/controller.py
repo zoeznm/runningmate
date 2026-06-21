@@ -4,6 +4,7 @@ import json
 
 session = wiz.model("portal/season/session").use()
 struct = wiz.model("struct")
+running = wiz.model("runningmate")
 
 
 def _request_payload():
@@ -45,6 +46,8 @@ def _profile_response(user):
     if not user:
         return {"success": False, "message": "사용자를 찾을 수 없습니다."}
 
+    cycle_setting = running.cycle_setting(user.get("id"))
+
     return {
         "success": True,
         "data": {
@@ -60,6 +63,8 @@ def _profile_response(user):
             "profile_image": user.get("profile_image") or "",
             "onboarded": bool(user.get("onboarded")),
             "is_public": bool(user.get("is_public", True)),
+            "cycle_enabled": bool(cycle_setting.get("enabled")),
+            "cycle_enabled_configured": bool(cycle_setting.get("configured")),
         },
     }
 
@@ -114,6 +119,15 @@ elif request.method == "PATCH":
 
     if "is_public" in payload or "isPublic" in payload:
         fields["is_public"] = _bool_value(payload.get("is_public") if "is_public" in payload else payload.get("isPublic"))
+
+    if "cycle_enabled" in payload or "cycleEnabled" in payload:
+        cycle_enabled = payload.get("cycle_enabled") if "cycle_enabled" in payload else payload.get("cycleEnabled")
+        _cycle_setting, cycle_error = running.save_cycle_setting(
+            {"enabled": _bool_value(cycle_enabled)},
+            user_id=user.get("id"),
+        )
+        if cycle_error:
+            wiz.response.status(400, success=False, message=cycle_error)
 
     if not fields:
         wiz.response.json(_profile_response(user))

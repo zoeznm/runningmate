@@ -44,7 +44,7 @@
     border: 0.5px solid rgba(255, 255, 255, 0.12);
     border-radius: 20px;
     background:
-        linear-gradient(180deg, rgba(116, 245, 106, 0.08), rgba(116, 245, 106, 0) 42%),
+        linear-gradient(180deg, rgba(36, 214, 181, 0.08), rgba(36, 214, 181, 0) 42%),
         #12121c;
     box-shadow: 0 24px 62px rgba(0, 0, 0, 0.38);
     padding: 22px 18px 18px;
@@ -72,8 +72,8 @@
 }
 
 .wiz-app-modal-icon-success {
-    background: rgba(116, 245, 106, 0.14);
-    color: #a7ff8a;
+    background: rgba(36, 214, 181, 0.14);
+    color: #24d6b5;
 }
 
 .wiz-app-modal-icon-warning {
@@ -150,7 +150,7 @@
 }
 
 .wiz-app-modal-button-success {
-    background: #74f56a;
+    background: #24d6b5;
     color: #07100a;
 }
 

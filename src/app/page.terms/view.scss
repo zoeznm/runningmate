@@ -50,8 +50,8 @@
     align-items: center;
     justify-content: center;
     border-radius: 8px;
-    background: #1f7a4d;
-    color: #fff;
+    background: #0e7490;
+    color: #ffffff;
     font-weight: 900;
 }
 
@@ -79,8 +79,8 @@
 }
 
 .legal-nav a.active {
-    border-color: #1f7a4d;
-    color: #145c39;
+    border-color: #0e7490;
+    color: #0e7490;
 }
 
 .legal-nav a.danger.active {
@@ -107,7 +107,7 @@
 .legal-eyebrow,
 .delete-kicker {
     margin: 0 0 10px;
-    color: #1f7a4d;
+    color: #0e7490;
     font-size: 12px;
     font-weight: 900;
     letter-spacing: 0;
@@ -207,8 +207,8 @@
     border: 0;
     border-radius: 8px;
     padding: 8px 10px;
-    background: #1f7a4d;
-    color: #fff;
+    background: #0e7490;
+    color: #ffffff;
     font-size: 13px;
     font-weight: 800;
     cursor: pointer;
@@ -225,7 +225,7 @@
 
 .legal-footer a {
     font-weight: 800;
-    color: #145c39;
+    color: #0e7490;
 }
 
 .delete-panel {
@@ -250,8 +250,8 @@
 }
 
 .delete-panel-icon.success {
-    background: #dcfae6;
-    color: #067647;
+    background: #e0f7fb;
+    color: #0e7490;
 }
 
 .delete-account-row,
@@ -348,8 +348,8 @@
 }
 
 .delete-status.success {
-    background: #dcfae6;
-    color: #067647;
+    background: #e0f7fb;
+    color: #0e7490;
 }
 
 .delete-status.error {
@@ -378,8 +378,8 @@
 
 .delete-primary {
     border: 0;
-    background: #1f7a4d;
-    color: #fff;
+    background: #0e7490;
+    color: #ffffff;
 }
 
 .delete-danger {
@@ -516,9 +516,9 @@
 }
 
 .legal-nav a.active {
-    border-color: rgba(116, 245, 106, 0.36);
-    background: rgba(116, 245, 106, 0.11);
-    color: #b8ffad;
+    border-color: rgba(36, 214, 181, 0.36);
+    background: rgba(36, 214, 181, 0.11);
+    color: #24d6b5;
 }
 
 .legal-nav a.danger.active {
@@ -598,7 +598,7 @@
     --legal-line-soft: rgba(145, 184, 160, 0.12);
     --legal-text: #f8fff9;
     --legal-muted: #a9b8ae;
-    --legal-primary: #74f56a;
+    --legal-primary: #24d6b5;
     --legal-danger: #f87171;
     width: 100%;
     max-width: 430px;
@@ -621,7 +621,7 @@
     --legal-line-soft: #e8efeb;
     --legal-text: #132018;
     --legal-muted: #53665b;
-    --legal-primary: #1b7f65;
+    --legal-primary: #0e7490;
     --legal-danger: #d92d20;
 }
 
@@ -852,12 +852,12 @@ button {
     --screen-bg: #12121c;
     --surface: #1e1e30;
     --surface-2: #2a2a40;
-    --primary: #78d6b3;
-    --primary-rgb: 120, 214, 179;
-    --primary-fill: #78d6b3;
-    --primary-fill-rgb: 120, 214, 179;
-    --primary-deep: #173e35;
-    --primary-ink: #10201a;
+    --primary: #24d6b5;
+    --primary-rgb: 36, 214, 181;
+    --primary-fill: #24d6b5;
+    --primary-fill-rgb: 36, 214, 181;
+    --primary-deep: #021513;
+    --primary-ink: #021513;
     --text: #e8e8f0;
     --text-muted: rgba(232, 232, 240, 0.68);
     --muted: #666;
@@ -885,12 +885,12 @@ button {
     --screen-bg: #f7f7f9;
     --surface: #ffffff;
     --surface-2: #f0f0f6;
-    --primary: #1b7f65;
-    --primary-rgb: 27, 127, 101;
-    --primary-fill: #78d6b3;
-    --primary-fill-rgb: 120, 214, 179;
-    --primary-deep: #10201a;
-    --primary-ink: #10201a;
+    --primary: #0e7490;
+    --primary-rgb: 14, 116, 144;
+    --primary-fill: #0e7490;
+    --primary-fill-rgb: 14, 116, 144;
+    --primary-deep: #021513;
+    --primary-ink: #ffffff;
     --text: #1a1a2e;
     --text-muted: rgba(26, 26, 46, 0.62);
     --muted: #888;

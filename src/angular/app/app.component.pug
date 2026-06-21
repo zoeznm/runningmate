@@ -8,29 +8,29 @@ div(*ngIf="agreementModalVisible", class="fixed inset-0 z-[100] flex items-cente
             h2(class="text-base font-black text-white") 약관 동의가 필요합니다
             p(class="mt-1 text-[13px] leading-5 text-slate-400") 최신 이용약관과 개인정보처리방침에 동의해야 서비스를 계속 이용할 수 있습니다.
         div(class="overflow-y-auto px-5 py-4")
-            label(class="mb-3 flex items-center gap-3 rounded-lg border border-[#74f56a]/25 bg-[#74f56a]/10 px-4 py-3 text-[13px] font-black text-slate-100")
-                input(type="checkbox", [ngModel]="reconsentAllChecked", (ngModelChange)="setAllReconsent($event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#74f56a] focus:ring-[#74f56a]")
+            label(class="mb-3 flex items-center gap-3 rounded-lg border border-[#24d6b5]/25 bg-[#24d6b5]/10 px-4 py-3 text-[13px] font-black text-slate-100")
+                input(type="checkbox", [ngModel]="reconsentAllChecked", (ngModelChange)="setAllReconsent($event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#24d6b5] focus:ring-[#24d6b5]")
                 span 전체 동의
 
             div(class="space-y-2")
                 div(class="flex items-center justify-between rounded-lg border border-white/10 bg-[#111827] px-3 py-2.5")
                     label(class="flex min-w-0 items-center gap-3 text-[13px] font-semibold text-slate-300")
-                        input(type="checkbox", [ngModel]="reconsent.terms", (ngModelChange)="setReconsent('terms', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#74f56a] focus:ring-[#74f56a]")
+                        input(type="checkbox", [ngModel]="reconsent.terms", (ngModelChange)="setReconsent('terms', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#24d6b5] focus:ring-[#24d6b5]")
                         span(class="truncate") [필수] 이용약관 동의
-                    button(type="button", (click)="openAgreementPolicy('terms')", aria-label="이용약관 전문 보기", class="ml-3 rounded-md px-2 py-1 text-[12px] font-bold text-[#a7ff8a] hover:bg-white/5") 보기
+                    button(type="button", (click)="openAgreementPolicy('terms')", aria-label="이용약관 전문 보기", class="ml-3 rounded-md px-2 py-1 text-[12px] font-bold text-[#24d6b5] hover:bg-white/5") 보기
                 div(class="flex items-center justify-between rounded-lg border border-white/10 bg-[#111827] px-3 py-2.5")
                     label(class="flex min-w-0 items-center gap-3 text-[13px] font-semibold text-slate-300")
-                        input(type="checkbox", [ngModel]="reconsent.privacy", (ngModelChange)="setReconsent('privacy', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#74f56a] focus:ring-[#74f56a]")
+                        input(type="checkbox", [ngModel]="reconsent.privacy", (ngModelChange)="setReconsent('privacy', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#24d6b5] focus:ring-[#24d6b5]")
                         span(class="truncate") [필수] 개인정보 수집·이용 동의
-                    button(type="button", (click)="openAgreementPolicy('privacy')", aria-label="개인정보처리방침 전문 보기", class="ml-3 rounded-md px-2 py-1 text-[12px] font-bold text-[#a7ff8a] hover:bg-white/5") 보기
+                    button(type="button", (click)="openAgreementPolicy('privacy')", aria-label="개인정보처리방침 전문 보기", class="ml-3 rounded-md px-2 py-1 text-[12px] font-bold text-[#24d6b5] hover:bg-white/5") 보기
                 label(class="flex items-center gap-3 rounded-lg border border-white/10 bg-[#111827] px-3 py-2.5 text-[13px] font-semibold text-slate-300")
-                    input(type="checkbox", [ngModel]="reconsent.age", (ngModelChange)="setReconsent('age', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#74f56a] focus:ring-[#74f56a]")
+                    input(type="checkbox", [ngModel]="reconsent.age", (ngModelChange)="setReconsent('age', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#24d6b5] focus:ring-[#24d6b5]")
                     span [필수] 만 14세 이상입니다
                 label(class="flex items-center gap-3 rounded-lg border border-white/10 bg-[#111827] px-3 py-2.5 text-[13px] font-semibold text-slate-300")
-                    input(type="checkbox", [ngModel]="reconsent.marketing", (ngModelChange)="setReconsent('marketing', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#74f56a] focus:ring-[#74f56a]")
+                    input(type="checkbox", [ngModel]="reconsent.marketing", (ngModelChange)="setReconsent('marketing', $event)", class="h-4 w-4 rounded border-white/20 bg-[#111827] text-[#24d6b5] focus:ring-[#24d6b5]")
                     span [선택] 마케팅 정보 수신 동의
         div(class="border-t border-white/10 px-5 py-4 text-right")
-            button(type="button", (click)="submitReconsent()", [disabled]="!reconsentReady || agreementSaving", [ngClass]="reconsentReady && !agreementSaving ? 'bg-[#74f56a] text-[#07100a]' : 'bg-white/10 text-slate-500 cursor-not-allowed'", class="rounded-lg px-4 py-2 text-[13px] font-black disabled:cursor-not-allowed disabled:opacity-60")
+            button(type="button", (click)="submitReconsent()", [disabled]="!reconsentReady || agreementSaving", [ngClass]="reconsentReady && !agreementSaving ? 'bg-[#24d6b5] text-[#07100a]' : 'bg-white/10 text-slate-500 cursor-not-allowed'", class="rounded-lg px-4 py-2 text-[13px] font-black disabled:cursor-not-allowed disabled:opacity-60")
                 span(class="inline-flex items-center gap-2")
                     wiz-component-loading-spinner(*ngIf="agreementSaving", size="sm", label="저장 중")
                     span {{agreementSaving ? '저장 중' : '동의하고 계속'}}
@@ -48,4 +48,4 @@ div(*ngIf="activeAgreementPolicy", class="fixed inset-0 z-[110] flex items-cente
                 h3(class="text-[13px] font-black text-white") {{section.title}}
                 p(class="mt-2 whitespace-pre-line text-[13px] leading-6 text-slate-300") {{section.body}}
         div(class="border-t border-white/10 px-5 py-4 text-right")
-            button(type="button", (click)="closeAgreementPolicy()", class="rounded-lg bg-[#74f56a] px-4 py-2 text-[13px] font-black text-[#07100a]") 확인
+            button(type="button", (click)="closeAgreementPolicy()", class="rounded-lg bg-[#24d6b5] px-4 py-2 text-[13px] font-black text-[#07100a]") 확인

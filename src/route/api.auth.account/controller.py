@@ -24,62 +24,87 @@ def _payload():
     return {}
 
 
+class ApiResponse(Exception):
+    def __init__(self, status_code, payload):
+        super().__init__(payload.get("message") or "")
+        self.status_code = status_code
+        self.payload = payload
+
+
 def _response(status_code, payload):
-    if status_code >= 400:
-        wiz.response.status(status_code, **payload)
-    wiz.response.json(payload)
+    raise ApiResponse(status_code, payload)
 
 
-if request.method != "DELETE":
-    _response(405, {"success": False, "message": "지원하지 않는 요청입니다."})
+def _send_response(status_code, payload):
+    flask = wiz.server.package.flask
+    response = flask.Response(
+        json.dumps(payload, ensure_ascii=False, default=str),
+        status=status_code,
+        content_type="application/json; charset=utf-8",
+    )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "same-origin"
+    wiz.response.response(response)
 
-user_id = session.get("id")
-if not user_id:
-    _response(401, {"success": False, "message": "로그인이 필요합니다."})
 
-user = struct.user.get(id=user_id)
-if not user:
-    session.clear()
-    _response(401, {"success": False, "message": "사용자를 찾을 수 없습니다."})
+def _audit(event, **kwargs):
+    try:
+        security.audit(event, **kwargs)
+    except Exception:
+        pass
 
-payload = _payload()
-confirm_text = str(payload.get("confirm_text") or payload.get("confirmText") or "").strip()
-password = str(payload.get("password") or "")
 
-if confirm_text and confirm_text != "삭제":
-    _response(400, {"success": False, "message": "'삭제'를 정확히 입력해주세요."})
-if not password and confirm_text != "삭제":
-    _response(400, {"success": False, "message": "계정 삭제 확인이 필요합니다."})
-if password and not struct.user.verify_password(user_id, password):
-    security.audit("auth.account_delete", actor_id=user_id, actor_role=session.get("role") or "", target=user_id, success=False, metadata={"reason": "invalid_password"})
-    _response(400, {"success": False, "message": "비밀번호가 올바르지 않습니다."})
-
-snapshot = running.snapshot_account_data()
 try:
-    result = running.delete_account_data(user_id, include_legacy=True, delete_files=False)
-    if not result.get("success"):
-        raise RuntimeError(result.get("message") or "계정 데이터를 삭제하지 못했습니다.")
+    if request.method != "DELETE":
+        _response(405, {"success": False, "message": "지원하지 않는 요청입니다."})
 
-    summary = result.get("data") or {}
-    file_cleanup = running.delete_account_files(summary.get("files") or [])
-    if file_cleanup.get("failed"):
-        raise RuntimeError("업로드 파일 삭제에 실패했습니다. 계정 삭제가 취소되었습니다.")
+    user_id = session.get("id")
+    if not user_id:
+        _response(401, {"success": False, "message": "로그인이 필요합니다."})
 
-    summary["file_cleanup"] = file_cleanup
-    if not struct.user.delete_account(user_id):
-        raise RuntimeError("사용자를 찾을 수 없습니다.")
+    user = struct.user.get(id=user_id)
+    if not user:
+        session.clear()
+        _response(401, {"success": False, "message": "사용자를 찾을 수 없습니다."})
 
-    security.audit("auth.account_delete", actor_id=user_id, actor_role=session.get("role") or "", target=user_id, success=True, metadata=summary)
-    session.clear()
-    wiz.response.json({
+    payload = _payload()
+    confirm_text = str(payload.get("confirm_text") or payload.get("confirmText") or "").strip()
+
+    if confirm_text != "삭제":
+        _response(400, {"success": False, "message": "'삭제'를 정확히 입력해주세요."})
+
+    snapshot = running.snapshot_account_data()
+    try:
+        result = running.delete_account_data(user_id, include_legacy=True, delete_files=False)
+        if not result.get("success"):
+            raise RuntimeError(result.get("message") or "계정 데이터를 삭제하지 못했습니다.")
+
+        summary = result.get("data") or {}
+        file_cleanup = running.delete_account_files(summary.get("files") or [])
+        if file_cleanup.get("failed"):
+            raise RuntimeError("업로드 파일 삭제에 실패했습니다. 계정 삭제가 취소되었습니다.")
+
+        summary["file_cleanup"] = file_cleanup
+        if not struct.user.delete_account(user_id):
+            raise RuntimeError("사용자를 찾을 수 없습니다.")
+
+        _audit("auth.account_delete", actor_id=user_id, actor_role=session.get("role") or "", target=user_id, success=True, metadata=summary)
+        session.clear()
+    except Exception as error:
+        running.restore_account_data(snapshot)
+        _audit("auth.account_delete", actor_id=user_id, actor_role=session.get("role") or "", target=user_id, success=False, metadata={"error": str(error)})
+        _response(500, {
+            "success": False,
+            "message": str(error) or "계정 삭제 중 오류가 발생해 변경 사항을 되돌렸습니다.",
+        })
+
+    _response(200, {
         "success": True,
         "message": "계정 삭제가 완료되었습니다.",
         "data": summary,
     })
-except Exception as error:
-    running.restore_account_data(snapshot)
-    security.audit("auth.account_delete", actor_id=user_id, actor_role=session.get("role") or "", target=user_id, success=False, metadata={"error": str(error)})
-    _response(500, {
-        "success": False,
-        "message": str(error) or "계정 삭제 중 오류가 발생해 변경 사항을 되돌렸습니다.",
-    })
+except ApiResponse as response:
+    _send_response(response.status_code, response.payload)

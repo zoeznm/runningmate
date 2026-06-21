@@ -48,10 +48,6 @@ main(class="account-delete-page", [class.dark-screen]="isDark", [class.light-scr
                 span 확인 문구
                 input(type="text", name="confirmText", autocomplete="off", placeholder="삭제", [(ngModel)]="confirmText")
                 small 입력창에 삭제를 정확히 입력해야 합니다.
-            label(class="delete-field")
-                span 비밀번호 재입력
-                input(type="password", name="password", autocomplete="current-password", placeholder="선택 입력", [(ngModel)]="password")
-                small 비밀번호 계정은 추가 검증에 사용됩니다.
             div(*ngIf="statusMessage", class="delete-status", [ngClass]="statusKind") {{statusMessage}}
             div(class="delete-actions end")
                 button(type="submit", class="delete-danger", [disabled]="!canDelete")

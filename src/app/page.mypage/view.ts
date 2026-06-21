@@ -1,7 +1,7 @@
 import { OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
 import { apiFetch, jsonRequest } from 'src/app/shared/api';
-import { ensureAuthenticated } from 'src/app/shared/auth';
+import { clearAuthTokens, ensureAuthenticated } from 'src/app/shared/auth';
 import { ToastService } from 'src/app/shared/toast.service';
 
 export class Component implements OnInit {
@@ -16,8 +16,7 @@ export class Component implements OnInit {
     public deletingAccount: boolean = false;
     public accountDeleted: boolean = false;
     public accountDeleteForm: any = {
-        confirm_text: '',
-        password: ''
+        confirm_text: ''
     };
 
     public passwordForm: any = {
@@ -214,13 +213,13 @@ export class Component implements OnInit {
 
     public openAccountDelete() {
         this.deleteStep = 1;
-        this.accountDeleteForm = { confirm_text: '', password: '' };
+        this.accountDeleteForm = { confirm_text: '' };
     }
 
     public closeAccountDelete() {
         if (this.deletingAccount) return;
         this.deleteStep = 0;
-        this.accountDeleteForm = { confirm_text: '', password: '' };
+        this.accountDeleteForm = { confirm_text: '' };
     }
 
     public continueAccountDelete() {
@@ -251,8 +250,7 @@ export class Component implements OnInit {
 
         try {
             const result = await jsonRequest<any>('/api/auth/account', 'DELETE', {
-                confirm_text: this.accountDeleteForm.confirm_text,
-                password: this.accountDeleteForm.password || ''
+                confirm_text: this.accountDeleteForm.confirm_text
             });
             if (!result.success) {
                 await this.service.modal.error(result.error?.message || result.message || "계정 삭제에 실패했습니다.");
@@ -260,6 +258,7 @@ export class Component implements OnInit {
             }
 
             this.accountDeleted = true;
+            clearAuthTokens();
             this.deleteStep = 0;
             await this.service.render();
             await this.service.sleep(1200);

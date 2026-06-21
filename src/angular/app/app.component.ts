@@ -25,6 +25,8 @@ export class AppComponent implements OnInit {
     };
     private readonly reconsentKeys: string[] = ['terms', 'privacy', 'age', 'marketing'];
     private readonly requiredReconsentKeys: string[] = ['terms', 'privacy', 'age'];
+    private readonly agreementModalBodyClass: string = 'runningmate-agreement-modal-visible';
+    private readonly agreementModalEventName: string = 'runningmate:agreement-modal';
 
     constructor(
         public service: Service,
@@ -111,7 +113,7 @@ export class AppComponent implements OnInit {
     public async checkAgreementRequirement() {
         const result = await apiFetch<any>('/api/agreements');
         if (!result.success) {
-            this.agreementModalVisible = false;
+            this.setAgreementModalVisible(false);
             return;
         }
 
@@ -123,7 +125,7 @@ export class AppComponent implements OnInit {
             marketing: !!result.data?.latest?.marketing_optin
         };
         this.reconsentAllChecked = this.allReconsentChecked;
-        this.agreementModalVisible = !!result.data?.needs_reagreement;
+        this.setAgreementModalVisible(!!result.data?.needs_reagreement);
         await this.service.render();
     }
 
@@ -159,7 +161,7 @@ export class AppComponent implements OnInit {
             });
             if (result.success) {
                 this.agreementStatus = result.data;
-                this.agreementModalVisible = false;
+                this.setAgreementModalVisible(false);
                 this.activeAgreementPolicy = '';
                 this.toast.clear();
             } else {
@@ -168,6 +170,22 @@ export class AppComponent implements OnInit {
         } finally {
             this.agreementSaving = false;
             await this.service.render();
+        }
+    }
+
+    private setAgreementModalVisible(visible: boolean): void {
+        this.agreementModalVisible = visible;
+        this.publishAgreementModalState();
+    }
+
+    private publishAgreementModalState(): void {
+        if (typeof document !== 'undefined') {
+            document.body?.classList.toggle(this.agreementModalBodyClass, this.agreementModalVisible);
+        }
+        if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+            window.dispatchEvent(new CustomEvent(this.agreementModalEventName, {
+                detail: { visible: this.agreementModalVisible }
+            }));
         }
     }
 }
