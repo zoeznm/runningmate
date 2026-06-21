@@ -3,7 +3,14 @@ import Capacitor
 import UIKit
 
 class RunningMateBridgeViewController: CAPBridgeViewController {
-    private let appBackgroundColor = UIColor(red: 18.0 / 255.0, green: 18.0 / 255.0, blue: 28.0 / 255.0, alpha: 1.0)
+    private var appBackgroundColor: UIColor {
+        UIColor { traits in
+            if traits.userInterfaceStyle == .light {
+                return UIColor(red: 247.0 / 255.0, green: 247.0 / 255.0, blue: 249.0 / 255.0, alpha: 1.0)
+            }
+            return UIColor(red: 18.0 / 255.0, green: 18.0 / 255.0, blue: 28.0 / 255.0, alpha: 1.0)
+        }
+    }
 
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
@@ -23,14 +30,20 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        applyAppBackground()
+        setNeedsStatusBarAppearanceUpdate()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        applyAppBackground()
+    }
+
+    private func applyAppBackground() {
         view.backgroundColor = appBackgroundColor
         webView?.isOpaque = false
         webView?.backgroundColor = appBackgroundColor
         webView?.scrollView.backgroundColor = appBackgroundColor
-        webView?.scrollView.contentInsetAdjustmentBehavior = .never
-        webView?.scrollView.contentInset = .zero
-        webView?.scrollView.scrollIndicatorInsets = .zero
-        setNeedsStatusBarAppearanceUpdate()
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle {

@@ -740,10 +740,28 @@ export class Component implements OnInit, OnDestroy {
         const normalized = String(provider || '').trim().toLowerCase();
         if (!['naver', 'google', 'apple'].includes(normalized)) return;
         if (isNativeLocalOrigin()) {
-            location.assign(`${RUNNINGMATE_API_ORIGIN}/api/auth/oauth/${normalized}/start?client=native`);
+            this.openNativeSocialAuth(`${RUNNINGMATE_API_ORIGIN}/api/auth/oauth/${normalized}/start?client=native`);
             return;
         }
         const url = `/api/auth/oauth/${normalized}/start`;
+        location.assign(url);
+    }
+
+    private openNativeSocialAuth(url: string) {
+        try {
+            const opened = window.open(url, '_system', 'noopener,noreferrer');
+            if (opened) return;
+        } catch { }
+        try {
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            return;
+        } catch { }
         location.assign(url);
     }
 

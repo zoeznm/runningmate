@@ -2204,3 +2204,40 @@
         min-height: 50px;
     }
 }
+
+/* Social provider icon normalization */
+.social-circle,
+.gsi-material-button,
+.access-shell--signup .social-circle,
+.access-shell--signup .gsi-material-button {
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    min-height: 46px;
+    border-radius: 50%;
+}
+
+.social-provider-img,
+.social-apple-picture,
+.social-apple-picture .social-provider-img {
+    width: 24px;
+    height: 24px;
+    border-radius: 0;
+    object-fit: contain;
+}
+
+.social-circle--naver .social-provider-img {
+    width: 26px;
+    height: 26px;
+}
+
+.gsi-material-button-content-wrapper {
+    width: 46px;
+    height: 46px;
+}
+
+.gsi-material-button-icon,
+.gsi-material-button-icon svg {
+    width: 22px;
+    height: 22px;
+}

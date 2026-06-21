@@ -143,7 +143,7 @@ class OAuth:
         return str(value or "").strip().lower() in ("native", "ios", "app", "capacitor", "1", "true")
 
     def _native_redirect_url(self, params):
-        return f"runmate://oauth/callback?{urllib.parse.urlencode(params)}"
+        return f"com.myrunningmate.run://oauth/callback?{urllib.parse.urlencode(params)}"
 
     def _error_redirect(self, message="social_login_failed", native=None):
         message = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(message or "social_login_failed"))[:80]
