@@ -1,12 +1,12 @@
-ICON_VERSION = "?v=rm-run-icon-20260522"
+ICON_VERSION = "?v=rm-main-logo-20260620"
 
 def icon(path):
     return f"{path}{ICON_VERSION}"
 
 wiz.response.json({
     "id": "/dashboard",
-    "name": "러닝메이트",
-    "short_name": "러닝메이트",
+    "name": "RunMate",
+    "short_name": "RunMate",
     "description": "러닝 기록을 모바일 홈 화면에서 앱처럼 확인합니다.",
     "lang": "ko-KR",
     "start_url": "/access",

@@ -1,47 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 180" role="img" aria-labelledby="runningmate-logo-title runningmate-logo-desc">
-  <title id="runningmate-logo-title">RunningMate logo</title>
-  <desc id="runningmate-logo-desc">러닝메이트 러너 심볼과 워드마크</desc>
-  <defs>
-    <linearGradient id="rm-mark-bg" x1="18" y1="8" x2="150" y2="156" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#161a3f"/>
-      <stop offset="1" stop-color="#08101f"/>
-    </linearGradient>
-    <linearGradient id="rm-runner" x1="40" y1="118" x2="154" y2="44" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#5ef0d0"/>
-      <stop offset="0.55" stop-color="#78f5a1"/>
-      <stop offset="1" stop-color="#b8ff35"/>
-    </linearGradient>
-    <filter id="rm-soft-glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
-      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.45 0 0 0 0 1 0 0 0 0 0.62 0 0 0 0.65 0" result="glow"/>
-      <feMerge>
-        <feMergeNode in="glow"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <clipPath id="rm-mark-clip">
-      <rect width="152" height="152" rx="36"/>
-    </clipPath>
-    <style>
-      .rm-word-overline { fill: #78d6b3; font: 900 21px SUIT, Pretendard, "Apple SD Gothic Neo", sans-serif; }
-      .rm-word-main { fill: #f8fafc; font: 900 68px SUIT, Pretendard, "Apple SD Gothic Neo", sans-serif; }
-    </style>
-  </defs>
-  <g transform="translate(18 14)">
-    <rect width="152" height="152" rx="36" fill="url(#rm-mark-bg)"/>
-    <rect x="1" y="1" width="150" height="150" rx="35" fill="none" stroke="#78d6b3" stroke-opacity="0.22" stroke-width="2"/>
-    <g clip-path="url(#rm-mark-clip)">
-      <g filter="url(#rm-soft-glow)" fill="none" stroke="url(#rm-runner)" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M40 108h35l21-29"/>
-        <path d="M65 70l22-24 31 5 18 26"/>
-        <path d="M102 86l22 21-10 35"/>
-        <path d="M122 74l18 16 22-24"/>
-      </g>
-      <circle cx="113" cy="34" r="18" fill="url(#rm-runner)" filter="url(#rm-soft-glow)"/>
-    </g>
-  </g>
-  <g transform="translate(200 38)">
-    <text class="rm-word-overline" x="0" y="0">RUNNINGMATE</text>
-    <text class="rm-word-main" x="0" y="76">러닝메이트</text>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="494 136 650 650">
+<rect x="494" y="136" width="650" height="650" fill="black"/>
+<g stroke="#24D6B5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+
+<circle cx="925" cy="265" r="52" fill="#24D6B5" stroke="none"/>
+
+<!-- 상단선: 원본처럼 더 얇고 길게 -->
+<path d="M684 436
+         C730 350, 810 330, 875 360
+         C930 385, 980 390, 1028 350"
+      stroke-width="46"/>
+
+<!-- 하단 다리 -->
+<path d="M620 676
+         C695 650, 747 604, 792 535
+         C814 501, 831 485, 874 488
+         C922 491, 970 509, 972 563
+         C974 615, 923 637, 865 648"
+      stroke-width="66"/>
+
+</g>
 </svg>

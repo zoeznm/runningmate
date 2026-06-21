@@ -1,6 +1,6 @@
 {
   "appId": "com.myrunningmate.run",
-  "appName": "러닝메이트",
+  "appName": "RunMate",
   "webDir": "bundle/www",
   "ios": {
     "contentInset": "automatic"

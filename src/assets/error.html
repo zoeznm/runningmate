@@ -15,8 +15,8 @@
       --text: #111827;
       --muted: #64748b;
       --soft: #e5edf6;
-      --brand: #74f56a;
-      --brand-strong: #1f8f3d;
+      --brand: #24d6b5;
+      --brand-strong: #0e7490;
       --shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
     }
 
@@ -60,7 +60,7 @@
       padding: calc(24px + env(safe-area-inset-top, 0px)) 24px 28px;
       color: #ffffff;
       background:
-        linear-gradient(145deg, rgba(116, 245, 106, 0.18), rgba(116, 245, 106, 0) 42%),
+        linear-gradient(145deg, rgba(36, 214, 181, 0.18), rgba(36, 214, 181, 0) 42%),
         linear-gradient(180deg, #121826 0%, #07100c 100%);
     }
 
@@ -89,14 +89,14 @@
       place-items: center;
       margin-bottom: 22px;
       border-radius: 28px;
-      background: rgba(116, 245, 106, 0.16);
+      background: rgba(36, 214, 181, 0.16);
     }
 
     .status-mark::before {
       content: "";
       width: 42px;
       height: 42px;
-      border: 10px solid rgba(116, 245, 106, 0.34);
+      border: 10px solid rgba(36, 214, 181, 0.34);
       border-top-color: var(--brand);
       border-radius: 50%;
     }
@@ -182,7 +182,7 @@
     }
 
     .button:focus-visible {
-      outline: 3px solid rgba(116, 245, 106, 0.48);
+      outline: 3px solid rgba(36, 214, 181, 0.48);
       outline-offset: 3px;
     }
 
@@ -191,9 +191,9 @@
     }
 
     .button-primary {
-      color: #07100a;
-      background: var(--brand);
-      box-shadow: 0 16px 34px rgba(31, 143, 61, 0.24);
+      color: #ffffff;
+      background: var(--brand-strong);
+      box-shadow: 0 16px 34px rgba(14, 116, 144, 0.24);
     }
 
     .button-secondary {
@@ -244,7 +244,7 @@
   <main class="app-screen" aria-labelledby="error-title">
     <section class="hero">
       <div class="brand-row">
-        <img src="/assets/brand/icon-192.png" alt="" aria-hidden="true">
+        <img src="/assets/brand/running_logo_main_app.svg?v=rm-main-logo-20260620" alt="" aria-hidden="true">
         <span>러닝메이트</span>
       </div>
       <div class="status-mark" aria-hidden="true"></div>
