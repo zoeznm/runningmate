@@ -1,5 +1,14 @@
 | 날짜 | ID | 작업 내용 | 상세 |
 |------|-----|----------|------|
+| 2026-06-20 | 007 | 설치 앱 이름 RunMate 적용 | [상세](devlog/2026-06-20/007-runmate-installed-app-name.md) |
+| 2026-06-20 | 006 | 브랜드 스플래시 및 초기 로딩 개선 | [상세](devlog/2026-06-20/006-brand-splash-initial-loading.md) |
+| 2026-06-20 | 005 | 라이트 모드 딥 청록 포인트 적용 | [상세](devlog/2026-06-20/005-light-mode-deep-teal-accent.md) |
+| 2026-06-20 | 004 | 라이트/설정 화면 잔여 초록 포인트 제거 | [상세](devlog/2026-06-20/004-light-settings-green-cleanup.md) |
+| 2026-06-20 | 003 | 콘텐츠 화면 포인트 컬러 로고 톤 반영 | [상세](devlog/2026-06-20/003-content-point-color-refresh.md) |
+| 2026-06-20 | 002 | 로그인 페이지 로고 컬러 톤 반영 | [상세](devlog/2026-06-20/002-access-logo-color-refresh.md) |
+| 2026-06-20 | 001 | 첨부 SVG 로고 전체 교체 | [상세](devlog/2026-06-20/001-replace-logo-with-attached-svg.md) |
+| 2026-06-19 | 002 | 브랜드 핵심 초록 컬러 단순화 | [상세](devlog/2026-06-19/002-brand-core-green-color.md) |
+| 2026-06-19 | 001 | 사이트 로고 제작 및 브랜드 요약/주요 컬러 정리 | [상세](devlog/2026-06-19/001-site-brand-logo-summary-colors.md) |
 | 2026-06-18 | 011 | Mac 프로젝트 Git 최신화 명령 및 한계 문서화 | [상세](devlog/2026-06-18/011-ios-mac-git-pull-source-refresh.md) |
 | 2026-06-18 | 010 | Mac Desktop 프로젝트 소스 최신화 필요 조건 문서화 | [상세](devlog/2026-06-18/010-ios-mac-source-refresh.md) |
 | 2026-06-18 | 009 | iOS sync/clean/delete와 소스 최신화 범위 구분 문서화 | [상세](devlog/2026-06-18/009-ios-sync-clean-source-refresh-scope.md) |

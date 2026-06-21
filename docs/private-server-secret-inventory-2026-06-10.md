@@ -127,19 +127,27 @@ RUNNINGMATE_AI_IMAGE_PARSE_MONTHLY_LIMIT=35
 ```env
 NAVER_CLIENT_ID=<naver_client_id>
 NAVER_CLIENT_SECRET=<naver_client_secret>
-NAVER_REDIRECT_URI=https://<personal-domain>/api/auth/naver/callback
+NAVER_REDIRECT_URI=https://<personal-domain>/access
 GOOGLE_CLIENT_ID=<google_client_id>
 GOOGLE_CLIENT_SECRET=<google_client_secret>
-GOOGLE_REDIRECT_URI=https://<personal-domain>/api/auth/google/callback
+GOOGLE_REDIRECT_URI=https://<personal-domain>/api/auth/oauth/google/callback
 ```
+
+현재 앱의 OAuth 시작 라우트는 `/api/auth/oauth/naver/start`, `/api/auth/oauth/google/start`이고,
+redirect URI는 provider 콘솔에 등록된 값과 위 값이 정확히 일치해야 한다.
+현재 운영 도메인 기준 예시는 `config-sample/oauth.env.example`에 둔다.
 
 ### `/opt/app/config/mail.env`
 
 ```env
-RUNNINGMATE_MAIL_FROM=<verified_sender_email>
+RUNNINGMATE_MAIL_DOMAIN=myrunningmate.com
+RUNNINGMATE_MAIL_FROM=no-reply@myrunningmate.com
 RUNNINGMATE_MAIL_FROM_NAME=RunningMate
 SENDGRID_API_KEY=<sendgrid_api_key>
 ```
+
+SendGrid 대신 SMTP를 쓰는 경우 `SENDGRID_API_KEY` 대신 `SMTP_HOST`, `SMTP_USERNAME`, `SMTP_PASSWORD`를 설정한다.
+운영 도메인용 상세 등록 절차는 `docs/mail-sender-setup-2026-06-15.md`에 둔다.
 
 ### `/opt/app/config/ops.env`
 

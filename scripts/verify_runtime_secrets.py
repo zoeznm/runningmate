@@ -20,11 +20,21 @@ ENV_FILES = {
     "oauth": {
         "path": SERVER_CONFIG_DIR / "oauth.env",
         "required": [
+            "RUNNINGMATE_PUBLIC_BASE_URL",
             "NAVER_CLIENT_ID",
             "NAVER_CLIENT_SECRET",
+            "NAVER_REDIRECT_URI",
             "GOOGLE_CLIENT_ID",
             "GOOGLE_CLIENT_SECRET",
+            "GOOGLE_REDIRECT_URI",
+            "APPLE_CLIENT_ID",
+            "APPLE_REDIRECT_URI",
         ],
+        "any_of": [
+            ["APPLE_CLIENT_SECRET"],
+            ["APPLE_TEAM_ID", "APPLE_KEY_ID", "APPLE_PRIVATE_KEY_PATH"],
+        ],
+        "file_keys": ["APPLE_PRIVATE_KEY_PATH"],
         "expected": {},
     },
     "mail": {
@@ -91,6 +101,12 @@ def check_env_file(name, spec):
     for key in spec.get("required", []):
         if not is_set(env_data, key):
             issues.append(f"{name}: {key} is not set")
+
+    for key in spec.get("file_keys", []):
+        value = os.environ.get(key) or env_data.get(key) or ""
+        value = value.strip().strip('"').strip("'")
+        if value and not Path(value).expanduser().exists():
+            issues.append(f"{name}: {key} points to a missing file")
 
     for group in spec.get("any_of", []):
         if all(is_set(env_data, key) for key in group):

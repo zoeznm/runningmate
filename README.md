@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="src/assets/brand/icon-512.png" width="180" alt="RunningMate app icon" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="src/assets/brand/logo-white.svg" />
+    <img src="src/assets/brand/logo-black.svg" width="360" alt="RunningMate logo" />
+  </picture>
 
   <h1>RunningMate</h1>
 
@@ -22,6 +25,7 @@
   <p>
     <a href="#빠른-시작">빠른 시작</a>
     · <a href="#기능-지도">기능 지도</a>
+    · <a href="docs/brand-summary-colors-2026-06-19.md">브랜드 요약</a>
     · <a href="#아키텍처">아키텍처</a>
     · <a href="#api-지도">API 지도</a>
     · <a href="#개인-서버-운영">개인 서버 운영</a>
