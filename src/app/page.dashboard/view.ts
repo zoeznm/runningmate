@@ -1616,6 +1616,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private initialLoadingSteps = new Map<string, string>();
     private onboardingTouchStartX: number | null = null;
     private cycleRequestSeq: number = 0;
+    private rankingRequestSeq: number = 0;
     private weatherRequestSeq: number = 0;
     private weatherRefreshTimer: number | null = null;
     private weatherPosition: WeatherPosition | null = null;
@@ -4654,19 +4655,20 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(`/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ranking_enabled: nextEnabled })
-            });
-            const payload = await response.json().catch(() => null);
-            if (!response.ok || !payload?.success) {
-                this.rankingStatus = payload?.message || '참여 설정을 저장하지 못했어.';
+            const result = await jsonRequest<any>(
+                `/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`,
+                'PATCH',
+                { ranking_enabled: nextEnabled },
+                { retries: 2, retryDelayMs: 500, timeoutMs: 12000 }
+            );
+            const payload = result.raw as any;
+            if (!result.success) {
+                this.rankingStatus = result.message || apiErrorMessage(result.error) || '참여 설정을 저장하지 못했어.';
                 return;
             }
 
             this.rankingParticipationEnabled = nextEnabled;
-            this.applyRankingPayload(payload.ranking || payload.data || payload);
+            this.applyRankingPayload(payload?.ranking || payload?.data || result.data || payload);
             this.rankingStatus = nextEnabled ? '랭킹 참여 중' : '랭킹에서 숨김';
             this.showToast(nextEnabled ? '랭킹 참여를 켰어.' : '랭킹 참여를 껐어.', 'success');
         } catch {
@@ -7907,26 +7909,32 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async loadRanking(): Promise<void> {
-        if (this.isRankingLoading) return;
-
+        const requestSeq = ++this.rankingRequestSeq;
         this.isRankingLoading = true;
         this.rankingStatus = this.rankingEntries.length ? '' : '랭킹 불러오는 중';
         this.cdr.detectChanges();
 
         try {
-            const result = await apiFetch<any>(`/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`);
+            const result = await apiFetch<any>(
+                `/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`,
+                { retries: 2, retryDelayMs: 500, timeoutMs: 12000 }
+            );
+            if (requestSeq !== this.rankingRequestSeq) return;
             if (!result.success) {
-                this.rankingStatus = result.error?.message || '랭킹을 불러오지 못했어.';
+                this.rankingStatus = result.message || apiErrorMessage(result.error) || '랭킹을 불러오지 못했어.';
                 return;
             }
 
             this.applyRankingPayload(result.data || result.raw);
             this.rankingStatus = '';
         } catch {
+            if (requestSeq !== this.rankingRequestSeq) return;
             this.rankingStatus = '인터넷 연결을 확인해줘';
         } finally {
-            this.isRankingLoading = false;
-            this.cdr.detectChanges();
+            if (requestSeq === this.rankingRequestSeq) {
+                this.isRankingLoading = false;
+                this.cdr.detectChanges();
+            }
         }
     }
 
