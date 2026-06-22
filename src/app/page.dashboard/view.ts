@@ -1615,6 +1615,7 @@ export class Component implements AfterViewInit, OnDestroy {
     ];
     private initialLoadingSteps = new Map<string, string>();
     private onboardingTouchStartX: number | null = null;
+    private cycleRequestSeq: number = 0;
     private weatherRequestSeq: number = 0;
     private weatherRefreshTimer: number | null = null;
     private weatherPosition: WeatherPosition | null = null;
@@ -5822,23 +5823,24 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles'), {
-                method: 'POST',
+            const result = await jsonRequest<any>('/api/cycles', 'POST', {
+                consent: true,
+                start_date: logDate,
+                end_date: logDate,
+                cycle_phase: 'menstrual',
+                flow_level: this.selectedCycleFlowLevel,
+                condition_emoji: this.selectedCycleConditionEmoji,
+                id: this.selectedCalendarCycleLog?.id || undefined,
+                note: this.cycleNoteText.trim()
+            }, {
                 headers: this.cycleRequestHeaders(),
-                body: JSON.stringify({
-                    consent: true,
-                    start_date: logDate,
-                    end_date: logDate,
-                    cycle_phase: 'menstrual',
-                    flow_level: this.selectedCycleFlowLevel,
-                    condition_emoji: this.selectedCycleConditionEmoji,
-                    id: this.selectedCalendarCycleLog?.id || undefined,
-                    note: this.cycleNoteText.trim()
-                })
+                retries: 2,
+                retryDelayMs: 500,
+                timeoutMs: 12000
             });
-            const payload = await response.json().catch(() => null);
-            if (!payload?.success) {
-                this.cycleStatus = payload?.message || '주기 기록을 저장하지 못했어.';
+            const payload = result.raw || result.data;
+            if (!result.success) {
+                this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 기록을 저장하지 못했어.';
                 return;
             }
 
@@ -5879,14 +5881,18 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles'), {
-                method: 'DELETE',
+            const result = await jsonRequest<any>('/api/cycles', 'DELETE', {
+                consent: true,
+                id: log.id
+            }, {
                 headers: this.cycleRequestHeaders(),
-                body: JSON.stringify({ consent: true, id: log.id })
+                retries: 2,
+                retryDelayMs: 500,
+                timeoutMs: 12000
             });
-            const payload = await response.json().catch(() => null);
-            if (!payload?.success) {
-                this.showToast(payload?.message || '주기 기록을 삭제하지 못했어.', 'error');
+            const payload = result.raw || result.data;
+            if (!result.success) {
+                this.showToast(result.message || apiErrorMessage(result.error) || '주기 기록을 삭제하지 못했어.', 'error');
                 return;
             }
 
@@ -5919,18 +5925,22 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles'), {
-                method: 'DELETE',
+            const result = await jsonRequest<any>('/api/cycles', 'DELETE', {
+                consent: true,
+                all: true
+            }, {
                 headers: this.cycleRequestHeaders(),
-                body: JSON.stringify({ consent: true, all: true })
+                retries: 2,
+                retryDelayMs: 500,
+                timeoutMs: 12000
             });
-            const payload = await response.json().catch(() => null);
-            if (!payload?.success) {
-                this.cycleStatus = payload?.message || '주기 데이터를 삭제하지 못했어.';
+            const payload = result.raw || result.data;
+            if (!result.success) {
+                this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 데이터를 삭제하지 못했어.';
                 return;
             }
 
-            this.setCycles([], payload.summary);
+            this.setCycles(this.cycleRowsFromPayload(payload) || [], this.cycleSummaryFromPayload(payload));
             this.cycleStatus = '전체 삭제됨';
             this.showToast('주기 데이터를 모두 삭제했어.', 'success');
         } catch {
@@ -7971,13 +7981,29 @@ export class Component implements AfterViewInit, OnDestroy {
             return;
         }
 
+        const requestSeq = ++this.cycleRequestSeq;
+        const result = await apiFetch<any>('/api/cycles?enabled=1', {
+            headers: this.cycleRequestHeaders(),
+            retries: 2,
+            retryDelayMs: 500,
+            timeoutMs: 12000
+        });
+        if (requestSeq !== this.cycleRequestSeq) return;
+
+        if (!result.success) {
+            if (!options.preserveStatus) {
+                if (!this.cycleLogs.length) {
+                    this.setCycles([], EMPTY_CYCLE_SUMMARY);
+                }
+                this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 데이터를 불러오지 못했어.';
+            }
+            return;
+        }
+
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles?enabled=1'), {
-                headers: this.cycleRequestHeaders()
-            });
-            const payload = await response.json();
+            const payload = result.raw || result.data;
             const rows = this.cycleRowsFromPayload(payload) || [];
-            this.setCycles(rows, payload?.summary);
+            this.setCycles(rows, this.cycleSummaryFromPayload(payload));
             if (!options.preserveStatus) {
                 this.cycleStatus = rows.length ? '' : '생리 기록 없음';
             }
@@ -7987,6 +8013,11 @@ export class Component implements AfterViewInit, OnDestroy {
                 this.cycleStatus = '주기 데이터를 불러오지 못했어.';
             }
         }
+    }
+
+    private cycleSummaryFromPayload(payload: unknown): unknown {
+        const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+        return source['summary'];
     }
 
     private cycleRowsFromPayload(payload: unknown, allowSingleDataUpsert: boolean = false): unknown[] | null {
@@ -12286,9 +12317,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private cycleRequestHeaders(): HeadersInit {
         return {
-            'Content-Type': 'application/json',
-            'X-Cycle-Consent': 'true',
-            ...authHeaderForUrl('/api/cycles')
+            'X-Cycle-Consent': 'true'
         };
     }
 
