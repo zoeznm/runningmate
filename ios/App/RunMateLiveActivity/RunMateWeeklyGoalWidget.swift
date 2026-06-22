@@ -65,72 +65,23 @@ private struct RunMateWeeklyGoalView: View {
     }
 
     private var rectangularView: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("이번 주 러닝")
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(.secondary)
-                Text("\(entry.progress.completedCount)/\(entry.progress.goalCount)")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(.primary)
-                    .minimumScaleFactor(0.8)
-            }
-
-            Spacer(minLength: 4)
-
-            RunMateGoalCircles(progress: entry.progress, size: 18, checkSize: 9, spacing: 4)
-        }
-        .padding(.vertical, 2)
+        RunMateGoalCircles(progress: entry.progress, size: 19, checkSize: 8, spacing: 5)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var circularView: some View {
         ZStack {
             AccessoryWidgetBackground()
-            VStack(spacing: 3) {
-                Text("\(entry.progress.completedCount)/\(entry.progress.goalCount)")
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .minimumScaleFactor(0.7)
-
-                RunMateGoalCircles(progress: entry.progress, size: 6, checkSize: 4, spacing: 1)
-            }
-            .padding(3)
+            RunMateGoalCircles(progress: entry.progress, size: 7, checkSize: 4, spacing: 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 6)
         }
     }
 
     private var smallView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: "figure.run")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(RunMateWeeklyGoalTheme.accent)
-                Spacer()
-                Text("\(entry.progress.completedCount)/\(entry.progress.goalCount)")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-            }
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("이번 주 러닝")
-                    .font(.headline.weight(.black))
-                    .lineLimit(1)
-                RunMateGoalCircles(progress: entry.progress, size: 21, checkSize: 10, spacing: 6)
-            }
-
-            Spacer(minLength: 0)
-
-            Text(statusText)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding()
-    }
-
-    private var statusText: String {
-        let remaining = max(0, entry.progress.goalCount - entry.progress.completedCount)
-        if remaining == 0 {
-            return "주간 목표 완료"
-        }
-        return "\(remaining)번 더 뛰면 완료"
+        RunMateGoalCircles(progress: entry.progress, size: 23, checkSize: 10, spacing: 7)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding()
     }
 }
 
