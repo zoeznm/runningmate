@@ -19,7 +19,7 @@ export class Component implements OnInit, OnDestroy {
     private tipTimer: number = 0;
 
     public ngOnInit(): void {
-        this.setNativeSafeAreaBackground('#020406').catch(() => null);
+        this.syncNativeSafeAreaBackground();
         this.startTipRotation();
     }
 
@@ -70,5 +70,13 @@ export class Component implements OnInit, OnDestroy {
         const plugin = this.nativeAuthPlugin();
         if (!plugin?.setSafeAreaBackground) return;
         await plugin.setSafeAreaBackground({ color });
+    }
+
+    private syncNativeSafeAreaBackground(): void {
+        const color = '#020406';
+        this.setNativeSafeAreaBackground(color).catch(() => null);
+        if (typeof window === 'undefined' || !isNativeLocalOrigin()) return;
+        window.setTimeout(() => this.setNativeSafeAreaBackground(color).catch(() => null), 120);
+        window.setTimeout(() => this.setNativeSafeAreaBackground(color).catch(() => null), 480);
     }
 }

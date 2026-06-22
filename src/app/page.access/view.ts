@@ -224,6 +224,10 @@ export class Component implements OnInit, OnDestroy {
             : this.accessSheetBackground;
         this.applyAccessOuterBackground(color);
         this.setNativeSafeAreaBackground(color).catch(() => null);
+        if (isNativeLocalOrigin()) {
+            window.setTimeout(() => this.setNativeSafeAreaBackground(color).catch(() => null), 120);
+            window.setTimeout(() => this.setNativeSafeAreaBackground(color).catch(() => null), 480);
+        }
     }
 
     private syncAccessViewportHeight() {

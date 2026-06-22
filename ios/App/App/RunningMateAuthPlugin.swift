@@ -24,7 +24,7 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
         }
 
         if #available(iOS 12.0, *) {
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "com.myrunningmate.run") { [weak self] callbackURL, _ in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "runmate") { [weak self] callbackURL, _ in
                 DispatchQueue.main.async {
                     self?.authSession = nil
                     guard let callbackURL = callbackURL else {
