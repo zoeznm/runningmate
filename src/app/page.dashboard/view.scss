@@ -123,6 +123,13 @@ button span {
     color-scheme: light;
 }
 
+.app-wrapper.live-run-screen-mode {
+    --dashboard-screen-bg: var(--primary-fill);
+    --screen-bg: var(--primary-fill);
+    background: var(--primary-fill);
+    background-color: var(--primary-fill);
+}
+
 .screen-page {
     display: none;
     flex: 1 1 auto;
