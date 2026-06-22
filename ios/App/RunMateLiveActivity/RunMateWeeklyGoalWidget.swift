@@ -51,14 +51,17 @@ private struct RunMateWeeklyGoalView: View {
     let entry: RunMateWeeklyGoalEntry
 
     var body: some View {
-        switch family {
-        case .accessoryCircular:
-            circularView
-        case .accessoryRectangular:
-            rectangularView
-        default:
-            smallView
+        Group {
+            switch family {
+            case .accessoryCircular:
+                circularView
+            case .accessoryRectangular:
+                rectangularView
+            default:
+                smallView
+            }
         }
+        .runMateWidgetContainerBackground(for: family)
     }
 
     private var rectangularView: some View {
@@ -120,7 +123,6 @@ private struct RunMateWeeklyGoalView: View {
                 .lineLimit(1)
         }
         .padding()
-        .runMateWidgetBackground()
     }
 
     private var statusText: String {
@@ -180,11 +182,19 @@ private enum RunMateWeeklyGoalTheme {
 
 private extension View {
     @ViewBuilder
-    func runMateWidgetBackground() -> some View {
+    func runMateWidgetContainerBackground(for family: WidgetFamily) -> some View {
         if #available(iOSApplicationExtension 17.0, *) {
-            containerBackground(RunMateWeeklyGoalTheme.background, for: .widget)
-        } else {
+            containerBackground(for: .widget) {
+                if family == .systemSmall {
+                    RunMateWeeklyGoalTheme.background
+                } else {
+                    Color.clear
+                }
+            }
+        } else if family == .systemSmall {
             background(RunMateWeeklyGoalTheme.background)
+        } else {
+            self
         }
     }
 }
