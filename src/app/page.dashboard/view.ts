@@ -1537,6 +1537,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private weatherDays = new Map<string, WeatherDay>();
     private weatherCoverage: WeatherCoverage | null = null;
     private liveRunNativePlugin: any = null;
+    private liveRunStartSequence: number = 0;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
     private deferredDashboardDataStarted: boolean = false;
@@ -6463,6 +6464,7 @@ export class Component implements AfterViewInit, OnDestroy {
             return;
         }
 
+        const startSequence = ++this.liveRunStartSequence;
         this.isLiveRunBusy = true;
         this.liveRunStatus = 'GPS와 Apple Watch 데이터를 준비하는 중';
         this.cdr.detectChanges();
@@ -6472,14 +6474,21 @@ export class Component implements AfterViewInit, OnDestroy {
                 runType: this.selectedRunType,
                 weightKg: this.currentWeightLog?.weight_kg || 60
             });
+            if (startSequence !== this.liveRunStartSequence) {
+                await this.discardNativeLiveRun(plugin).catch(() => null);
+                return;
+            }
             this.applyLiveRunMetrics(metrics);
             this.liveRunStatus = '러닝 측정 중';
         } catch (error) {
+            if (startSequence !== this.liveRunStartSequence) return;
             this.liveRunStatus = this.liveRunErrorMessage(error, '실시간 러닝을 시작하지 못했어.');
             this.showToast(this.liveRunStatus, 'error');
         } finally {
-            this.isLiveRunBusy = false;
-            this.cdr.detectChanges();
+            if (startSequence === this.liveRunStartSequence) {
+                this.isLiveRunBusy = false;
+                this.cdr.detectChanges();
+            }
         }
     }
 
@@ -6576,7 +6585,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async discardLiveRun(): Promise<void> {
-        if (!this.isLiveRunActive || this.isLiveRunSaving) return;
+        if (this.isLiveRunSaving) return;
         if (!(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
             title: '러닝 종료',
             confirmLabel: '저장 없이 종료',
@@ -6585,12 +6594,13 @@ export class Component implements AfterViewInit, OnDestroy {
         }))) return;
 
         const plugin = this.liveRunPlugin();
-        if (!plugin?.stopLiveRun) return;
+        this.liveRunStartSequence += 1;
 
         this.isLiveRunBusy = true;
+        this.liveRunStatus = '러닝 측정 취소 중';
         this.cdr.detectChanges();
         try {
-            await plugin.stopLiveRun();
+            await this.discardNativeLiveRun(plugin);
             this.liveRun = this.emptyLiveRunMetrics();
             this.liveRunStatus = '러닝 측정을 취소했어.';
             this.showToast('러닝 측정을 저장하지 않고 종료했어.', 'success');
@@ -6602,6 +6612,16 @@ export class Component implements AfterViewInit, OnDestroy {
         } finally {
             this.isLiveRunBusy = false;
             this.cdr.detectChanges();
+        }
+    }
+
+    private async discardNativeLiveRun(plugin: any): Promise<void> {
+        if (plugin?.discardLiveRun) {
+            await plugin.discardLiveRun();
+            return;
+        }
+        if (plugin?.stopLiveRun) {
+            await plugin.stopLiveRun();
         }
     }
 

@@ -17,6 +17,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         CAPPluginMethod(name: "pauseLiveRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "resumeLiveRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopLiveRun", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "discardLiveRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getLiveRunSnapshot", returnType: CAPPluginReturnPromise)
     ]
 
@@ -188,6 +189,26 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         )
         endLiveActivity(with: payload)
         notifyListeners("liveRunEnded", data: payload)
+        liveRunSession = nil
+        call.resolve(payload)
+    }
+
+    @objc func discardLiveRun(_ call: CAPPluginCall) {
+        guard let session = liveRunSession else {
+            call.resolve([
+                "active": false,
+                "status": "stopped",
+                "reason": "discarded"
+            ])
+            return
+        }
+
+        session.stop()
+        sendWatchRunCommand("stop", extra: ["runId": session.id])
+        stopLiveRunSensors()
+        let payload = liveRunPayload(for: session, reason: "discarded", ended: true)
+        endLiveActivity(with: payload)
+        notifyListeners("liveRunUpdate", data: payload)
         liveRunSession = nil
         call.resolve(payload)
     }

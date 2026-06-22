@@ -73,7 +73,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         button(
                             type="button",
                             class="live-run-cancel-action",
-                            [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunActive",
+                            [disabled]="isLiveRunSaving",
                             aria-label="저장하지 않고 러닝 종료",
                             title="저장하지 않고 러닝 종료",
                             (click)="discardLiveRun()")
