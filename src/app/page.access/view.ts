@@ -84,6 +84,8 @@ export class Component implements OnInit, OnDestroy {
     };
     private readonly accessViewportProperty: string = '--access-visual-height';
     private readonly accessViewportClass: string = 'is-access-page';
+    private readonly accessDarkBackground: string = '#020406';
+    private readonly accessSheetBackground: string = '#07110f';
     private readonly updateAccessViewportHeight = () => {
         this.syncAccessViewportHeight();
         if (!this.isAccessFormControlFocused()) this.scheduleAccessScrollReset();
@@ -123,6 +125,7 @@ export class Component implements OnInit, OnDestroy {
             this.view = 'reset';
             this.isSessionChecking = false;
             this.showAccessSplash = false;
+            this.syncAccessSafeAreaBackground();
         }
         if (!resetToken && this.forwardOAuthReturn()) return;
 
@@ -132,6 +135,7 @@ export class Component implements OnInit, OnDestroy {
             await this.waitForAccessSplashMinimum();
             this.showAccessSplash = false;
             this.isSessionChecking = false;
+            this.syncAccessSafeAreaBackground();
             await this.safeRender();
         }
         if (socialError && !resetToken) {
@@ -150,15 +154,15 @@ export class Component implements OnInit, OnDestroy {
         document.body?.classList.add(this.accessViewportClass);
         this.themeMeta = document.querySelector('meta[name="theme-color"]');
         this.previousThemeColor = this.themeMeta?.getAttribute('content') || '';
-        this.themeMeta?.setAttribute('content', '#020406');
+        this.themeMeta?.setAttribute('content', this.accessDarkBackground);
         this.appRootElement = document.querySelector('app-root');
         this.previousRootBackground = document.documentElement.style.background;
         this.previousBodyBackground = document.body?.style.background || '';
         this.previousAppRootBackground = this.appRootElement?.style.background || '';
-        document.documentElement.style.background = '#020406';
-        if (document.body) document.body.style.background = '#020406';
-        if (this.appRootElement) this.appRootElement.style.background = '#020406';
-        this.setNativeSafeAreaBackground('#020406').catch(() => null);
+        document.documentElement.style.background = this.accessDarkBackground;
+        if (document.body) document.body.style.background = this.accessDarkBackground;
+        if (this.appRootElement) this.appRootElement.style.background = this.accessDarkBackground;
+        this.syncAccessSafeAreaBackground();
         this.syncAccessViewportHeight();
         window.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
         window.addEventListener('orientationchange', this.updateAccessViewportHeight, { passive: true });
@@ -207,6 +211,13 @@ export class Component implements OnInit, OnDestroy {
         const plugin = this.nativeAuthPlugin();
         if (!plugin?.setSafeAreaBackground) return;
         await plugin.setSafeAreaBackground({ color });
+    }
+
+    private syncAccessSafeAreaBackground(): void {
+        const color = this.showAccessSplash || this.view === 'landing'
+            ? this.accessDarkBackground
+            : this.accessSheetBackground;
+        this.setNativeSafeAreaBackground(color).catch(() => null);
     }
 
     private syncAccessViewportHeight() {
@@ -460,10 +471,12 @@ export class Component implements OnInit, OnDestroy {
         this.clearNativeOAuthReturnFromUrl();
         this.showAccessSplash = true;
         this.isSessionChecking = true;
+        this.syncAccessSafeAreaBackground();
 
         if (payload.socialError) {
             this.showAccessSplash = false;
             this.isSessionChecking = false;
+            this.syncAccessSafeAreaBackground();
             await this.alert(this.socialErrorMessage(payload.socialError), 'error');
             await this.loadPolicies().catch(() => null);
             await this.safeRender();
@@ -478,6 +491,7 @@ export class Component implements OnInit, OnDestroy {
 
         this.showAccessSplash = false;
         this.isSessionChecking = false;
+        this.syncAccessSafeAreaBackground();
         clearAuthTokens();
         await this.alert('소셜 로그인 세션을 앱에 연결하지 못했습니다. 다시 시도해주세요.', 'error');
         await this.loadPolicies().catch(() => null);
@@ -706,6 +720,7 @@ export class Component implements OnInit, OnDestroy {
         this.signupStep = 1;
         this.resetData.newPassword = '';
         this.resetData.confirmPassword = '';
+        this.syncAccessSafeAreaBackground();
         await this.service.render();
         this.scheduleAccessScrollReset();
     }
@@ -724,6 +739,7 @@ export class Component implements OnInit, OnDestroy {
         this.view = 'landing';
         this.signupStep = 1;
         this.activePolicy = '';
+        this.syncAccessSafeAreaBackground();
         await this.service.render();
         this.scheduleAccessScrollReset();
     }
@@ -731,6 +747,7 @@ export class Component implements OnInit, OnDestroy {
     public async showEmailSignup() {
         this.view = 'signup';
         this.signupStep = 1;
+        this.syncAccessSafeAreaBackground();
         await this.service.render();
         this.scheduleAccessScrollReset();
     }
@@ -766,19 +783,23 @@ export class Component implements OnInit, OnDestroy {
     }
 
     private async openNativeSocialAuth(url: string): Promise<void> {
+        const plugin = this.nativeAuthPlugin();
+        if (!plugin?.openExternalAuth) {
+            await this.alert('앱 소셜 로그인 모듈이 아직 적용되지 않았습니다. 최신 앱 빌드로 다시 실행해주세요.', 'error');
+            return;
+        }
+
         try {
-            const plugin = this.nativeAuthPlugin();
-            if (plugin?.openExternalAuth) {
-                await plugin.openExternalAuth({ url });
-                return;
-            }
-        } catch { }
-        location.assign(url);
+            await plugin.openExternalAuth({ url });
+        } catch {
+            await this.alert('소셜 인증 화면을 열지 못했습니다. 앱을 다시 빌드한 뒤 시도해주세요.', 'error');
+        }
     }
 
     public async showForgotPassword() {
         this.view = 'forgot';
         this.forgotData.email = this.normalizeEmail(this.forgotData.email);
+        this.syncAccessSafeAreaBackground();
         await this.service.render();
         this.scheduleAccessScrollReset();
     }
@@ -810,6 +831,7 @@ export class Component implements OnInit, OnDestroy {
 
         this.forgotData.email = email;
         this.view = 'forgotSent';
+        this.syncAccessSafeAreaBackground();
         await this.service.render();
         this.scheduleAccessScrollReset();
     }

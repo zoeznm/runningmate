@@ -1,15 +1,18 @@
 import Capacitor
 import Foundation
+import AuthenticationServices
 import UIKit
 
 @objc(RunningMateAuthPlugin)
-class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin {
+class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPresentationContextProviding {
     let identifier = "RunningMateAuthPlugin"
     let jsName = "RunningMateAuth"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "openExternalAuth", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSafeAreaBackground", returnType: CAPPluginReturnPromise)
     ]
+
+    private var authSession: ASWebAuthenticationSession?
 
     @objc func openExternalAuth(_ call: CAPPluginCall) {
         guard let rawURL = call.getString("url"),
@@ -20,10 +23,38 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
 
+        if #available(iOS 12.0, *) {
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "com.myrunningmate.run") { [weak self] callbackURL, _ in
+                DispatchQueue.main.async {
+                    self?.authSession = nil
+                    guard let callbackURL = callbackURL else {
+                        return
+                    }
+                    if let controller = self?.bridge?.viewController as? RunningMateBridgeViewController {
+                        _ = controller.handleOAuthRedirect(callbackURL)
+                    }
+                }
+            }
+
+            if #available(iOS 13.0, *) {
+                session.presentationContextProvider = self
+                session.prefersEphemeralWebBrowserSession = false
+            }
+
+            authSession = session
+            if session.start() {
+                call.resolve(["opened": true, "mode": "authentication_session"])
+            } else {
+                authSession = nil
+                call.reject("인증 화면을 열지 못했습니다.", "open_failed")
+            }
+            return
+        }
+
         DispatchQueue.main.async {
             UIApplication.shared.open(url, options: [:]) { success in
                 if success {
-                    call.resolve(["opened": true])
+                    call.resolve(["opened": true, "mode": "external_browser"])
                 } else {
                     call.reject("인증 화면을 열지 못했습니다.", "open_failed")
                 }
@@ -39,5 +70,21 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             call.resolve()
         }
+    }
+
+    @available(iOS 12.0, *)
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        if let window = bridge?.viewController?.view.window {
+            return window
+        }
+
+        if #available(iOS 13.0, *) {
+            return UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+                .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+        }
+
+        return UIApplication.shared.keyWindow ?? ASPresentationAnchor()
     }
 }
