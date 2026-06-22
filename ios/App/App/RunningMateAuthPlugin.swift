@@ -24,15 +24,29 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
         }
 
         if #available(iOS 12.0, *) {
-            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "runmate") { [weak self] callbackURL, _ in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "runmate") { [weak self] callbackURL, error in
                 DispatchQueue.main.async {
                     self?.authSession = nil
-                    guard let callbackURL = callbackURL else {
+
+                    if let callbackURL = callbackURL {
+                        if let controller = self?.bridge?.viewController as? RunningMateBridgeViewController {
+                            _ = controller.handleOAuthRedirect(callbackURL)
+                        }
+                        call.resolve([
+                            "opened": true,
+                            "mode": "authentication_session",
+                            "callbackUrl": callbackURL.absoluteString
+                        ])
                         return
                     }
-                    if let controller = self?.bridge?.viewController as? RunningMateBridgeViewController {
-                        _ = controller.handleOAuthRedirect(callbackURL)
+
+                    if let authError = error as? ASWebAuthenticationSessionError,
+                       authError.code == .canceledLogin {
+                        call.reject("소셜 로그인이 취소되었습니다.", "auth_cancelled")
+                        return
                     }
+
+                    call.reject("소셜 인증 응답을 받지 못했습니다.", "auth_failed")
                 }
             }
 
@@ -43,7 +57,7 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
 
             authSession = session
             if session.start() {
-                call.resolve(["opened": true, "mode": "authentication_session"])
+                return
             } else {
                 authSession = nil
                 call.reject("인증 화면을 열지 못했습니다.", "open_failed")

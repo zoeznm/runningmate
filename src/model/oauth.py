@@ -183,7 +183,7 @@ class OAuth:
             "provider": provider,
         })
 
-    def _signed_state_payload(self, provider, state):
+    def _signed_state_payload_any(self, state):
         try:
             raw, signature = str(state or "").rsplit(".", 1)
             expected = hmac.new(self._state_secret().encode("utf-8"), raw.encode("ascii"), hashlib.sha256).digest()
@@ -191,7 +191,8 @@ class OAuth:
                 return None
             padding = "=" * ((4 - len(raw) % 4) % 4)
             payload = json.loads(base64.urlsafe_b64decode((raw + padding).encode("ascii")).decode("utf-8"))
-            if str(payload.get("provider") or "") != provider:
+            provider = str(payload.get("provider") or "").strip().lower()
+            if provider not in self.PROVIDERS:
                 return None
             created_at = int(payload.get("iat") or 0)
             try:
@@ -203,6 +204,14 @@ class OAuth:
             return payload
         except Exception:
             return None
+
+    def _signed_state_payload(self, provider, state):
+        payload = self._signed_state_payload_any(state)
+        if not payload:
+            return None
+        if str(payload.get("provider") or "").strip().lower() != str(provider or "").strip().lower():
+            return None
+        return payload
 
     def _verify_signed_state(self, provider, state):
         return bool(self._signed_state_payload(provider, state))
@@ -382,13 +391,17 @@ class OAuth:
         saved = self._session().get(self.STATE_KEY) or {}
         return str(saved.get("provider") or "").strip().lower()
 
-    def _callback_client(self, provider, state):
+    def _callback_client(self, provider, state, state_payload=None):
+        payload = state_payload or self._signed_state_payload(provider, state) or {}
+        client = str(payload.get("client") or "").strip().lower()
+        if client:
+            return client
+
         saved = self._session().get(self.STATE_KEY) or {}
         client = str(saved.get("client") or "").strip().lower()
         if client:
             return client
-        payload = self._signed_state_payload(provider, state) or {}
-        return str(payload.get("client") or "web").strip().lower()
+        return "web"
 
     def _token(self, config, code, state):
         data = {
@@ -486,14 +499,15 @@ class OAuth:
             pass
         request = self._request()
         request_values = request.values
-        provider = str(provider or self._saved_provider() or "").strip().lower()
+        state = str(request_values.get("state") or "").strip()
+        state_payload = self._signed_state_payload_any(state)
+        provider = str(provider or self._saved_provider() or (state_payload or {}).get("provider") or "").strip().lower()
         config = self._provider(provider)
         if not config:
             self._error_redirect("social_provider_invalid")
             return
 
-        state = str(request_values.get("state") or "").strip()
-        native_client = self._callback_client(config["provider"], state) == "native"
+        native_client = self._callback_client(config["provider"], state, state_payload) == "native"
 
         if request_values.get("error"):
             error = str(request_values.get("error") or "social_denied")

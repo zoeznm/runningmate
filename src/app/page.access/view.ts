@@ -214,8 +214,15 @@ export class Component implements OnInit, OnDestroy {
     private applyAccessOuterBackground(color: string): void {
         this.themeMeta?.setAttribute('content', color);
         document.documentElement.style.background = color;
+        document.documentElement.style.backgroundColor = color;
         if (document.body) document.body.style.background = color;
-        if (this.appRootElement) this.appRootElement.style.background = color;
+        if (document.body) document.body.style.backgroundColor = color;
+        if (this.appRootElement) {
+            this.appRootElement.style.background = color;
+            this.appRootElement.style.backgroundColor = color;
+        }
+        document.documentElement.style.setProperty('--access-native-bg', color);
+        document.body?.style.setProperty('--access-native-bg', color);
     }
 
     private syncAccessSafeAreaBackground(): void {
@@ -445,8 +452,15 @@ export class Component implements OnInit, OnDestroy {
         return true;
     }
 
-    private nativeOAuthReturnFromUrl() {
-        const params = new URLSearchParams(location.search || '');
+    private nativeOAuthReturnFromUrl(href: string = location.href) {
+        let search = location.search || '';
+        try {
+            const parsed = new URL(href);
+            search = parsed.search || '';
+        } catch {
+            search = location.search || '';
+        }
+        const params = new URLSearchParams(search);
         const socialError = params.get('social_error') || '';
         const accessToken = params.get('oauth_access_token') || '';
         const refreshToken = params.get('oauth_refresh_token') || '';
@@ -800,9 +814,33 @@ export class Component implements OnInit, OnDestroy {
         }
 
         try {
-            await plugin.openExternalAuth({ url });
-        } catch {
+            this.showAccessSplash = true;
+            this.isSessionChecking = true;
+            this.syncAccessSafeAreaBackground();
+            await this.service.render();
+            const result = await plugin.openExternalAuth({ url });
+            const callbackUrl = String(result?.callbackUrl || result?.url || '');
+            const payload = callbackUrl ? this.nativeOAuthReturnFromUrl(callbackUrl) : null;
+            if (payload) {
+                await this.consumeNativeOAuthReturn(payload);
+                return;
+            }
+
+            this.showAccessSplash = false;
+            this.isSessionChecking = false;
+            this.syncAccessSafeAreaBackground();
+            await this.alert('소셜 인증 응답을 앱에서 확인하지 못했습니다. 다시 시도해주세요.', 'error');
+            await this.safeRender();
+        } catch (error: any) {
+            this.showAccessSplash = false;
+            this.isSessionChecking = false;
+            this.syncAccessSafeAreaBackground();
+            if (error?.code === 'auth_cancelled' || error?.message?.includes('취소')) {
+                await this.safeRender();
+                return;
+            }
             await this.alert('소셜 인증 화면을 열지 못했습니다. 앱을 다시 빌드한 뒤 시도해주세요.', 'error');
+            await this.safeRender();
         }
     }
 

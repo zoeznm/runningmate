@@ -3,6 +3,7 @@
     --access-bg: #000403;
     --access-screen: #020807;
     --access-sheet: #07110f;
+    --access-native-bg: var(--access-bg);
     --access-field: #10191d;
     --access-line: rgba(36, 214, 181, 0.16);
     --access-muted: #8ea6a2;
@@ -20,7 +21,7 @@
     background:
         linear-gradient(180deg, rgba(36, 214, 181, 0.12), rgba(36, 214, 181, 0) 38%),
         linear-gradient(125deg, rgba(36, 214, 181, 0.08), rgba(36, 214, 181, 0) 46%),
-        var(--access-bg);
+        var(--access-native-bg, var(--access-bg));
     isolation: isolate;
     overscroll-behavior: none;
     touch-action: pan-y;
@@ -52,7 +53,7 @@
     background:
         linear-gradient(180deg, rgba(36, 214, 181, 0.11), rgba(36, 214, 181, 0) 35%),
         linear-gradient(122deg, rgba(36, 214, 181, 0.07), rgba(36, 214, 181, 0) 48%),
-        var(--access-bg);
+        var(--access-native-bg, var(--access-bg));
 }
 
 .access-page::before {
@@ -2240,4 +2241,13 @@
 .gsi-material-button-icon svg {
     width: 22px;
     height: 22px;
+}
+
+/* Final native sheet background override: keep iOS bottom safe area aligned with the auth sheet. */
+.access-shell--sheet,
+.access-shell--signup,
+.access-shell--reset {
+    background:
+        linear-gradient(160deg, rgba(36, 214, 181, 0.16), rgba(36, 214, 181, 0) 32%),
+        linear-gradient(180deg, #020706 0%, #020706 50%, var(--access-sheet) 76%, var(--access-sheet) 100%);
 }
