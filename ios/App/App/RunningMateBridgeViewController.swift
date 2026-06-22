@@ -3,7 +3,7 @@ import Capacitor
 import UIKit
 
 class RunningMateBridgeViewController: CAPBridgeViewController {
-    private var appBackgroundOverride: UIColor?
+    private var appBackgroundOverride: UIColor? = UIColor(red: 2.0 / 255.0, green: 4.0 / 255.0, blue: 6.0 / 255.0, alpha: 1.0)
     private var appBackgroundColor: UIColor {
         if let appBackgroundOverride = appBackgroundOverride {
             return appBackgroundOverride
@@ -45,6 +45,7 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
     }
 
     private func applyAppBackground() {
+        view.window?.backgroundColor = appBackgroundColor
         view.backgroundColor = appBackgroundColor
         webView?.isOpaque = false
         webView?.backgroundColor = appBackgroundColor

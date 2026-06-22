@@ -56,7 +56,13 @@ export class Component implements OnInit, OnDestroy {
     }
 
     private nativeAuthPlugin(): any {
-        return (window as any).Capacitor?.Plugins?.RunningMateAuth || null;
+        const capacitor = (window as any).Capacitor;
+        if (!capacitor) return null;
+        if (capacitor.Plugins?.RunningMateAuth) return capacitor.Plugins.RunningMateAuth;
+        if (typeof capacitor.registerPlugin === 'function') {
+            return capacitor.registerPlugin('RunningMateAuth');
+        }
+        return null;
     }
 
     private async setNativeSafeAreaBackground(color: string): Promise<void> {
