@@ -34,7 +34,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        if runningMateBridgeViewController(from: window?.rootViewController)?.handleOAuthRedirect(url) == true {
+        if runningMateBridgeViewController()?.handleOAuthRedirect(url) == true {
             return true
         }
 
@@ -48,6 +48,28 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
+    }
+
+    private func runningMateBridgeViewController() -> RunningMateBridgeViewController? {
+        if let bridge = runningMateBridgeViewController(from: window?.rootViewController) {
+            return bridge
+        }
+
+        if #available(iOS 13.0, *) {
+            for scene in UIApplication.shared.connectedScenes {
+                guard let windowScene = scene as? UIWindowScene else { continue }
+                let windows = windowScene.windows.sorted { left, right in
+                    left.isKeyWindow && !right.isKeyWindow
+                }
+                for window in windows {
+                    if let bridge = runningMateBridgeViewController(from: window.rootViewController) {
+                        return bridge
+                    }
+                }
+            }
+        }
+
+        return nil
     }
 
     private func runningMateBridgeViewController(from controller: UIViewController?) -> RunningMateBridgeViewController? {

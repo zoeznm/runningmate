@@ -159,9 +159,7 @@ export class Component implements OnInit, OnDestroy {
         this.previousRootBackground = document.documentElement.style.background;
         this.previousBodyBackground = document.body?.style.background || '';
         this.previousAppRootBackground = this.appRootElement?.style.background || '';
-        document.documentElement.style.background = this.accessDarkBackground;
-        if (document.body) document.body.style.background = this.accessDarkBackground;
-        if (this.appRootElement) this.appRootElement.style.background = this.accessDarkBackground;
+        this.applyAccessOuterBackground(this.accessDarkBackground);
         this.syncAccessSafeAreaBackground();
         this.syncAccessViewportHeight();
         window.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
@@ -213,10 +211,18 @@ export class Component implements OnInit, OnDestroy {
         await plugin.setSafeAreaBackground({ color });
     }
 
+    private applyAccessOuterBackground(color: string): void {
+        this.themeMeta?.setAttribute('content', color);
+        document.documentElement.style.background = color;
+        if (document.body) document.body.style.background = color;
+        if (this.appRootElement) this.appRootElement.style.background = color;
+    }
+
     private syncAccessSafeAreaBackground(): void {
         const color = this.showAccessSplash || this.view === 'landing'
             ? this.accessDarkBackground
             : this.accessSheetBackground;
+        this.applyAccessOuterBackground(color);
         this.setNativeSafeAreaBackground(color).catch(() => null);
     }
 

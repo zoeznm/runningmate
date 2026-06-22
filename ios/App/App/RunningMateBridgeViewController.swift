@@ -79,18 +79,28 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
         }
 
         let source = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        var target = URLComponents()
-        target.scheme = "capacitor"
-        target.host = "localhost"
-        target.path = "/access"
-        target.percentEncodedQuery = source?.percentEncodedQuery
-
-        guard let targetURL = target.url else {
-            return false
-        }
+        let query = source?.percentEncodedQuery ?? ""
+        let accessPath = query.isEmpty ? "/access" : "/access?\(query)"
+        let escapedPath = accessPath
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
 
         DispatchQueue.main.async { [weak self] in
-            self?.webView?.load(URLRequest(url: targetURL))
+            guard let self = self else { return }
+            self.setAppBackgroundColor("#020406")
+            self.webView?.evaluateJavaScript("window.location.replace('\(escapedPath)')") { [weak self] _, error in
+                guard let self = self, error != nil else { return }
+
+                var target = URLComponents()
+                target.scheme = "capacitor"
+                target.host = "localhost"
+                target.path = "/access"
+                target.percentEncodedQuery = source?.percentEncodedQuery
+
+                if let targetURL = target.url {
+                    self.webView?.load(URLRequest(url: targetURL))
+                }
+            }
         }
         return true
     }
