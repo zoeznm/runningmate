@@ -4,6 +4,7 @@ import UIKit
 
 class RunningMateBridgeViewController: CAPBridgeViewController {
     private var appBackgroundOverride: UIColor? = UIColor(red: 7.0 / 255.0, green: 17.0 / 255.0, blue: 15.0 / 255.0, alpha: 1.0)
+    private var appBackgroundPrefersDarkStatusBarText: Bool = false
     private var appBackgroundColor: UIColor {
         if let appBackgroundOverride = appBackgroundOverride {
             return appBackgroundOverride
@@ -56,6 +57,10 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
 
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
+        if appBackgroundOverride == nil {
+            appBackgroundPrefersDarkStatusBarText = traitCollection.userInterfaceStyle == .light
+            setNeedsStatusBarAppearanceUpdate()
+        }
         applyAppBackground()
     }
 
@@ -70,14 +75,17 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
     func setAppBackgroundColor(_ hexString: String) {
         if let color = UIColor(runningMateHexString: hexString) {
             appBackgroundOverride = color
+            appBackgroundPrefersDarkStatusBarText = color.runningMatePrefersDarkStatusBarText
         } else {
             appBackgroundOverride = nil
+            appBackgroundPrefersDarkStatusBarText = traitCollection.userInterfaceStyle == .light
         }
         applyAppBackground()
+        setNeedsStatusBarAppearanceUpdate()
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        .lightContent
+        appBackgroundPrefersDarkStatusBarText ? .darkContent : .lightContent
     }
 
     override func capacitorDidLoad() {
@@ -135,5 +143,19 @@ private extension UIColor {
         let green = CGFloat((value & 0x00FF00) >> 8) / 255.0
         let blue = CGFloat(value & 0x0000FF) / 255.0
         self.init(red: red, green: green, blue: blue, alpha: 1.0)
+    }
+
+    var runningMatePrefersDarkStatusBarText: Bool {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return false
+        }
+
+        let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+        return luminance > 0.72
     }
 }

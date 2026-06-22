@@ -5,6 +5,7 @@
     display: block;
     min-height: var(--dashboard-viewport-height);
     background: var(--dashboard-screen-bg);
+    background-color: var(--dashboard-screen-bg);
     font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow-wrap: normal;
     word-break: keep-all;
@@ -49,7 +50,9 @@ button span {
     min-height: var(--dashboard-viewport-height);
     margin: 0 auto;
     padding: 1rem 0;
-    background: var(--screen-bg, transparent);
+    background: var(--screen-bg, var(--dashboard-screen-bg));
+    background-color: var(--screen-bg, var(--dashboard-screen-bg));
+    color: var(--text);
 }
 
 .phone-frame {
@@ -61,6 +64,8 @@ button span {
     overflow: hidden;
     border: 0.5px solid;
     border-radius: 36px;
+    background: var(--screen-bg, var(--dashboard-screen-bg));
+    background-color: var(--screen-bg, var(--dashboard-screen-bg));
 }
 
 .dark-screen {
@@ -82,6 +87,8 @@ button span {
     --bar-muted: rgba(36, 214, 181, 0.28);
     border-color: rgba(255, 255, 255, 0.08);
     background: #12121c;
+    background-color: #12121c;
+    color-scheme: dark;
 }
 
 .light-screen {
@@ -103,6 +110,8 @@ button span {
     --bar-muted: #b9f6ec;
     border-color: rgba(0, 0, 0, 0.08);
     background: #f7f7f9;
+    background-color: #f7f7f9;
+    color-scheme: light;
 }
 
 .screen-page {
@@ -11138,13 +11147,20 @@ button span {
     color: var(--primary-ink);
 }
 
-@media (max-width: 520px) {
+@media (max-width: 520px), (max-height: 520px) and (hover: none) and (pointer: coarse) {
     :host {
+        --dashboard-mobile-safe-top: env(safe-area-inset-top, 0px);
         --dashboard-mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
-        --dashboard-mobile-nav-bottom-padding: 0px;
-        --dashboard-mobile-nav-height: 62px;
-        --dashboard-mobile-content-bottom-padding: calc(var(--dashboard-mobile-nav-height) + 32px);
-        --dashboard-mobile-chat-bottom-padding: calc(var(--dashboard-mobile-nav-height) + 20px);
+        --dashboard-mobile-safe-left: env(safe-area-inset-left, 0px);
+        --dashboard-mobile-safe-right: env(safe-area-inset-right, 0px);
+        --dashboard-mobile-top-padding: max(28px, calc(var(--dashboard-mobile-safe-top) + 8px));
+        --dashboard-mobile-inline-start: max(16px, var(--dashboard-mobile-safe-left));
+        --dashboard-mobile-inline-end: max(16px, var(--dashboard-mobile-safe-right));
+        --dashboard-mobile-nav-content-height: 58px;
+        --dashboard-mobile-nav-bottom-padding: max(6px, var(--dashboard-mobile-safe-bottom));
+        --dashboard-mobile-nav-height: calc(var(--dashboard-mobile-nav-content-height) + var(--dashboard-mobile-nav-bottom-padding));
+        --dashboard-mobile-content-bottom-padding: calc(var(--dashboard-mobile-nav-height) + 24px);
+        --dashboard-mobile-chat-bottom-padding: calc(var(--dashboard-mobile-nav-height) + 16px);
 
         position: fixed;
         inset: 0;
@@ -11153,6 +11169,7 @@ button span {
         min-height: var(--dashboard-viewport-height);
         overflow: hidden;
         background: var(--dashboard-screen-bg);
+        background-color: var(--dashboard-screen-bg);
     }
 
     .app-wrapper {
@@ -11163,6 +11180,7 @@ button span {
         margin: 0;
         padding: 0;
         background: var(--screen-bg);
+        background-color: var(--screen-bg);
         overflow: hidden;
     }
 
@@ -11173,10 +11191,12 @@ button span {
         min-height: var(--dashboard-viewport-height);
         border: 0;
         border-radius: 0;
+        background: var(--screen-bg);
+        background-color: var(--screen-bg);
     }
 
     .screen-page {
-        padding-top: 18px;
+        padding-top: var(--dashboard-mobile-top-padding);
     }
 
     .screen-page.active {
@@ -11185,8 +11205,16 @@ button span {
         overscroll-behavior: contain;
     }
 
+    .dashboard-error-overlay {
+        inset:
+            var(--dashboard-mobile-top-padding)
+            var(--dashboard-mobile-inline-end)
+            var(--dashboard-mobile-content-bottom-padding)
+            var(--dashboard-mobile-inline-start);
+    }
+
     .profile-social-page {
-        padding-top: 18px;
+        padding-top: var(--dashboard-mobile-top-padding);
     }
 
     .nav-bar {
@@ -11197,6 +11225,7 @@ button span {
         left: 0;
         flex: none;
         width: 100%;
+        height: var(--dashboard-mobile-nav-height);
         min-height: var(--dashboard-mobile-nav-height);
         transform: translateZ(0);
         padding-top: 4px;
@@ -11204,11 +11233,13 @@ button span {
         padding-bottom: var(--dashboard-mobile-nav-bottom-padding);
         padding-left: env(safe-area-inset-left, 0px);
         background: var(--screen-bg);
+        background-color: var(--screen-bg);
         z-index: 100;
     }
 
     .nav-item {
-        min-height: 50px;
+        min-height: calc(var(--dashboard-mobile-nav-content-height) - 4px);
+        transform: translateY(2px);
     }
 
     .home-content,
@@ -11223,13 +11254,17 @@ button span {
     .gallery-content,
     .profile-content,
     .settings-content {
+        padding-right: var(--dashboard-mobile-inline-end);
         padding-bottom: var(--dashboard-mobile-content-bottom-padding);
+        padding-left: var(--dashboard-mobile-inline-start);
         scroll-padding-bottom: var(--dashboard-mobile-content-bottom-padding);
         -webkit-overflow-scrolling: touch;
     }
 
     .chart-scroll {
+        padding-right: var(--dashboard-mobile-inline-end);
         padding-bottom: var(--dashboard-mobile-content-bottom-padding);
+        padding-left: var(--dashboard-mobile-inline-start);
         -webkit-overflow-scrolling: touch;
     }
 
@@ -11237,10 +11272,46 @@ button span {
         padding-bottom: var(--dashboard-mobile-chat-bottom-padding);
     }
 
-    .chat-history-panel {
-        width: min(320px, 84%);
-        padding-top: calc(18px + env(safe-area-inset-top, 0px));
-        padding-bottom: var(--dashboard-mobile-content-bottom-padding);
+    .chat-header,
+    .chat-quota-banner,
+    .chat-messages,
+    .chat-input-row {
+        padding-right: var(--dashboard-mobile-inline-end);
+        padding-left: var(--dashboard-mobile-inline-start);
     }
 
+    .chat-history-panel {
+        width: min(320px, 84%);
+        padding-top: var(--dashboard-mobile-top-padding);
+        padding-right: var(--dashboard-mobile-inline-end);
+        padding-bottom: var(--dashboard-mobile-content-bottom-padding);
+        padding-left: var(--dashboard-mobile-inline-start);
+    }
+
+    .profile-page-head {
+        padding-right: var(--dashboard-mobile-inline-end);
+        padding-left: var(--dashboard-mobile-inline-start);
+    }
+
+    .profile-page-tab-row {
+        margin-right: var(--dashboard-mobile-inline-end);
+        margin-left: var(--dashboard-mobile-inline-start);
+    }
+
+    .profile-page-body {
+        padding-right: var(--dashboard-mobile-inline-end);
+        padding-bottom: var(--dashboard-mobile-content-bottom-padding);
+        padding-left: var(--dashboard-mobile-inline-start);
+        scroll-padding-bottom: var(--dashboard-mobile-content-bottom-padding);
+    }
+
+}
+
+@media (max-width: 520px) and (max-height: 700px), (max-height: 460px) and (hover: none) and (pointer: coarse) {
+    :host {
+        --dashboard-mobile-top-padding: max(24px, calc(var(--dashboard-mobile-safe-top) + 6px));
+        --dashboard-mobile-nav-content-height: 54px;
+        --dashboard-mobile-content-bottom-padding: calc(var(--dashboard-mobile-nav-height) + 18px);
+        --dashboard-mobile-chat-bottom-padding: calc(var(--dashboard-mobile-nav-height) + 12px);
+    }
 }

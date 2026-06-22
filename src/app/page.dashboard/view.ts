@@ -1586,15 +1586,31 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly dashboardViewportClass: string = 'is-dashboard-page';
     private readonly dashboardViewportProperty: string = '--dashboard-visual-height';
     private readonly dashboardScreenBgProperty: string = '--dashboard-screen-bg';
+    private readonly appShellBgProperty: string = '--app-shell-bg';
+    private readonly appShellTextProperty: string = '--app-shell-text';
+    private readonly dashboardDarkBackground: string = '#12121c';
+    private readonly dashboardLightBackground: string = '#f7f7f9';
+    private readonly dashboardDarkTextColor: string = '#e8e8f0';
+    private readonly dashboardLightTextColor: string = '#1a1a2e';
     private dashboardThemeMeta: HTMLMetaElement | null = null;
     private dashboardAppRootElement: HTMLElement | null = null;
+    private dashboardChromeSyncTimers: number[] = [];
     private previousDashboardThemeColor: string = '';
     private previousRootBackground: string = '';
     private previousBodyBackground: string = '';
     private previousAppRootBackground: string = '';
+    private previousRootBackgroundColor: string = '';
+    private previousBodyBackgroundColor: string = '';
+    private previousAppRootBackgroundColor: string = '';
     private previousRootScreenBg: string = '';
     private previousBodyScreenBg: string = '';
     private previousAppRootScreenBg: string = '';
+    private previousRootShellBg: string = '';
+    private previousBodyShellBg: string = '';
+    private previousAppRootShellBg: string = '';
+    private previousRootShellText: string = '';
+    private previousBodyShellText: string = '';
+    private previousAppRootShellText: string = '';
     private readonly updateDashboardViewportHeight = (): void => {
         this.syncDashboardViewportHeight();
     };
@@ -11760,9 +11776,18 @@ export class Component implements AfterViewInit, OnDestroy {
         this.previousRootBackground = root.style.background;
         this.previousBodyBackground = body?.style.background || '';
         this.previousAppRootBackground = this.dashboardAppRootElement?.style.background || '';
+        this.previousRootBackgroundColor = root.style.backgroundColor;
+        this.previousBodyBackgroundColor = body?.style.backgroundColor || '';
+        this.previousAppRootBackgroundColor = this.dashboardAppRootElement?.style.backgroundColor || '';
         this.previousRootScreenBg = root.style.getPropertyValue(this.dashboardScreenBgProperty);
         this.previousBodyScreenBg = body?.style.getPropertyValue(this.dashboardScreenBgProperty) || '';
         this.previousAppRootScreenBg = this.dashboardAppRootElement?.style.getPropertyValue(this.dashboardScreenBgProperty) || '';
+        this.previousRootShellBg = root.style.getPropertyValue(this.appShellBgProperty);
+        this.previousBodyShellBg = body?.style.getPropertyValue(this.appShellBgProperty) || '';
+        this.previousAppRootShellBg = this.dashboardAppRootElement?.style.getPropertyValue(this.appShellBgProperty) || '';
+        this.previousRootShellText = root.style.getPropertyValue(this.appShellTextProperty);
+        this.previousBodyShellText = body?.style.getPropertyValue(this.appShellTextProperty) || '';
+        this.previousAppRootShellText = this.dashboardAppRootElement?.style.getPropertyValue(this.appShellTextProperty) || '';
 
         root.classList.add(this.dashboardViewportClass);
         body?.classList.add(this.dashboardViewportClass);
@@ -11783,6 +11808,7 @@ export class Component implements AfterViewInit, OnDestroy {
         window.removeEventListener('orientationchange', this.updateDashboardViewportHeight);
         window.visualViewport?.removeEventListener('resize', this.updateDashboardViewportHeight);
         window.visualViewport?.removeEventListener('scroll', this.updateDashboardViewportHeight);
+        this.clearDashboardChromeSyncTimers();
 
         const root = document.documentElement;
         const body = document.body;
@@ -11795,12 +11821,27 @@ export class Component implements AfterViewInit, OnDestroy {
             this.dashboardThemeMeta.setAttribute('content', this.previousDashboardThemeColor);
         }
         root.style.background = this.previousRootBackground;
+        root.style.backgroundColor = this.previousRootBackgroundColor;
         if (body) body.style.background = this.previousBodyBackground;
-        if (this.dashboardAppRootElement) this.dashboardAppRootElement.style.background = this.previousAppRootBackground;
+        if (body) body.style.backgroundColor = this.previousBodyBackgroundColor;
+        if (this.dashboardAppRootElement) {
+            this.dashboardAppRootElement.style.background = this.previousAppRootBackground;
+            this.dashboardAppRootElement.style.backgroundColor = this.previousAppRootBackgroundColor;
+        }
         this.restoreStyleProperty(root, this.dashboardScreenBgProperty, this.previousRootScreenBg);
         if (body) this.restoreStyleProperty(body, this.dashboardScreenBgProperty, this.previousBodyScreenBg);
         if (this.dashboardAppRootElement) {
             this.restoreStyleProperty(this.dashboardAppRootElement, this.dashboardScreenBgProperty, this.previousAppRootScreenBg);
+        }
+        this.restoreStyleProperty(root, this.appShellBgProperty, this.previousRootShellBg);
+        this.restoreStyleProperty(root, this.appShellTextProperty, this.previousRootShellText);
+        if (body) {
+            this.restoreStyleProperty(body, this.appShellBgProperty, this.previousBodyShellBg);
+            this.restoreStyleProperty(body, this.appShellTextProperty, this.previousBodyShellText);
+        }
+        if (this.dashboardAppRootElement) {
+            this.restoreStyleProperty(this.dashboardAppRootElement, this.appShellBgProperty, this.previousAppRootShellBg);
+            this.restoreStyleProperty(this.dashboardAppRootElement, this.appShellTextProperty, this.previousAppRootShellText);
         }
         this.dashboardThemeMeta = null;
         this.dashboardAppRootElement = null;
@@ -11810,20 +11851,52 @@ export class Component implements AfterViewInit, OnDestroy {
         if (typeof document === 'undefined') return;
 
         const color = this.dashboardScreenBackground();
+        const textColor = this.dashboardShellTextColor();
+        this.applyDashboardChrome(color, textColor);
+        this.queueNativeDashboardChromeSync(color);
+    }
+
+    private applyDashboardChrome(color: string, textColor: string): void {
+        if (typeof document === 'undefined') return;
+
         const root = document.documentElement;
         const body = document.body;
-        root.style.setProperty(this.dashboardScreenBgProperty, color);
-        root.style.background = color;
-        if (body) {
-            body.style.setProperty(this.dashboardScreenBgProperty, color);
-            body.style.background = color;
-        }
-        if (this.dashboardAppRootElement) {
-            this.dashboardAppRootElement.style.setProperty(this.dashboardScreenBgProperty, color);
-            this.dashboardAppRootElement.style.background = color;
-        }
+        this.applyDashboardChromeElement(root, color, textColor);
+        if (body) this.applyDashboardChromeElement(body, color, textColor);
+        if (this.dashboardAppRootElement) this.applyDashboardChromeElement(this.dashboardAppRootElement, color, textColor);
         this.dashboardThemeMeta?.setAttribute('content', color);
+    }
+
+    private applyDashboardChromeElement(element: HTMLElement, color: string, textColor: string): void {
+        element.style.setProperty(this.dashboardScreenBgProperty, color);
+        element.style.setProperty(this.appShellBgProperty, color);
+        element.style.setProperty(this.appShellTextProperty, textColor);
+        element.style.background = color;
+        element.style.backgroundColor = color;
+    }
+
+    private queueNativeDashboardChromeSync(color: string): void {
+        this.clearDashboardChromeSyncTimers();
         this.setNativeSafeAreaBackground(color).catch(() => null);
+
+        if (typeof window === 'undefined' || !isNativeLocalOrigin()) return;
+
+        this.dashboardChromeSyncTimers = [120, 480, 1000].map((delay) => window.setTimeout(() => {
+            const nextColor = this.dashboardScreenBackground();
+            const nextTextColor = this.dashboardShellTextColor();
+            this.applyDashboardChrome(nextColor, nextTextColor);
+            this.setNativeSafeAreaBackground(nextColor).catch(() => null);
+        }, delay));
+    }
+
+    private clearDashboardChromeSyncTimers(): void {
+        if (typeof window === 'undefined') {
+            this.dashboardChromeSyncTimers = [];
+            return;
+        }
+
+        this.dashboardChromeSyncTimers.forEach((timer) => window.clearTimeout(timer));
+        this.dashboardChromeSyncTimers = [];
     }
 
     private nativeAuthPlugin(): any {
@@ -11860,7 +11933,11 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardScreenBackground(): string {
-        return this.isDark ? '#12121c' : '#f7f7f9';
+        return this.isDark ? this.dashboardDarkBackground : this.dashboardLightBackground;
+    }
+
+    private dashboardShellTextColor(): string {
+        return this.isDark ? this.dashboardDarkTextColor : this.dashboardLightTextColor;
     }
 
     private restoreStyleProperty(element: HTMLElement, property: string, value: string): void {
