@@ -14,6 +14,21 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         img(*ngIf="homeProfileImage", [src]="homeProfileImage", [attr.alt]="profileNameText")
                         span(*ngIf="!homeProfileImage") {{homeAvatarText}}
 
+                button(
+                    type="button",
+                    class="home-live-run-button",
+                    [class.active]="isLiveRunActive",
+                    [class.paused]="isLiveRunPaused",
+                    [disabled]="isLiveRunBusy || isLiveRunSaving",
+                    (click)="openLiveRunScreen()")
+                    span(class="home-live-run-icon")
+                        i(class="fa-solid", [ngClass]="isLiveRunBusy ? 'fa-spinner' : isLiveRunActive ? 'fa-chart-line' : 'fa-play'", aria-hidden="true")
+                    span(class="home-live-run-copy")
+                        span(class="home-live-run-eyebrow") 실시간 러닝
+                        strong {{homeLiveRunButtonText}}
+                    span(class="home-live-run-arrow", aria-hidden="true")
+                        i(class="fa-solid fa-chevron-right")
+
                 div(class="month-total-card")
                     div(class="month-label") 이번달 총 거리
                     div(class="month-km")
@@ -50,6 +65,65 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     div(class="home-weight-goal-side")
                         div(class="stat-label") 감량 필요
                         div(class="home-weight-goal-value") {{weightGoalRemainingText}}
+
+        div(class="screen-page", [class.active]="activeScreen === 'live-run'", id="screen-live-run")
+            div(class="live-run-page-content")
+                div(class="live-run-page-head")
+                    button(type="button", class="live-run-back-btn", aria-label="홈으로 돌아가기", title="홈으로 돌아가기", (click)="setScreen('home')")
+                        i(class="fa-solid fa-chevron-left", aria-hidden="true")
+                    div
+                        div(class="live-run-page-title") 실시간 러닝
+                        div(class="live-run-page-status") {{liveRunStatus}}
+                    div(class="live-run-chip", [class.running]="liveRun.status === 'running'", [class.paused]="liveRun.status === 'paused'")
+                        i(class="fa-solid", [ngClass]="liveRun.status === 'running' ? 'fa-satellite-dish' : liveRun.status === 'paused' ? 'fa-pause' : 'fa-location-arrow'", aria-hidden="true")
+                        span {{liveRun.status === 'running' ? '측정 중' : liveRun.status === 'paused' ? '일시정지' : '대기'}}
+
+                section(class="live-run-focus-panel", [class.active]="isLiveRunActive", [class.paused]="isLiveRunPaused")
+                    div(class="live-run-distance-focus")
+                        span 거리
+                        strong {{liveRunDistanceText}}
+                    div(class="live-run-detail-grid")
+                        div(class="live-run-detail-metric")
+                            span 현재 페이스
+                            strong {{liveRunCurrentPaceText}}
+                        div(class="live-run-detail-metric")
+                            span 평균 페이스
+                            strong {{liveRunPaceText}}
+                        div(class="live-run-detail-metric")
+                            span 심박수
+                            strong {{liveRunHeartRateText}}
+                        div(class="live-run-detail-metric")
+                            span 시간
+                            strong {{liveRunElapsedText}}
+                        div(class="live-run-detail-metric")
+                            span 케이던스
+                            strong {{liveRunCadenceText}}
+
+                div(class="live-run-actions live-run-page-actions")
+                    button(
+                        type="button",
+                        class="live-run-primary",
+                        [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunSupported",
+                        (click)="isLiveRunActive ? toggleLiveRunPause() : startLiveRun()")
+                        i(class="fa-solid", [ngClass]="isLiveRunBusy ? 'fa-spinner' : liveRunPrimaryIcon", aria-hidden="true")
+                        span {{isLiveRunBusy ? '준비 중' : liveRunPrimaryText}}
+                    button(
+                        *ngIf="isLiveRunActive",
+                        type="button",
+                        class="live-run-finish",
+                        [disabled]="isLiveRunBusy || isLiveRunSaving",
+                        (click)="finishLiveRun()")
+                        i(class="fa-solid", [ngClass]="isLiveRunSaving ? 'fa-spinner' : 'fa-flag-checkered'", aria-hidden="true")
+                        span {{isLiveRunSaving ? '저장 중' : '종료 저장'}}
+                    button(
+                        *ngIf="isLiveRunActive",
+                        type="button",
+                        class="live-run-discard",
+                        [disabled]="isLiveRunBusy || isLiveRunSaving",
+                        aria-label="러닝 측정 취소",
+                        title="러닝 측정 취소",
+                        (click)="discardLiveRun()")
+                        i(class="fa-solid fa-xmark", aria-hidden="true")
 
         div(class="screen-page", [class.active]="activeScreen === 'goals'", id="screen-goals")
             div(class="goals-content")
@@ -874,60 +948,6 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         (click)="setScreen(item.id)")
                         i(class="fa-solid", [ngClass]="item.icon", aria-hidden="true")
                         span {{item.label}}
-
-                section(class="live-run-card", [class.active]="isLiveRunActive", [class.paused]="isLiveRunPaused")
-                    div(class="live-run-top")
-                        div
-                            div(class="live-run-title") 실시간 러닝
-                            div(class="live-run-status") {{liveRunStatus}}
-                        div(class="live-run-chip", [class.running]="liveRun.status === 'running'", [class.paused]="liveRun.status === 'paused'")
-                            i(class="fa-solid", [ngClass]="liveRun.status === 'running' ? 'fa-satellite-dish' : liveRun.status === 'paused' ? 'fa-pause' : 'fa-location-arrow'", aria-hidden="true")
-                            span {{liveRun.status === 'running' ? '측정 중' : liveRun.status === 'paused' ? '일시정지' : '대기'}}
-                    div(class="live-run-hero")
-                        div(class="live-run-distance")
-                            span 거리
-                            strong {{liveRunDistanceText}}
-                        div(class="live-run-time")
-                            span 시간
-                            strong {{liveRunElapsedText}}
-                    div(class="live-run-metrics")
-                        div(class="live-run-metric")
-                            span 페이스
-                            strong {{liveRunPaceText}}
-                        div(class="live-run-metric")
-                            span 심박수
-                            strong {{liveRunHeartRateText}}
-                        div(class="live-run-metric")
-                            span 케이던스
-                            strong {{liveRunCadenceText}}
-                        div(class="live-run-metric")
-                            span 칼로리
-                            strong {{liveRunCaloriesText}}
-                    div(class="live-run-actions")
-                        button(
-                            type="button",
-                            class="live-run-primary",
-                            [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunSupported",
-                            (click)="isLiveRunActive ? toggleLiveRunPause() : startLiveRun()")
-                            i(class="fa-solid", [ngClass]="isLiveRunBusy ? 'fa-spinner' : liveRunPrimaryIcon", aria-hidden="true")
-                            span {{isLiveRunBusy ? '준비 중' : liveRunPrimaryText}}
-                        button(
-                            *ngIf="isLiveRunActive",
-                            type="button",
-                            class="live-run-finish",
-                            [disabled]="isLiveRunBusy || isLiveRunSaving",
-                            (click)="finishLiveRun()")
-                            i(class="fa-solid", [ngClass]="isLiveRunSaving ? 'fa-spinner' : 'fa-flag-checkered'", aria-hidden="true")
-                            span {{isLiveRunSaving ? '저장 중' : '종료 저장'}}
-                        button(
-                            *ngIf="isLiveRunActive",
-                            type="button",
-                            class="live-run-discard",
-                            [disabled]="isLiveRunBusy || isLiveRunSaving",
-                            aria-label="러닝 측정 취소",
-                            title="러닝 측정 취소",
-                            (click)="discardLiveRun()")
-                            i(class="fa-solid fa-xmark", aria-hidden="true")
 
                 div(class="legend-row")
                     div(class="legend-item")

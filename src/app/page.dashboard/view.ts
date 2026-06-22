@@ -5,7 +5,7 @@ import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/
 import { ToastService } from 'src/app/shared/toast.service';
 import { PredictionEngine, type HistoryInput } from 'cyclia';
 
-type ScreenKey = 'home' | 'goals' | 'challenges' | 'feed' | 'friends' | 'ranking' | 'achievements' | 'calendar' | 'weight' | 'chart' | 'gallery' | 'chat' | 'ai-settings' | 'settings' | 'profile';
+type ScreenKey = 'home' | 'live-run' | 'goals' | 'challenges' | 'feed' | 'friends' | 'ranking' | 'achievements' | 'calendar' | 'weight' | 'chart' | 'gallery' | 'chat' | 'ai-settings' | 'settings' | 'profile';
 type OnboardingStepKey = 'welcome' | 'menu-record' | 'menu-goal' | 'menu-community' | 'menu-ai' | 'menu-settings' | 'profile' | 'goal' | 'complete';
 type CalendarStatus = 'run' | 'rest' | 'no-run' | 'today' | 'future';
 type WeatherTone = 'sunny' | 'cloud' | 'rain' | 'snow' | 'mixed';
@@ -868,6 +868,7 @@ interface LiveRunMetrics {
     distance_km: number;
     duration: string;
     duration_seconds: number;
+    current_pace?: string | null;
     avg_pace: string;
     calories: number;
     heart_rate?: number | null;
@@ -1880,6 +1881,7 @@ export class Component implements AfterViewInit, OnDestroy {
     ];
 
     private readonly navActiveGroups: Partial<Record<ScreenKey, ScreenKey[]>> = {
+        home: ['home', 'live-run'],
         calendar: ['calendar', 'weight', 'chart', 'gallery'],
         goals: ['goals', 'challenges', 'achievements'],
         feed: ['feed', 'friends', 'ranking', 'profile'],
@@ -1888,6 +1890,7 @@ export class Component implements AfterViewInit, OnDestroy {
     };
     private readonly routeScreenMap: Record<string, ScreenKey> = {
         home: 'home',
+        'live-run': 'live-run',
         calendar: 'calendar',
         goals: 'goals',
         feed: 'feed',
@@ -6033,6 +6036,7 @@ export class Component implements AfterViewInit, OnDestroy {
             distance_km: 0,
             duration: '00:00:00',
             duration_seconds: 0,
+            current_pace: '-',
             avg_pace: '-',
             calories: 0,
             heart_rate: null,
@@ -6142,6 +6146,11 @@ export class Component implements AfterViewInit, OnDestroy {
             distance_km: this.round2(distance),
             duration: typeof source['duration'] === 'string' ? source['duration'] : this.durationFromSeconds(durationSeconds),
             duration_seconds: Math.round(durationSeconds),
+            current_pace: typeof source['current_pace'] === 'string'
+                ? source['current_pace']
+                : typeof source['currentPace'] === 'string'
+                    ? source['currentPace']
+                    : null,
             avg_pace: typeof source['avg_pace'] === 'string' ? source['avg_pace'] : typeof source['avgPace'] === 'string' ? source['avgPace'] : '-',
             calories: Math.max(0, Math.round(this.toNumber(source['calories']) || 0)),
             heart_rate: this.toNumber(source['heart_rate'] ?? source['heartRate']),
@@ -6245,12 +6254,26 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.liveRun.status === 'paused';
     }
 
+    public get homeLiveRunButtonText(): string {
+        if (this.isLiveRunBusy) return '러닝 준비 중';
+        if (this.isLiveRunSaving) return '러닝 저장 중';
+        if (this.isLiveRunPaused) return '일시정지된 러닝 보기';
+        if (this.isLiveRunActive) return '실시간 러닝 보기';
+        return '러닝 시작';
+    }
+
     public get liveRunDistanceText(): string {
         return this.distanceText(this.liveRun.distance_km || 0);
     }
 
     public get liveRunElapsedText(): string {
         return this.liveRun.duration || '00:00:00';
+    }
+
+    public get liveRunCurrentPaceText(): string {
+        return this.liveRun.current_pace && this.liveRun.current_pace !== '-'
+            ? this.displayPace(this.liveRun.current_pace)
+            : '-';
     }
 
     public get liveRunPaceText(): string {
@@ -6282,6 +6305,13 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!this.isLiveRunSupported) return 'fa-mobile-screen-button';
         if (this.isLiveRunActive) return this.isLiveRunPaused ? 'fa-play' : 'fa-pause';
         return 'fa-play';
+    }
+
+    public async openLiveRunScreen(): Promise<void> {
+        this.setScreen('live-run');
+        if (!this.isLiveRunActive && !this.isLiveRunBusy && !this.isLiveRunSaving) {
+            await this.startLiveRun();
+        }
     }
 
     public async startLiveRun(): Promise<void> {

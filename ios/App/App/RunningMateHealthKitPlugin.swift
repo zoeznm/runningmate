@@ -331,12 +331,8 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         let steps = max(session.steps, session.watchSteps ?? 0)
         let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? steps / (elapsedSeconds / 60.0) : nil)
         let calories = session.watchCalories ?? estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
-        let paceSecondsPerKm: Double?
-        if distanceKm > 0.003 {
-            paceSecondsPerKm = elapsedSeconds / distanceKm
-        } else {
-            paceSecondsPerKm = session.instantPaceSecondsPerKm
-        }
+        let averagePaceSecondsPerKm = distanceKm > 0.003 ? elapsedSeconds / distanceKm : nil
+        let currentPaceSecondsPerKm = session.instantPaceSecondsPerKm ?? averagePaceSecondsPerKm
         let watchConnected = session.hasRecentWatchMetrics || watchSessionIsReachable()
         var payload: [String: Any] = [
             "active": !ended && session.status != .stopped,
@@ -348,7 +344,8 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             "distance_km": rounded(distanceKm, places: 3),
             "duration": durationText(elapsedSeconds),
             "duration_seconds": Int(round(elapsedSeconds)),
-            "avg_pace": paceSecondsPerKm.map { paceText($0) } ?? "-",
+            "current_pace": currentPaceSecondsPerKm.map { paceText($0) } ?? "-",
+            "avg_pace": averagePaceSecondsPerKm.map { paceText($0) } ?? "-",
             "calories": Int(round(calories)),
             "step_count": Int(round(steps)),
             "elevation_gain_m": Int(round(session.elevationGainMeters)),
