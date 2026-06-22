@@ -2265,132 +2265,323 @@ button span {
     box-shadow: 0 12px 26px rgba(14, 116, 144, 0.12);
 }
 
+.live-run-mode {
+    border-color: transparent;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+}
+
+.live-run-mode .nav-bar {
+    display: none;
+}
+
+.live-run-mode #screen-live-run {
+    padding-top: 0;
+    background: var(--primary-fill);
+}
+
 .live-run-page-content {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+    padding: max(22px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+}
+
+.live-run-active-stage,
+.live-run-summary-stage {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.live-run-active-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
     gap: 14px;
 }
 
-.live-run-page-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 0 2px;
-}
-
-.live-run-back-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
-    border: 0.5px solid var(--line-soft);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-}
-
-.live-run-back-btn:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-}
-
-.live-run-page-head > div:not(.live-run-chip) {
-    flex: 1 1 auto;
-    min-width: 0;
-}
-
-.live-run-page-title {
-    color: var(--text);
-    font-size: 21px;
+.live-run-active-label {
+    color: color-mix(in srgb, var(--primary-ink) 72%, transparent);
+    font-size: 13px;
     font-weight: 950;
     line-height: 1.2;
 }
 
-.live-run-page-status {
-    overflow: hidden;
-    margin-top: 3px;
-    color: var(--muted);
-    font-size: 12px;
-    font-weight: 750;
-    line-height: 1.35;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.live-run-active-status {
+    margin-top: 4px;
+    color: var(--primary-ink);
+    font-size: 18px;
+    font-weight: 950;
+    line-height: 1.25;
 }
 
-.live-run-focus-panel {
-    border: 0.5px solid rgba(var(--primary-fill-rgb), 0.24);
-    border-radius: 22px;
-    background:
-        linear-gradient(160deg, rgba(var(--primary-fill-rgb), 0.18), rgba(var(--primary-fill-rgb), 0.035)),
-        var(--surface);
-    padding: 18px;
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.16);
-}
-
-.light-screen .live-run-focus-panel {
-    box-shadow: 0 18px 34px rgba(14, 116, 144, 0.12);
-}
-
-.live-run-focus-panel.active {
-    border-color: rgba(var(--primary-fill-rgb), 0.46);
-}
-
-.live-run-focus-panel.paused {
-    border-color: rgba(250, 204, 21, 0.42);
-}
-
-.live-run-distance-focus span,
-.live-run-detail-metric span {
-    display: block;
-    color: var(--muted);
+.live-run-active-chip {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 6px;
+    border: 1px solid color-mix(in srgb, var(--primary-ink) 16%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-ink) 10%, transparent);
+    padding: 8px 11px;
+    color: var(--primary-ink);
     font-size: 11px;
-    font-weight: 900;
+    font-weight: 950;
+    line-height: 1;
+}
+
+.live-run-active-chip.paused {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.live-run-big-distance {
+    margin-top: clamp(44px, 11vh, 110px);
+}
+
+.live-run-big-distance span,
+.live-run-live-metric span,
+.live-run-summary-metric span {
+    display: block;
+    color: color-mix(in srgb, var(--primary-ink) 64%, transparent);
+    font-size: 12px;
+    font-weight: 950;
     line-height: 1.2;
 }
 
-.live-run-distance-focus strong {
+.live-run-big-distance strong {
     display: block;
     overflow-wrap: anywhere;
     margin-top: 8px;
-    color: var(--text);
-    font-size: 48px;
+    color: var(--primary-ink);
+    font-size: 70px;
     font-weight: 950;
     letter-spacing: 0;
-    line-height: 0.95;
+    line-height: 0.9;
 }
 
-.live-run-detail-grid {
+.live-run-live-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-top: 18px;
+    gap: 12px;
+    margin-top: clamp(34px, 7vh, 68px);
 }
 
-.live-run-detail-metric {
+.live-run-live-metric {
     min-width: 0;
-    border: 0.5px solid var(--line-soft);
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--screen-bg) 76%, var(--surface));
-    padding: 12px 10px;
+    border: 1px solid color-mix(in srgb, var(--primary-ink) 13%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--primary-ink) 8%, transparent);
+    padding: 14px 12px;
 }
 
-.live-run-detail-metric strong {
+.live-run-live-metric strong,
+.live-run-summary-metric strong {
     display: block;
     overflow: hidden;
-    margin-top: 6px;
-    color: var(--text);
-    font-size: 18px;
+    margin-top: 8px;
+    color: var(--primary-ink);
+    font-size: 21px;
     font-weight: 950;
-    line-height: 1.1;
+    line-height: 1.05;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.live-run-page-actions {
-    margin-top: 2px;
+.live-run-bottom-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    margin-top: auto;
+    padding-top: 22px;
+}
+
+.live-run-pause-action,
+.live-run-save-action,
+.live-run-summary-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    cursor: pointer;
+    font-weight: 950;
+    line-height: 1;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.live-run-pause-action,
+.live-run-save-action {
+    gap: 8px;
+    min-height: 58px;
+    border-radius: 999px;
+    font-size: 15px;
+}
+
+.live-run-pause-action {
+    background: color-mix(in srgb, var(--primary-ink) 12%, transparent);
+    color: var(--primary-ink);
+}
+
+.live-run-save-action {
+    background: var(--primary-ink);
+    color: var(--primary-fill);
+}
+
+.live-run-pause-action:disabled,
+.live-run-save-action:disabled {
+    cursor: default;
+    opacity: 0.52;
+}
+
+.live-run-pause-action:focus-visible,
+.live-run-save-action:focus-visible,
+.live-run-summary-back:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary-ink) 72%, transparent);
+    outline-offset: 2px;
+}
+
+.live-run-summary-map {
+    position: relative;
+    flex: 0 0 min(48%, 390px);
+    min-height: 300px;
+    overflow: hidden;
+    border-radius: 0 0 32px 32px;
+    background:
+        radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--primary-ink) 16%, transparent), transparent 28%),
+        radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--primary-ink) 18%, transparent), transparent 30%),
+        color-mix(in srgb, var(--primary-ink) 8%, transparent);
+}
+
+.live-run-map-grid {
+    position: absolute;
+    inset: 0;
+    opacity: 0.22;
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--primary-ink) 34%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--primary-ink) 34%, transparent) 1px, transparent 1px);
+    background-size: 36px 36px;
+}
+
+.live-run-map-route {
+    position: absolute;
+    inset: 42px 24px 54px;
+    width: calc(100% - 48px);
+    height: calc(100% - 96px);
+}
+
+.live-run-route-line {
+    fill: none;
+    stroke: var(--primary-ink);
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 4.5;
+    vector-effect: non-scaling-stroke;
+}
+
+.live-run-summary-back {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    left: 14px;
+    z-index: 2;
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-ink) 14%, transparent);
+    color: var(--primary-ink);
+    font-size: 15px;
+}
+
+.live-run-map-pin {
+    display: inline-flex;
+    align-items: center;
+    position: absolute;
+    z-index: 2;
+    gap: 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-fill) 72%, white);
+    padding: 7px 9px;
+    color: var(--primary-ink);
+    font-size: 11px;
+    font-weight: 950;
+    line-height: 1;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+.live-run-map-pin-start {
+    left: 24px;
+    bottom: 76px;
+}
+
+.live-run-map-pin-end {
+    right: 24px;
+    top: 86px;
+}
+
+.live-run-map-caption {
+    position: absolute;
+    right: 18px;
+    bottom: 16px;
+    left: 18px;
+    z-index: 2;
+    color: var(--primary-ink);
+}
+
+.live-run-map-caption strong,
+.live-run-map-caption span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.live-run-map-caption strong {
+    font-size: 18px;
+    font-weight: 950;
+    line-height: 1.2;
+}
+
+.live-run-map-caption span {
+    margin-top: 4px;
+    color: color-mix(in srgb, var(--primary-ink) 68%, transparent);
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.25;
+}
+
+.live-run-summary-panel {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    padding-top: 20px;
+}
+
+.live-run-summary-title {
+    color: var(--primary-ink);
+    font-size: 24px;
+    font-weight: 950;
+    line-height: 1.2;
+}
+
+.live-run-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.live-run-summary-metric {
+    min-width: 0;
+    border: 1px solid color-mix(in srgb, var(--primary-ink) 13%, transparent);
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--primary-ink) 8%, transparent);
+    padding: 14px 12px;
 }
 
 .live-run-card.active {
@@ -11676,6 +11867,27 @@ button span {
         padding-left: var(--dashboard-mobile-inline-start);
         scroll-padding-bottom: var(--dashboard-mobile-content-bottom-padding);
         -webkit-overflow-scrolling: touch;
+    }
+
+    .live-run-mode {
+        background: var(--primary-fill);
+        background-color: var(--primary-fill);
+    }
+
+    .live-run-mode #screen-live-run {
+        overflow: hidden;
+        padding-top: 0;
+        background: var(--primary-fill);
+    }
+
+    .live-run-mode .live-run-page-content {
+        overflow: hidden;
+        padding:
+            max(22px, calc(var(--dashboard-mobile-safe-top) + 12px))
+            var(--dashboard-mobile-inline-end)
+            max(20px, calc(var(--dashboard-mobile-safe-bottom) + 14px))
+            var(--dashboard-mobile-inline-start);
+        scroll-padding-bottom: 0;
     }
 
     .chart-scroll {

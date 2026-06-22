@@ -877,6 +877,14 @@ interface LiveRunMetrics {
     step_count?: number | null;
     elevation_gain_m?: number | null;
     heart_rate_available?: boolean;
+    start_location?: LiveRunRoutePoint | null;
+    end_location?: LiveRunRoutePoint | null;
+    route_points?: LiveRunRoutePoint[];
+}
+
+interface LiveRunRoutePoint {
+    lat: number;
+    lng: number;
 }
 
 interface PluginListenerHandle {
@@ -1469,6 +1477,7 @@ export class Component implements AfterViewInit, OnDestroy {
     };
     public isManualRunSaving: boolean = false;
     public liveRun: LiveRunMetrics = this.emptyLiveRunMetrics();
+    public completedLiveRun: LiveRunMetrics | null = null;
     public liveRunStatus: string = '러닝 대기 중';
     public isLiveRunBusy: boolean = false;
     public isLiveRunSaving: boolean = false;
@@ -6044,7 +6053,10 @@ export class Component implements AfterViewInit, OnDestroy {
             cadence: null,
             step_count: null,
             elevation_gain_m: null,
-            heart_rate_available: false
+            heart_rate_available: false,
+            start_location: null,
+            end_location: null,
+            route_points: []
         };
     }
 
@@ -6060,9 +6072,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.addLiveRunListener(plugin, 'liveRunUpdate', (event) => {
             this.applyLiveRunMetrics(event);
             if (this.liveRun.status === 'running') {
-                this.liveRunStatus = this.liveRun.heart_rate_available === false
-                    ? '러닝 측정 중 · Apple Watch 심박을 기다리는 중'
-                    : '러닝 측정 중';
+                this.liveRunStatus = '러닝 측정 중';
             }
         });
         this.addLiveRunListener(plugin, 'liveRunEnded', (event) => {
@@ -6134,6 +6144,16 @@ export class Component implements AfterViewInit, OnDestroy {
         const distance = this.toNumber(source['distance_km'] ?? source['distanceKm']) || 0;
         const durationSeconds = this.toNumber(source['duration_seconds'] ?? source['durationSeconds']) || 0;
         const runType = this.normalizeRunType(source['run_type'] ?? source['runType']);
+        const heartRate = this.toNumber(source['heart_rate'] ?? source['heartRate']);
+        const avgHeartRate = this.toNumber(source['avg_heart_rate'] ?? source['avgHeartRate']);
+        const explicitHeartRateAvailable = source['heart_rate_available'] ?? source['heartRateAvailable'];
+        const routePoints = this.normalizeLiveRunRoutePoints(source['route_points'] ?? source['routePoints']);
+        const startLocation = this.normalizeLiveRunRoutePoint(source['start_location'] ?? source['startLocation'])
+            || routePoints[0]
+            || null;
+        const endLocation = this.normalizeLiveRunRoutePoint(source['end_location'] ?? source['endLocation'])
+            || routePoints[routePoints.length - 1]
+            || null;
 
         return {
             active: Boolean(source['active']) && status !== 'stopped',
@@ -6153,13 +6173,36 @@ export class Component implements AfterViewInit, OnDestroy {
                     : null,
             avg_pace: typeof source['avg_pace'] === 'string' ? source['avg_pace'] : typeof source['avgPace'] === 'string' ? source['avgPace'] : '-',
             calories: Math.max(0, Math.round(this.toNumber(source['calories']) || 0)),
-            heart_rate: this.toNumber(source['heart_rate'] ?? source['heartRate']),
-            avg_heart_rate: this.toNumber(source['avg_heart_rate'] ?? source['avgHeartRate']),
+            heart_rate: heartRate,
+            avg_heart_rate: avgHeartRate,
             cadence: this.toNumber(source['cadence']),
             step_count: this.toNumber(source['step_count'] ?? source['stepCount']),
             elevation_gain_m: this.toNumber(source['elevation_gain_m'] ?? source['elevationGainM'] ?? source['elevation_gain']),
-            heart_rate_available: Boolean(source['heart_rate_available'] ?? source['heartRateAvailable'])
+            heart_rate_available: Boolean(explicitHeartRateAvailable) || heartRate !== null || avgHeartRate !== null,
+            start_location: startLocation,
+            end_location: endLocation,
+            route_points: routePoints
         };
+    }
+
+    private normalizeLiveRunRoutePoint(value: unknown): LiveRunRoutePoint | null {
+        if (!value || typeof value !== 'object') return null;
+        const source = value as Record<string, unknown>;
+        const lat = this.toNumber(source['lat'] ?? source['latitude']);
+        const lng = this.toNumber(source['lng'] ?? source['lon'] ?? source['longitude']);
+        if (lat === null || lng === null) return null;
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+        return { lat, lng };
+    }
+
+    private normalizeLiveRunRoutePoints(value: unknown): LiveRunRoutePoint[] {
+        if (!Array.isArray(value)) return [];
+        const points = value
+            .map((point) => this.normalizeLiveRunRoutePoint(point))
+            .filter((point): point is LiveRunRoutePoint => Boolean(point));
+        if (points.length <= 80) return points;
+        const step = Math.ceil(points.length / 80);
+        return points.filter((_, index) => index % step === 0 || index === points.length - 1);
     }
 
     private durationFromSeconds(seconds: number): string {
@@ -6282,7 +6325,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get liveRunHeartRateText(): string {
         const heartRate = this.toNumber(this.liveRun.heart_rate ?? this.liveRun.avg_heart_rate);
-        return heartRate !== null ? `${Math.round(heartRate)} bpm` : '--';
+        return heartRate !== null ? `${Math.round(heartRate)} bpm` : '측정 중';
     }
 
     public get liveRunCadenceText(): string {
@@ -6293,6 +6336,91 @@ export class Component implements AfterViewInit, OnDestroy {
     public get liveRunCaloriesText(): string {
         const calories = this.toNumber(this.liveRun.calories);
         return calories !== null ? `${Math.round(calories)} kcal` : '0 kcal';
+    }
+
+    public get completedLiveRunDistanceText(): string {
+        return this.distanceText(this.completedLiveRun?.distance_km || 0);
+    }
+
+    public get completedLiveRunPaceText(): string {
+        const pace = this.completedLiveRun?.avg_pace;
+        return pace && pace !== '-' ? this.displayPace(pace) : '-';
+    }
+
+    public get completedLiveRunHeartRateText(): string {
+        const metrics = this.completedLiveRun;
+        const heartRate = this.toNumber(metrics?.avg_heart_rate ?? metrics?.heart_rate);
+        return heartRate !== null ? `${Math.round(heartRate)} bpm` : '-';
+    }
+
+    public get completedLiveRunElapsedText(): string {
+        return this.completedLiveRun?.duration || '00:00:00';
+    }
+
+    public get completedLiveRunCadenceText(): string {
+        const cadence = this.toNumber(this.completedLiveRun?.cadence);
+        return cadence !== null ? `${Math.round(cadence)} spm` : '-';
+    }
+
+    public get completedLiveRunDateText(): string {
+        const date = this.completedLiveRunDateKey;
+        return date ? this.displayDate(date, true) : '오늘 러닝';
+    }
+
+    public get completedLiveRunRouteText(): string {
+        const metrics = this.completedLiveRun;
+        if (!metrics) return '러닝 경로';
+        const routePoints = metrics.route_points || [];
+        const start = this.coordinateLabel(metrics.start_location || metrics.route_points?.[0] || null);
+        const end = this.coordinateLabel(metrics.end_location || routePoints[routePoints.length - 1] || null);
+        if (start && end && start !== end) return `${start} → ${end}`;
+        if (start) return `${start} 출발/도착`;
+        return '위치 포인트를 기반으로 경로를 표시했어';
+    }
+
+    public get liveRunRoutePolyline(): string {
+        const points = this.completedLiveRunRoutePoints;
+        if (!points.length) return '12,72 28,55 46,60 63,36 86,28';
+        if (points.length === 1) return '50,50 50,50';
+
+        const lats = points.map((point) => point.lat);
+        const lngs = points.map((point) => point.lng);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const latSpan = Math.max(maxLat - minLat, 0.0001);
+        const lngSpan = Math.max(maxLng - minLng, 0.0001);
+        const padding = 12;
+        const size = 100 - padding * 2;
+
+        return points.map((point) => {
+            const x = padding + ((point.lng - minLng) / lngSpan) * size;
+            const y = padding + (1 - ((point.lat - minLat) / latSpan)) * size;
+            return `${this.round2(x)},${this.round2(y)}`;
+        }).join(' ');
+    }
+
+    private get completedLiveRunDateKey(): string {
+        return this.chatDateKey(this.completedLiveRun?.started_at)
+            || this.selectedCalendarDate
+            || this.todayDateKey;
+    }
+
+    private get completedLiveRunRoutePoints(): LiveRunRoutePoint[] {
+        const metrics = this.completedLiveRun;
+        if (!metrics) return [];
+        const points = metrics.route_points?.length ? [...metrics.route_points] : [];
+        if (!points.length && metrics.start_location) points.push(metrics.start_location);
+        if (metrics.end_location && !points.some((point) => point.lat === metrics.end_location?.lat && point.lng === metrics.end_location?.lng)) {
+            points.push(metrics.end_location);
+        }
+        return points;
+    }
+
+    private coordinateLabel(point: LiveRunRoutePoint | null): string {
+        if (!point) return '';
+        return `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
     }
 
     public get liveRunPrimaryText(): string {
@@ -6308,6 +6436,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async openLiveRunScreen(): Promise<void> {
+        this.completedLiveRun = null;
         this.setScreen('live-run');
         if (!this.isLiveRunActive && !this.isLiveRunBusy && !this.isLiveRunSaving) {
             await this.startLiveRun();
@@ -6316,6 +6445,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async startLiveRun(): Promise<void> {
         if (this.isLiveRunBusy || this.isLiveRunSaving || this.isLiveRunActive) return;
+        this.completedLiveRun = null;
         const plugin = this.liveRunPlugin();
         if (!this.isLiveRunSupported || !plugin?.startLiveRun) {
             this.liveRunStatus = '실시간 러닝은 iPhone 앱에서 사용할 수 있어.';
@@ -6369,12 +6499,6 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async finishLiveRun(): Promise<void> {
         if (!this.isLiveRunActive || this.isLiveRunSaving) return;
-        if (!(await this.openConfirmDialog('러닝을 종료하고 기록으로 저장할까요?', {
-            title: '러닝 종료',
-            confirmLabel: '저장',
-            iconClass: 'fa-flag-checkered'
-        }))) return;
-
         const plugin = this.liveRunPlugin();
         if (!plugin?.stopLiveRun) return;
 
@@ -6414,9 +6538,13 @@ export class Component implements AfterViewInit, OnDestroy {
 
             this.selectedCalendarDate = startedDate;
             this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
-            this.liveRunStatus = '실시간 러닝 기록을 저장했어.';
+            this.completedLiveRun = metrics;
+            this.liveRunStatus = '러닝 저장 완료';
             this.showToast('러닝 기록을 저장했어.', 'success');
             await this.loadRuns();
+            this.selectedCalendarDate = startedDate;
+            this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
+            this.refreshDerivedState();
         } catch (error) {
             this.liveRunStatus = this.liveRunErrorMessage(error, '러닝 기록 저장 중 오류가 발생했어.');
             this.showToast(this.liveRunStatus, 'error');
@@ -6424,6 +6552,18 @@ export class Component implements AfterViewInit, OnDestroy {
             this.isLiveRunSaving = false;
             this.cdr.detectChanges();
         }
+    }
+
+    public closeLiveRunSummaryToCalendar(): void {
+        const date = this.completedLiveRunDateKey;
+        this.completedLiveRun = null;
+        this.liveRun = this.emptyLiveRunMetrics();
+        this.liveRunStatus = '러닝 대기 중';
+        this.selectedCalendarDate = date;
+        this.activeYearMonth = this.yearMonthKey(this.parseDate(date) || new Date());
+        this.refreshDerivedState();
+        this.setScreen('calendar');
+        this.cdr.detectChanges();
     }
 
     public async discardLiveRun(): Promise<void> {
