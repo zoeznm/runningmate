@@ -1,7 +1,16 @@
+import HealthKit
 import SwiftUI
+import WatchKit
+
+final class RunMateWatchAppDelegate: NSObject, WKApplicationDelegate {
+    func handle(_ workoutConfiguration: HKWorkoutConfiguration) {
+        RunMateWatchWorkoutManager.shared.start(runId: nil, runType: "jogging", configuration: workoutConfiguration)
+    }
+}
 
 @main
 struct RunMateWatchApp: App {
+    @WKApplicationDelegateAdaptor(RunMateWatchAppDelegate.self) private var appDelegate
     @StateObject private var workoutManager = RunMateWatchWorkoutManager.shared
 
     var body: some Scene {

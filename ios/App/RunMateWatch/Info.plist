@@ -26,6 +26,10 @@
     <string>Apple Watch 러닝 운동 세션과 운동 데이터를 건강 앱에 기록하기 위해 건강 데이터를 사용합니다.</string>
     <key>WKApplication</key>
     <true/>
+    <key>WKBackgroundModes</key>
+    <array>
+        <string>workout-processing</string>
+    </array>
     <key>WKCompanionAppBundleIdentifier</key>
     <string>com.myrunningmate.run</string>
 </dict>

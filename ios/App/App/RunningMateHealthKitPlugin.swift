@@ -109,6 +109,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                     }
                 }
                 self.configureWatchConnectivity()
+                self.startWatchWorkoutApp(runType: runType, runId: session.id, weightKg: session.weightKg, startedAt: session.startDate)
                 self.sendWatchRunCommand("start", extra: [
                     "runType": runType,
                     "runId": session.id,
@@ -467,6 +468,42 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         }
         try? watchSession.updateApplicationContext(message)
         watchSession.transferUserInfo(message)
+    }
+
+    private func startWatchWorkoutApp(runType: String, runId: String, weightKg: Double, startedAt: Date) {
+        guard HKHealthStore.isHealthDataAvailable(), watchAppInstalled() else { return }
+
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .running
+        configuration.locationType = runType == "treadmill" ? .indoor : .outdoor
+
+        let commandExtra: [String: Any] = [
+            "runType": runType,
+            "runId": runId,
+            "weightKg": weightKg,
+            "startedAt": isoString(startedAt)
+        ]
+
+        healthStore.startWatchApp(with: configuration) { [weak self] success, error in
+            DispatchQueue.main.async {
+                guard let self = self,
+                      let session = self.liveRunSession,
+                      session.id == runId,
+                      session.status == .running else {
+                    return
+                }
+
+                if success {
+                    self.sendWatchRunCommand("start", extra: commandExtra)
+                } else if let error = error {
+                    self.notifyListeners("liveRunError", data: [
+                        "message": "Apple Watch에서 RunMate를 열고 건강 권한을 허용해줘.",
+                        "detail": error.localizedDescription,
+                        "code": "watch_launch_error"
+                    ])
+                }
+            }
+        }
     }
 
     private func handleWatchMessage(_ message: [String: Any]) {

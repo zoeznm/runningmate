@@ -35,8 +35,11 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         activateConnectivity()
     }
 
-    func start(runId: String?, runType: String) {
+    func start(runId: String?, runType: String, configuration: HKWorkoutConfiguration? = nil) {
         if workoutSession != nil {
+            if let runId = runId, !runId.isEmpty {
+                self.runId = runId
+            }
             sendMetrics(force: true)
             return
         }
@@ -54,7 +57,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
                     self.sendError("Apple Watch 건강 접근 권한을 허용해줘.")
                     return
                 }
-                self.startWorkoutSession(runId: runId, runType: runType)
+                self.startWorkoutSession(runId: runId, runType: runType, configuration: configuration)
             }
         }
     }
@@ -97,10 +100,8 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
-    private func startWorkoutSession(runId: String?, runType: String) {
-        let configuration = HKWorkoutConfiguration()
-        configuration.activityType = .running
-        configuration.locationType = runType == "treadmill" ? .indoor : .outdoor
+    private func startWorkoutSession(runId: String?, runType: String, configuration: HKWorkoutConfiguration? = nil) {
+        let configuration = configuration ?? workoutConfiguration(for: runType)
 
         do {
             let session = try HKWorkoutSession(healthStore: healthStore, configuration: configuration)
@@ -141,6 +142,13 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
             statusText = "측정 시작 실패"
             sendError(error.localizedDescription)
         }
+    }
+
+    private func workoutConfiguration(for runType: String) -> HKWorkoutConfiguration {
+        let configuration = HKWorkoutConfiguration()
+        configuration.activityType = .running
+        configuration.locationType = runType == "treadmill" ? .indoor : .outdoor
+        return configuration
     }
 
     private func requestHealthKitAccess(completion: @escaping (Bool) -> Void) {
