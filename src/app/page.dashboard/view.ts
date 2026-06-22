@@ -857,6 +857,31 @@ interface SaveRunResult {
     newlyEarnedBadges?: Badge[];
 }
 
+interface LiveRunMetrics {
+    active: boolean;
+    id?: string;
+    status: 'idle' | 'running' | 'paused' | 'stopped';
+    reason?: string;
+    run_type?: RunType | string;
+    started_at?: string;
+    ended_at?: string;
+    distance_km: number;
+    duration: string;
+    duration_seconds: number;
+    avg_pace: string;
+    calories: number;
+    heart_rate?: number | null;
+    avg_heart_rate?: number | null;
+    cadence?: number | null;
+    step_count?: number | null;
+    elevation_gain_m?: number | null;
+    heart_rate_available?: boolean;
+}
+
+interface PluginListenerHandle {
+    remove: () => Promise<void> | void;
+}
+
 interface AiLoginRefreshResult {
     success: boolean;
     message?: string;
@@ -1442,6 +1467,10 @@ export class Component implements AfterViewInit, OnDestroy {
         cadence: ''
     };
     public isManualRunSaving: boolean = false;
+    public liveRun: LiveRunMetrics = this.emptyLiveRunMetrics();
+    public liveRunStatus: string = '러닝 대기 중';
+    public isLiveRunBusy: boolean = false;
+    public isLiveRunSaving: boolean = false;
     public aiConnection: AiConnection | null = null;
     public chatText: string = '';
     public isChatSending: boolean = false;
@@ -1497,6 +1526,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private cyclePredictionEngine = new PredictionEngine({ strategy: 'wma', lutealPhaseDays: 14, timezone: 'Asia/Seoul' });
     private weatherDays = new Map<string, WeatherDay>();
     private weatherCoverage: WeatherCoverage | null = null;
+    private liveRunNativePlugin: any = null;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
     private deferredDashboardDataStarted: boolean = false;
@@ -5996,6 +6026,154 @@ export class Component implements AfterViewInit, OnDestroy {
         await this.loadRuns();
     }
 
+    private emptyLiveRunMetrics(): LiveRunMetrics {
+        return {
+            active: false,
+            status: 'idle',
+            distance_km: 0,
+            duration: '00:00:00',
+            duration_seconds: 0,
+            avg_pace: '-',
+            calories: 0,
+            heart_rate: null,
+            avg_heart_rate: null,
+            cadence: null,
+            step_count: null,
+            elevation_gain_m: null,
+            heart_rate_available: false
+        };
+    }
+
+    private installLiveRunListeners(): void {
+        const plugin = this.liveRunPlugin();
+        if (!plugin) {
+            this.liveRunStatus = isNativeLocalOrigin()
+                ? '실시간 러닝 모듈을 찾지 못했어. 최신 앱 빌드가 필요해.'
+                : '실시간 러닝은 iPhone 앱에서 사용할 수 있어.';
+            return;
+        }
+
+        this.addLiveRunListener(plugin, 'liveRunUpdate', (event) => {
+            this.applyLiveRunMetrics(event);
+            if (this.liveRun.status === 'running') {
+                this.liveRunStatus = this.liveRun.heart_rate_available === false
+                    ? '러닝 측정 중 · Apple Watch 심박을 기다리는 중'
+                    : '러닝 측정 중';
+            }
+        });
+        this.addLiveRunListener(plugin, 'liveRunEnded', (event) => {
+            this.applyLiveRunMetrics(event);
+        });
+        this.addLiveRunListener(plugin, 'liveRunError', (event) => {
+            this.liveRunStatus = this.liveRunErrorMessage(event, '실시간 러닝 측정 중 오류가 발생했어.');
+            this.cdr.detectChanges();
+        });
+
+        if (typeof plugin.getLiveRunSnapshot === 'function') {
+            plugin.getLiveRunSnapshot()
+                .then((snapshot: unknown) => {
+                    const metrics = this.normalizeLiveRunMetrics(snapshot);
+                    if (metrics.active) {
+                        this.liveRun = metrics;
+                        this.liveRunStatus = metrics.status === 'paused' ? '일시정지됨' : '러닝 측정 중';
+                        this.cdr.detectChanges();
+                    }
+                })
+                .catch(() => null);
+        }
+    }
+
+    private addLiveRunListener(plugin: any, eventName: string, handler: (event: unknown) => void): void {
+        if (typeof plugin.addListener !== 'function') return;
+
+        const listener = plugin.addListener(eventName, handler);
+        if (listener && typeof listener.then === 'function') {
+            listener
+                .then((handle: PluginListenerHandle) => {
+                    if (handle?.remove) this.cleanupHandlers.push(() => { void handle.remove(); });
+                })
+                .catch(() => null);
+            return;
+        }
+        if (listener?.remove) {
+            this.cleanupHandlers.push(() => { void listener.remove(); });
+        }
+    }
+
+    private liveRunPlugin(): any {
+        if (this.liveRunNativePlugin) return this.liveRunNativePlugin;
+        if (typeof window === 'undefined') return null;
+        const capacitor = (window as any).Capacitor;
+        if (!capacitor) return null;
+        if (capacitor.Plugins?.RunningMateHealthKit) {
+            this.liveRunNativePlugin = capacitor.Plugins.RunningMateHealthKit;
+            return this.liveRunNativePlugin;
+        }
+        if (typeof capacitor.registerPlugin === 'function') {
+            this.liveRunNativePlugin = capacitor.registerPlugin('RunningMateHealthKit');
+            return this.liveRunNativePlugin;
+        }
+        return null;
+    }
+
+    private applyLiveRunMetrics(value: unknown): void {
+        this.liveRun = this.normalizeLiveRunMetrics(value);
+        this.cdr.detectChanges();
+    }
+
+    private normalizeLiveRunMetrics(value: unknown): LiveRunMetrics {
+        const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+        const rawStatus = typeof source['status'] === 'string' ? source['status'] : '';
+        const status: LiveRunMetrics['status'] = rawStatus === 'running' || rawStatus === 'paused' || rawStatus === 'stopped'
+            ? rawStatus
+            : Boolean(source['active']) ? 'running' : 'idle';
+        const distance = this.toNumber(source['distance_km'] ?? source['distanceKm']) || 0;
+        const durationSeconds = this.toNumber(source['duration_seconds'] ?? source['durationSeconds']) || 0;
+        const runType = this.normalizeRunType(source['run_type'] ?? source['runType']);
+
+        return {
+            active: Boolean(source['active']) && status !== 'stopped',
+            id: typeof source['id'] === 'string' ? source['id'] : undefined,
+            status,
+            reason: typeof source['reason'] === 'string' ? source['reason'] : undefined,
+            run_type: runType,
+            started_at: typeof source['started_at'] === 'string' ? source['started_at'] : typeof source['startedAt'] === 'string' ? source['startedAt'] : undefined,
+            ended_at: typeof source['ended_at'] === 'string' ? source['ended_at'] : typeof source['endedAt'] === 'string' ? source['endedAt'] : undefined,
+            distance_km: this.round2(distance),
+            duration: typeof source['duration'] === 'string' ? source['duration'] : this.durationFromSeconds(durationSeconds),
+            duration_seconds: Math.round(durationSeconds),
+            avg_pace: typeof source['avg_pace'] === 'string' ? source['avg_pace'] : typeof source['avgPace'] === 'string' ? source['avgPace'] : '-',
+            calories: Math.max(0, Math.round(this.toNumber(source['calories']) || 0)),
+            heart_rate: this.toNumber(source['heart_rate'] ?? source['heartRate']),
+            avg_heart_rate: this.toNumber(source['avg_heart_rate'] ?? source['avgHeartRate']),
+            cadence: this.toNumber(source['cadence']),
+            step_count: this.toNumber(source['step_count'] ?? source['stepCount']),
+            elevation_gain_m: this.toNumber(source['elevation_gain_m'] ?? source['elevationGainM'] ?? source['elevation_gain']),
+            heart_rate_available: Boolean(source['heart_rate_available'] ?? source['heartRateAvailable'])
+        };
+    }
+
+    private durationFromSeconds(seconds: number): string {
+        const total = Math.max(0, Math.round(seconds || 0));
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const remain = total % 60;
+        return [hours, minutes, remain].map((part) => String(part).padStart(2, '0')).join(':');
+    }
+
+    private liveRunErrorMessage(error: unknown, fallback: string): string {
+        if (error && typeof error === 'object') {
+            const source = error as Record<string, unknown>;
+            const message = typeof source['message'] === 'string'
+                ? source['message']
+                : typeof source['localizedDescription'] === 'string'
+                    ? source['localizedDescription']
+                    : '';
+            if (message) return message;
+        }
+        return fallback;
+    }
+
     private emptyManualRunForm(): any {
         return {
             distance_km: '',
@@ -6052,6 +6230,196 @@ export class Component implements AfterViewInit, OnDestroy {
         this.manualEntryVisible = false;
         this.manualEntryRunId = null;
         this.cdr.detectChanges();
+    }
+
+    public get isLiveRunSupported(): boolean {
+        const plugin = this.liveRunPlugin();
+        return isNativeLocalOrigin() && !!plugin?.startLiveRun;
+    }
+
+    public get isLiveRunActive(): boolean {
+        return this.liveRun.active && (this.liveRun.status === 'running' || this.liveRun.status === 'paused');
+    }
+
+    public get isLiveRunPaused(): boolean {
+        return this.liveRun.status === 'paused';
+    }
+
+    public get liveRunDistanceText(): string {
+        return this.distanceText(this.liveRun.distance_km || 0);
+    }
+
+    public get liveRunElapsedText(): string {
+        return this.liveRun.duration || '00:00:00';
+    }
+
+    public get liveRunPaceText(): string {
+        return this.liveRun.avg_pace && this.liveRun.avg_pace !== '-' ? this.displayPace(this.liveRun.avg_pace) : '-';
+    }
+
+    public get liveRunHeartRateText(): string {
+        const heartRate = this.toNumber(this.liveRun.heart_rate ?? this.liveRun.avg_heart_rate);
+        return heartRate !== null ? `${Math.round(heartRate)} bpm` : '--';
+    }
+
+    public get liveRunCadenceText(): string {
+        const cadence = this.toNumber(this.liveRun.cadence);
+        return cadence !== null ? `${Math.round(cadence)} spm` : '--';
+    }
+
+    public get liveRunCaloriesText(): string {
+        const calories = this.toNumber(this.liveRun.calories);
+        return calories !== null ? `${Math.round(calories)} kcal` : '0 kcal';
+    }
+
+    public get liveRunPrimaryText(): string {
+        if (!this.isLiveRunSupported) return 'iPhone 앱 전용';
+        if (this.isLiveRunActive) return this.isLiveRunPaused ? '재개' : '일시정지';
+        return '러닝 시작';
+    }
+
+    public get liveRunPrimaryIcon(): string {
+        if (!this.isLiveRunSupported) return 'fa-mobile-screen-button';
+        if (this.isLiveRunActive) return this.isLiveRunPaused ? 'fa-play' : 'fa-pause';
+        return 'fa-play';
+    }
+
+    public async startLiveRun(): Promise<void> {
+        if (this.isLiveRunBusy || this.isLiveRunSaving || this.isLiveRunActive) return;
+        const plugin = this.liveRunPlugin();
+        if (!this.isLiveRunSupported || !plugin?.startLiveRun) {
+            this.liveRunStatus = '실시간 러닝은 iPhone 앱에서 사용할 수 있어.';
+            this.showToast(this.liveRunStatus, 'error');
+            this.cdr.detectChanges();
+            return;
+        }
+
+        this.isLiveRunBusy = true;
+        this.liveRunStatus = 'GPS와 Apple Watch 데이터를 준비하는 중';
+        this.cdr.detectChanges();
+
+        try {
+            const metrics = await plugin.startLiveRun({
+                runType: this.selectedRunType,
+                weightKg: this.currentWeightLog?.weight_kg || 60
+            });
+            this.applyLiveRunMetrics(metrics);
+            this.liveRunStatus = '러닝 측정 중';
+        } catch (error) {
+            this.liveRunStatus = this.liveRunErrorMessage(error, '실시간 러닝을 시작하지 못했어.');
+            this.showToast(this.liveRunStatus, 'error');
+        } finally {
+            this.isLiveRunBusy = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    public async toggleLiveRunPause(): Promise<void> {
+        if (!this.isLiveRunActive || this.isLiveRunBusy || this.isLiveRunSaving) return;
+        const plugin = this.liveRunPlugin();
+        const method = this.isLiveRunPaused ? 'resumeLiveRun' : 'pauseLiveRun';
+        if (!plugin?.[method]) return;
+
+        this.isLiveRunBusy = true;
+        this.liveRunStatus = this.isLiveRunPaused ? '러닝 재개 중' : '러닝 일시정지 중';
+        this.cdr.detectChanges();
+
+        try {
+            const metrics = await plugin[method]();
+            this.applyLiveRunMetrics(metrics);
+            this.liveRunStatus = this.isLiveRunPaused ? '일시정지됨' : '러닝 측정 중';
+        } catch (error) {
+            this.liveRunStatus = this.liveRunErrorMessage(error, '상태를 변경하지 못했어.');
+            this.showToast(this.liveRunStatus, 'error');
+        } finally {
+            this.isLiveRunBusy = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    public async finishLiveRun(): Promise<void> {
+        if (!this.isLiveRunActive || this.isLiveRunSaving) return;
+        if (!(await this.openConfirmDialog('러닝을 종료하고 기록으로 저장할까요?', {
+            title: '러닝 종료',
+            confirmLabel: '저장',
+            iconClass: 'fa-flag-checkered'
+        }))) return;
+
+        const plugin = this.liveRunPlugin();
+        if (!plugin?.stopLiveRun) return;
+
+        this.isLiveRunSaving = true;
+        this.liveRunStatus = '러닝 종료 중';
+        this.cdr.detectChanges();
+
+        try {
+            const metrics = this.normalizeLiveRunMetrics(await plugin.stopLiveRun());
+            this.liveRun = metrics;
+            const distanceKm = this.round2(metrics.distance_km || 0);
+            if (distanceKm <= 0.01) {
+                this.liveRunStatus = '거리 측정값이 너무 짧아 저장하지 않았어.';
+                this.showToast(this.liveRunStatus, 'error');
+                return;
+            }
+
+            const startedDate = this.chatDateKey(metrics.started_at) || this.todayDateKey;
+            const payload: RunRecord = {
+                date: startedDate,
+                distance_km: distanceKm,
+                avg_pace: metrics.avg_pace && metrics.avg_pace !== '-' ? metrics.avg_pace : null,
+                duration: metrics.duration || null,
+                run_type: this.normalizeRunType(metrics.run_type || this.selectedRunType),
+                calories: this.toNumber(metrics.calories),
+                avg_heart_rate: this.toNumber(metrics.avg_heart_rate ?? metrics.heart_rate),
+                cadence: this.toNumber(metrics.cadence),
+                elevation_gain: this.toNumber(metrics.elevation_gain_m),
+                is_public: this.calendarUploadIsPublic
+            };
+            const saved = await this.saveRunRecord(payload);
+            if (!saved.saved) {
+                this.liveRunStatus = saved.message || '러닝 기록을 저장하지 못했어.';
+                this.showToast(this.liveRunStatus, 'error');
+                return;
+            }
+
+            this.selectedCalendarDate = startedDate;
+            this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
+            this.liveRunStatus = '실시간 러닝 기록을 저장했어.';
+            this.showToast('러닝 기록을 저장했어.', 'success');
+            await this.loadRuns();
+        } catch (error) {
+            this.liveRunStatus = this.liveRunErrorMessage(error, '러닝 기록 저장 중 오류가 발생했어.');
+            this.showToast(this.liveRunStatus, 'error');
+        } finally {
+            this.isLiveRunSaving = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    public async discardLiveRun(): Promise<void> {
+        if (!this.isLiveRunActive || this.isLiveRunSaving) return;
+        if (!(await this.openConfirmDialog('현재 러닝 측정을 취소할까요? 기록은 저장되지 않습니다.', {
+            title: '러닝 취소',
+            confirmLabel: '취소',
+            tone: 'danger',
+            iconClass: 'fa-stop'
+        }))) return;
+
+        const plugin = this.liveRunPlugin();
+        if (!plugin?.stopLiveRun) return;
+
+        this.isLiveRunBusy = true;
+        this.cdr.detectChanges();
+        try {
+            this.liveRun = this.normalizeLiveRunMetrics(await plugin.stopLiveRun());
+            this.liveRunStatus = '러닝 측정을 취소했어.';
+        } catch {
+            this.liveRun = this.emptyLiveRunMetrics();
+            this.liveRunStatus = '러닝 측정을 취소했어.';
+        } finally {
+            this.isLiveRunBusy = false;
+            this.cdr.detectChanges();
+        }
     }
 
     public async saveManualRun(): Promise<void> {
@@ -6245,6 +6613,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public ngAfterViewInit(): void {
         this.installDashboardViewportSync();
         this.installAgreementLoadingMessageSync();
+        this.installLiveRunListeners();
 
         this.bindNativeClick('[data-screen]', (target) => {
             const screen = target.dataset.screen as ScreenKey | undefined;

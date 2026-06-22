@@ -2158,6 +2158,202 @@ button span {
     gap: 6px;
 }
 
+.live-run-card {
+    margin: 12px 0 10px;
+    border: 0.5px solid rgba(var(--primary-fill-rgb), 0.22);
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, rgba(var(--primary-fill-rgb), 0.15), rgba(var(--primary-fill-rgb), 0.03)),
+        var(--surface);
+    padding: 13px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.light-screen .live-run-card {
+    box-shadow: 0 12px 26px rgba(14, 116, 144, 0.12);
+}
+
+.live-run-card.active {
+    border-color: rgba(var(--primary-fill-rgb), 0.42);
+}
+
+.live-run-top,
+.live-run-hero,
+.live-run-actions {
+    display: flex;
+    align-items: center;
+}
+
+.live-run-top {
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.live-run-title {
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 900;
+    line-height: 1.25;
+}
+
+.live-run-status {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 750;
+    line-height: 1.35;
+}
+
+.live-run-chip {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 5px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 6px 9px;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.light-screen .live-run-chip {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.live-run-chip.running {
+    background: rgba(var(--primary-fill-rgb), 0.16);
+    color: var(--primary);
+}
+
+.live-run-chip.paused {
+    background: rgba(250, 204, 21, 0.16);
+    color: #facc15;
+}
+
+.light-screen .live-run-chip.paused {
+    color: #92400e;
+}
+
+.live-run-hero {
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.live-run-distance,
+.live-run-time,
+.live-run-metric {
+    min-width: 0;
+}
+
+.live-run-distance span,
+.live-run-time span,
+.live-run-metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1.2;
+}
+
+.live-run-distance strong,
+.live-run-time strong {
+    display: block;
+    margin-top: 4px;
+    color: var(--text);
+    font-size: 28px;
+    font-weight: 950;
+    line-height: 1;
+}
+
+.live-run-time {
+    text-align: right;
+}
+
+.live-run-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.live-run-metric {
+    border: 0.5px solid var(--line-soft);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--screen-bg) 74%, var(--surface));
+    padding: 9px 8px;
+}
+
+.live-run-metric strong {
+    display: block;
+    overflow: hidden;
+    margin-top: 4px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.live-run-actions {
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.live-run-primary,
+.live-run-finish,
+.live-run-discard {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 40px;
+    border: 0;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.live-run-primary {
+    flex: 1 1 auto;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+    padding: 0 16px;
+}
+
+.live-run-finish {
+    flex: 1 1 auto;
+    background: var(--text);
+    color: var(--screen-bg);
+    padding: 0 16px;
+}
+
+.live-run-discard {
+    flex: 0 0 40px;
+    width: 40px;
+    background: rgba(239, 68, 68, 0.14);
+    color: #f87171;
+}
+
+.live-run-primary:disabled,
+.live-run-finish:disabled,
+.live-run-discard:disabled {
+    cursor: default;
+    opacity: 0.52;
+}
+
+.live-run-primary:focus-visible,
+.live-run-finish:focus-visible,
+.live-run-discard:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
 .calendar-upload-panel {
     margin-bottom: 8px;
     border: 0.5px solid var(--line);
@@ -11266,6 +11462,15 @@ button span {
         padding-bottom: var(--dashboard-mobile-content-bottom-padding);
         padding-left: var(--dashboard-mobile-inline-start);
         -webkit-overflow-scrolling: touch;
+    }
+
+    .live-run-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .live-run-distance strong,
+    .live-run-time strong {
+        font-size: 25px;
     }
 
     .chat-content {

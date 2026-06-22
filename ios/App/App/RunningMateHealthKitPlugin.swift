@@ -1,18 +1,31 @@
 import Capacitor
+import CoreLocation
+import CoreMotion
 import Foundation
 import HealthKit
 
 @objc(RunningMateHealthKitPlugin)
-class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
+class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate {
     let identifier = "RunningMateHealthKitPlugin"
     let jsName = "RunningMateHealthKit"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "isAvailable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestAuthorization", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getRunningWorkouts", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getRunningWorkouts", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startLiveRun", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "pauseLiveRun", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "resumeLiveRun", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopLiveRun", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getLiveRunSnapshot", returnType: CAPPluginReturnPromise)
     ]
 
     private let healthStore = HKHealthStore()
+    private let pedometer = CMPedometer()
+    private var locationManager: CLLocationManager?
+    private var liveRunSession: LiveRunSession?
+    private var pendingLocationAuthorization: ((Bool) -> Void)?
+    private var liveRunTimer: Timer?
+    private var liveHeartRateTimer: Timer?
 
     @objc func isAvailable(_ call: CAPPluginCall) {
         call.resolve(["available": HKHealthStore.isHealthDataAvailable()])
@@ -60,6 +73,353 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+    }
+
+    @objc func startLiveRun(_ call: CAPPluginCall) {
+        if let session = liveRunSession, session.status != .stopped {
+            call.resolve(liveRunPayload(for: session))
+            return
+        }
+
+        requestLocationAccess { [weak self] granted in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                guard granted else {
+                    call.reject("러닝 거리 측정을 위해 위치 권한을 허용해줘.", "location_permission_denied")
+                    return
+                }
+
+                let runType = call.getString("runType", "jogging")
+                let weightKg = call.getDouble("weightKg") ?? 60.0
+                let session = LiveRunSession(runType: runType, weightKg: max(30.0, min(weightKg, 220.0)))
+                self.liveRunSession = session
+                self.requestHealthKitAccess { _, _ in }
+                self.configureLocationTracking()
+                self.startLocationUpdates()
+                self.startPedometerUpdates(from: session.activeSegmentStart)
+                self.startLiveRunTimers()
+                self.emitLiveRunUpdate(reason: "started")
+                call.resolve(self.liveRunPayload(for: session))
+            }
+        }
+    }
+
+    @objc func pauseLiveRun(_ call: CAPPluginCall) {
+        guard let session = liveRunSession, session.status == .running else {
+            call.reject("진행 중인 러닝이 없어.", "no_active_run")
+            return
+        }
+
+        session.pause()
+        stopLocationUpdates()
+        pedometer.stopUpdates()
+        emitLiveRunUpdate(reason: "paused")
+        call.resolve(liveRunPayload(for: session))
+    }
+
+    @objc func resumeLiveRun(_ call: CAPPluginCall) {
+        guard let session = liveRunSession, session.status == .paused else {
+            call.reject("일시정지된 러닝이 없어.", "no_paused_run")
+            return
+        }
+
+        requestLocationAccess { [weak self] granted in
+            guard let self = self else { return }
+
+            DispatchQueue.main.async {
+                guard granted else {
+                    call.reject("러닝 거리 측정을 위해 위치 권한을 허용해줘.", "location_permission_denied")
+                    return
+                }
+
+                session.resume()
+                self.configureLocationTracking()
+                self.startLocationUpdates()
+                self.startPedometerUpdates(from: session.activeSegmentStart)
+                self.startLiveRunTimers()
+                self.emitLiveRunUpdate(reason: "resumed")
+                call.resolve(self.liveRunPayload(for: session))
+            }
+        }
+    }
+
+    @objc func stopLiveRun(_ call: CAPPluginCall) {
+        guard let session = liveRunSession else {
+            call.reject("종료할 러닝이 없어.", "no_active_run")
+            return
+        }
+
+        session.stop()
+        stopLiveRunSensors()
+        let payload = liveRunPayload(for: session, ended: true)
+        notifyListeners("liveRunEnded", data: payload)
+        liveRunSession = nil
+        call.resolve(payload)
+    }
+
+    @objc func getLiveRunSnapshot(_ call: CAPPluginCall) {
+        guard let session = liveRunSession else {
+            call.resolve(["active": false])
+            return
+        }
+
+        call.resolve(liveRunPayload(for: session))
+    }
+
+    private func requestLocationAccess(completion: @escaping (Bool) -> Void) {
+        DispatchQueue.main.async {
+            let manager = self.liveLocationManager()
+            let status = manager.authorizationStatus
+            switch status {
+            case .authorizedAlways, .authorizedWhenInUse:
+                completion(true)
+            case .notDetermined:
+                self.pendingLocationAuthorization = completion
+                manager.requestWhenInUseAuthorization()
+            case .denied, .restricted:
+                completion(false)
+            @unknown default:
+                completion(false)
+            }
+        }
+    }
+
+    private func liveLocationManager() -> CLLocationManager {
+        if let locationManager = locationManager {
+            return locationManager
+        }
+
+        let manager = CLLocationManager()
+        manager.delegate = self
+        locationManager = manager
+        return manager
+    }
+
+    private func configureLocationTracking() {
+        let manager = liveLocationManager()
+        manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        manager.distanceFilter = kCLDistanceFilterNone
+        manager.activityType = .fitness
+        manager.pausesLocationUpdatesAutomatically = false
+        if Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") != nil {
+            manager.allowsBackgroundLocationUpdates = true
+            manager.showsBackgroundLocationIndicator = true
+        }
+    }
+
+    private func startLocationUpdates() {
+        liveLocationManager().startUpdatingLocation()
+    }
+
+    private func stopLocationUpdates() {
+        locationManager?.stopUpdatingLocation()
+    }
+
+    private func startPedometerUpdates(from startDate: Date) {
+        guard CMPedometer.isStepCountingAvailable(), let session = liveRunSession else {
+            return
+        }
+
+        pedometer.stopUpdates()
+        pedometer.startUpdates(from: startDate) { [weak self, weak session] data, _ in
+            guard let self = self, let session = session, let data = data else { return }
+
+            DispatchQueue.main.async {
+                guard self.liveRunSession === session, session.status == .running else { return }
+
+                session.steps = session.stepOffset + data.numberOfSteps.doubleValue
+                if CMPedometer.isCadenceAvailable(), let cadence = data.currentCadence?.doubleValue, cadence.isFinite {
+                    session.cadenceStepsPerMinute = max(0, cadence * 60.0)
+                } else {
+                    let minutes = max(session.elapsedSeconds / 60.0, 0.1)
+                    session.cadenceStepsPerMinute = session.steps / minutes
+                }
+                self.emitLiveRunUpdate(reason: "pedometer")
+            }
+        }
+    }
+
+    private func startLiveRunTimers() {
+        guard liveRunTimer == nil else { return }
+
+        liveRunTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.emitLiveRunUpdate(reason: "tick")
+        }
+        if let liveRunTimer = liveRunTimer {
+            RunLoop.main.add(liveRunTimer, forMode: .common)
+        }
+
+        liveHeartRateTimer?.invalidate()
+        liveHeartRateTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.queryLiveHeartRateSamples()
+        }
+        if let liveHeartRateTimer = liveHeartRateTimer {
+            RunLoop.main.add(liveHeartRateTimer, forMode: .common)
+        }
+        queryLiveHeartRateSamples()
+    }
+
+    private func stopLiveRunSensors() {
+        stopLocationUpdates()
+        pedometer.stopUpdates()
+        liveRunTimer?.invalidate()
+        liveRunTimer = nil
+        liveHeartRateTimer?.invalidate()
+        liveHeartRateTimer = nil
+    }
+
+    private func emitLiveRunUpdate(reason: String) {
+        guard let session = liveRunSession else { return }
+        notifyListeners("liveRunUpdate", data: liveRunPayload(for: session, reason: reason))
+    }
+
+    private func liveRunPayload(for session: LiveRunSession, reason: String = "snapshot", ended: Bool = false) -> [String: Any] {
+        let elapsedSeconds = session.elapsedSeconds
+        let distanceKm = session.distanceMeters / 1000.0
+        let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? session.steps / (elapsedSeconds / 60.0) : nil)
+        let calories = estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
+        var payload: [String: Any] = [
+            "active": !ended && session.status != .stopped,
+            "id": session.id,
+            "status": ended ? "stopped" : session.status.rawValue,
+            "reason": reason,
+            "run_type": session.runType,
+            "started_at": isoString(session.startDate),
+            "distance_km": rounded(distanceKm, places: 3),
+            "duration": durationText(elapsedSeconds),
+            "duration_seconds": Int(round(elapsedSeconds)),
+            "avg_pace": distanceKm > 0.01 ? paceText(elapsedSeconds / distanceKm) : "-",
+            "calories": Int(round(calories)),
+            "step_count": Int(round(session.steps)),
+            "elevation_gain_m": Int(round(session.elevationGainMeters)),
+            "heart_rate_available": session.latestHeartRate != nil
+        ]
+
+        if let cadence = cadence, cadence.isFinite {
+            payload["cadence"] = Int(round(cadence))
+        }
+        if let latestHeartRate = session.latestHeartRate {
+            payload["heart_rate"] = Int(round(latestHeartRate))
+        }
+        if session.heartRateSampleCount > 0 {
+            payload["avg_heart_rate"] = Int(round(session.heartRateSum / Double(session.heartRateSampleCount)))
+        }
+        if let endDate = session.endDate {
+            payload["ended_at"] = isoString(endDate)
+        }
+        return payload
+    }
+
+    private func estimatedCalories(distanceKm: Double, elapsedSeconds: TimeInterval, weightKg: Double) -> Double {
+        if distanceKm > 0.05 {
+            return max(0, distanceKm * weightKg * 1.036)
+        }
+
+        let minutes = max(0, elapsedSeconds / 60.0)
+        let joggingMet = 8.3
+        return max(0, joggingMet * 3.5 * weightKg / 200.0 * minutes)
+    }
+
+    private func queryLiveHeartRateSamples() {
+        guard let session = liveRunSession,
+              session.status == .running,
+              HKHealthStore.isHealthDataAvailable(),
+              let quantityType = HKObjectType.quantityType(forIdentifier: .heartRate) else {
+            return
+        }
+
+        let predicate = HKQuery.predicateForSamples(
+            withStart: session.startDate,
+            end: Date(),
+            options: [.strictStartDate]
+        )
+        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(
+            sampleType: quantityType,
+            predicate: predicate,
+            limit: 12,
+            sortDescriptors: [sort]
+        ) { [weak self, weak session] _, samples, _ in
+            guard let self = self, let session = session else { return }
+
+            let unit = HKUnit.count().unitDivided(by: HKUnit.minute())
+            let heartRateSamples = (samples as? [HKQuantitySample]) ?? []
+            DispatchQueue.main.async {
+                guard self.liveRunSession === session else { return }
+
+                for sample in heartRateSamples {
+                    if session.heartRateSampleIds.contains(sample.uuid) {
+                        continue
+                    }
+                    let value = sample.quantity.doubleValue(for: unit)
+                    guard value.isFinite && value > 0 else { continue }
+                    session.heartRateSampleIds.insert(sample.uuid)
+                    session.latestHeartRate = value
+                    session.heartRateSum += value
+                    session.heartRateSampleCount += 1
+                }
+                self.emitLiveRunUpdate(reason: "heart_rate")
+            }
+        }
+        healthStore.execute(query)
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        guard let pendingLocationAuthorization = pendingLocationAuthorization else { return }
+
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            self.pendingLocationAuthorization = nil
+            pendingLocationAuthorization(true)
+        case .denied, .restricted:
+            self.pendingLocationAuthorization = nil
+            pendingLocationAuthorization(false)
+        case .notDetermined:
+            break
+        @unknown default:
+            self.pendingLocationAuthorization = nil
+            pendingLocationAuthorization(false)
+        }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let session = liveRunSession, session.status == .running else { return }
+
+        for location in locations {
+            guard location.horizontalAccuracy >= 0,
+                  location.horizontalAccuracy <= 55,
+                  location.timestamp >= session.activeSegmentStart else {
+                continue
+            }
+
+            if let lastLocation = session.lastLocation {
+                let delta = location.distance(from: lastLocation)
+                if delta >= 1.5 && delta <= 220 {
+                    session.distanceMeters += delta
+                }
+            }
+            session.lastLocation = location
+
+            if location.verticalAccuracy >= 0 && location.verticalAccuracy <= 30 {
+                if let lastAltitude = session.lastAltitude {
+                    let altitudeDelta = location.altitude - lastAltitude
+                    if altitudeDelta > 1.5 {
+                        session.elevationGainMeters += altitudeDelta
+                    }
+                }
+                session.lastAltitude = location.altitude
+            }
+        }
+
+        emitLiveRunUpdate(reason: "location")
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        notifyListeners("liveRunError", data: [
+            "message": "위치 정보를 가져오지 못했어.",
+            "code": "location_error"
+        ])
     }
 
     private func requestHealthKitAccess(completion: @escaping (Bool, Error?) -> Void) {
@@ -260,5 +620,77 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
     private func rounded(_ value: Double, places: Int) -> Double {
         let power = pow(10.0, Double(places))
         return (value * power).rounded() / power
+    }
+}
+
+private final class LiveRunSession {
+    enum Status: String {
+        case running
+        case paused
+        case stopped
+    }
+
+    let id = UUID().uuidString
+    let startDate = Date()
+    let runType: String
+    let weightKg: Double
+    var status: Status = .running
+    var activeSegmentStart: Date
+    var pausedAt: Date?
+    var pausedDuration: TimeInterval = 0
+    var endDate: Date?
+    var distanceMeters: Double = 0
+    var elevationGainMeters: Double = 0
+    var steps: Double = 0
+    var stepOffset: Double = 0
+    var cadenceStepsPerMinute: Double?
+    var lastLocation: CLLocation?
+    var lastAltitude: Double?
+    var latestHeartRate: Double?
+    var heartRateSum: Double = 0
+    var heartRateSampleCount: Int = 0
+    var heartRateSampleIds = Set<UUID>()
+
+    init(runType: String, weightKg: Double) {
+        self.runType = runType
+        self.weightKg = weightKg
+        self.activeSegmentStart = startDate
+    }
+
+    var elapsedSeconds: TimeInterval {
+        let end = endDate ?? Date()
+        let currentPause = status == .paused ? max(0, end.timeIntervalSince(pausedAt ?? end)) : 0
+        return max(0, end.timeIntervalSince(startDate) - pausedDuration - currentPause)
+    }
+
+    func pause() {
+        guard status == .running else { return }
+        status = .paused
+        pausedAt = Date()
+        stepOffset = steps
+    }
+
+    func resume() {
+        guard status == .paused else { return }
+        let now = Date()
+        if let pausedAt = pausedAt {
+            pausedDuration += max(0, now.timeIntervalSince(pausedAt))
+        }
+        status = .running
+        self.pausedAt = nil
+        activeSegmentStart = now
+        lastLocation = nil
+        lastAltitude = nil
+        cadenceStepsPerMinute = nil
+    }
+
+    func stop() {
+        if status == .paused, let pausedAt = pausedAt {
+            pausedDuration += max(0, Date().timeIntervalSince(pausedAt))
+        }
+        status = .stopped
+        endDate = Date()
+        stepOffset = steps
+        pausedAt = nil
     }
 }

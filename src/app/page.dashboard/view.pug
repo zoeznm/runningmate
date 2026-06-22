@@ -875,6 +875,60 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         i(class="fa-solid", [ngClass]="item.icon", aria-hidden="true")
                         span {{item.label}}
 
+                section(class="live-run-card", [class.active]="isLiveRunActive", [class.paused]="isLiveRunPaused")
+                    div(class="live-run-top")
+                        div
+                            div(class="live-run-title") 실시간 러닝
+                            div(class="live-run-status") {{liveRunStatus}}
+                        div(class="live-run-chip", [class.running]="liveRun.status === 'running'", [class.paused]="liveRun.status === 'paused'")
+                            i(class="fa-solid", [ngClass]="liveRun.status === 'running' ? 'fa-satellite-dish' : liveRun.status === 'paused' ? 'fa-pause' : 'fa-location-arrow'", aria-hidden="true")
+                            span {{liveRun.status === 'running' ? '측정 중' : liveRun.status === 'paused' ? '일시정지' : '대기'}}
+                    div(class="live-run-hero")
+                        div(class="live-run-distance")
+                            span 거리
+                            strong {{liveRunDistanceText}}
+                        div(class="live-run-time")
+                            span 시간
+                            strong {{liveRunElapsedText}}
+                    div(class="live-run-metrics")
+                        div(class="live-run-metric")
+                            span 페이스
+                            strong {{liveRunPaceText}}
+                        div(class="live-run-metric")
+                            span 심박수
+                            strong {{liveRunHeartRateText}}
+                        div(class="live-run-metric")
+                            span 케이던스
+                            strong {{liveRunCadenceText}}
+                        div(class="live-run-metric")
+                            span 칼로리
+                            strong {{liveRunCaloriesText}}
+                    div(class="live-run-actions")
+                        button(
+                            type="button",
+                            class="live-run-primary",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunSupported",
+                            (click)="isLiveRunActive ? toggleLiveRunPause() : startLiveRun()")
+                            i(class="fa-solid", [ngClass]="isLiveRunBusy ? 'fa-spinner' : liveRunPrimaryIcon", aria-hidden="true")
+                            span {{isLiveRunBusy ? '준비 중' : liveRunPrimaryText}}
+                        button(
+                            *ngIf="isLiveRunActive",
+                            type="button",
+                            class="live-run-finish",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving",
+                            (click)="finishLiveRun()")
+                            i(class="fa-solid", [ngClass]="isLiveRunSaving ? 'fa-spinner' : 'fa-flag-checkered'", aria-hidden="true")
+                            span {{isLiveRunSaving ? '저장 중' : '종료 저장'}}
+                        button(
+                            *ngIf="isLiveRunActive",
+                            type="button",
+                            class="live-run-discard",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving",
+                            aria-label="러닝 측정 취소",
+                            title="러닝 측정 취소",
+                            (click)="discardLiveRun()")
+                            i(class="fa-solid fa-xmark", aria-hidden="true")
+
                 div(class="legend-row")
                     div(class="legend-item")
                         div(class="legend-dot dot-green")
