@@ -52,42 +52,43 @@ private struct RunMateLiveRunLockView: View {
     let context: ActivityViewContext<RunningMateLiveRunAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(RunMateLiveRunTheme.accent.opacity(0.16))
                     Image(systemName: context.state.status == "paused" ? "pause.fill" : "figure.run")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(RunMateLiveRunTheme.accent)
                 }
-                .frame(width: 42, height: 42)
+                .frame(width: 36, height: 36)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("RunMate")
-                        .font(.headline.weight(.black))
+                        .font(.subheadline.weight(.black))
                         .foregroundStyle(.white)
                     Text("\(context.attributes.runTypeText) · \(context.state.statusText)")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.68))
                 }
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 6)
 
                 Text(context.state.updatedAt, style: .time)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.52))
             }
 
-            HStack(alignment: .bottom, spacing: 18) {
+            HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("거리")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white.opacity(0.56))
                     Text(context.state.distanceText)
-                        .font(.system(size: 31, weight: .black, design: .rounded))
+                        .font(.system(size: 28, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
-                        .minimumScaleFactor(0.78)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -95,20 +96,22 @@ private struct RunMateLiveRunLockView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white.opacity(0.56))
                     Text(context.state.elapsedText)
-                        .font(.system(size: 24, weight: .heavy, design: .rounded))
+                        .font(.system(size: 21, weight: .heavy, design: .rounded))
                         .foregroundStyle(RunMateLiveRunTheme.accent)
-                        .minimumScaleFactor(0.78)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
             }
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 RunMateLockMetric(title: "페이스", value: context.state.paceText)
                 RunMateLockMetric(title: "심박", value: context.state.heartRateText)
                 RunMateLockMetric(title: "케이던스", value: context.state.cadenceText)
                 RunMateLockMetric(title: "칼로리", value: context.state.caloriesText)
             }
         }
-        .padding(18)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
     }
 }
 
@@ -117,20 +120,20 @@ private struct RunMateLockMetric: View {
     let value: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.caption2.weight(.bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white.opacity(0.52))
             Text(value)
-                .font(.caption.weight(.heavy))
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white.opacity(0.92))
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .minimumScaleFactor(0.58)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 9)
-        .padding(.horizontal, 8)
-        .background(.white.opacity(0.075), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.vertical, 7)
+        .padding(.horizontal, 6)
+        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
