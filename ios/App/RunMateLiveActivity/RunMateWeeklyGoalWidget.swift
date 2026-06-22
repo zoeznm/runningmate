@@ -65,8 +65,30 @@ private struct RunMateWeeklyGoalView: View {
     }
 
     private var rectangularView: some View {
-        RunMateGoalCircles(progress: entry.progress, size: 19, checkSize: 8, spacing: 5)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        VStack(spacing: 6) {
+            statusLabel(font: .system(size: 13, weight: .bold, design: .rounded))
+            RunMateGoalCircles(progress: entry.progress, size: 17, checkSize: 7, spacing: 5)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var smallView: some View {
+        VStack(spacing: 12) {
+            statusLabel(font: .system(size: 17, weight: .black, design: .rounded))
+            RunMateGoalCircles(progress: entry.progress, size: 23, checkSize: 10, spacing: 7)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+    }
+
+    private func statusLabel(font: Font) -> some View {
+        Text(statusText)
+            .font(font)
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
     }
 
     private var circularView: some View {
@@ -78,10 +100,21 @@ private struct RunMateWeeklyGoalView: View {
         }
     }
 
-    private var smallView: some View {
-        RunMateGoalCircles(progress: entry.progress, size: 23, checkSize: 10, spacing: 7)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding()
+    private var statusText: String {
+        switch entry.progress.completedCount {
+        case 0:
+            return "이번주도 러닝 시작!"
+        case 1:
+            return "1회 러닝 완료!"
+        case 2:
+            return "2회 러닝 완료!"
+        case 3:
+            return "3회 러닝 완료!"
+        case 4:
+            return "4회 러닝 완료!"
+        default:
+            return "이번주 러닝 완료!"
+        }
     }
 }
 
