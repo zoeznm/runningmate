@@ -6792,6 +6792,22 @@ button span {
     pointer-events: none;
 }
 
+.ranking-row-status {
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    z-index: 1;
+    max-width: calc(100% - 24px);
+    border-radius: 999px;
+    background: rgba(var(--primary-fill-rgb), 0.18);
+    padding: 5px 8px;
+    color: var(--primary-fill);
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+    pointer-events: none;
+}
+
 .light-screen .ranking-row.blurred::after {
     background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(247, 247, 249, 0.42));
 }
@@ -6836,8 +6852,18 @@ button span {
     color: #cd7f32;
 }
 
+.ranking-rank.outside {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--muted);
+    font-size: 11px;
+}
+
 .light-screen .ranking-rank.silver {
     color: #78909c;
+}
+
+.light-screen .ranking-rank.outside {
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .ranking-avatar {

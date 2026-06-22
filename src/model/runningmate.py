@@ -2732,12 +2732,27 @@ class RunningMateData:
         max_distance = max([row.get("distance_km") or 0 for row in entries] or [0])
         rank_key = None
         current_rank = 0
-        for index, entry in enumerate(entries, start=1):
+        ranked_position = 0
+        for entry in entries:
+            if (entry.get("distance_km") or 0) <= 0:
+                entry["rank"] = 0
+                entry["rank_out"] = True
+                entry["rank_label"] = "순위 밖"
+                entry["rank_status"] = "달리지 않아서 순위 밖"
+                entry["bar_percent"] = 0
+                entry["highlight"] = bool(entry.get("is_viewer"))
+                entry["medal"] = ""
+                continue
+
+            ranked_position += 1
             next_rank_key = (entry.get("distance_km") or 0, entry.get("_avg_pace_seconds"))
             if next_rank_key != rank_key:
-                current_rank = index
+                current_rank = ranked_position
                 rank_key = next_rank_key
             entry["rank"] = current_rank
+            entry["rank_out"] = False
+            entry["rank_label"] = f"{current_rank}위"
+            entry["rank_status"] = ""
             entry["bar_percent"] = round(((entry.get("distance_km") or 0) / max_distance) * 100) if max_distance else 0
             entry["highlight"] = bool(entry.get("is_viewer"))
             entry["medal"] = "gold" if current_rank == 1 else "silver" if current_rank == 2 else "bronze" if current_rank == 3 else ""
@@ -2752,11 +2767,12 @@ class RunningMateData:
             same_distance = distance_groups.get(entry.get("distance_km") or 0, [])
             same_rank = rank_groups.get(entry.get("rank") or 0, [])
             pace_tiebreak_applied = (
+                not entry.get("rank_out") and
                 len(same_distance) > 1
                 and len({row.get("rank") for row in same_distance}) > 1
                 and any(row.get("_avg_pace_seconds") is not None for row in same_distance)
             )
-            entry["rank_tied"] = len(same_rank) > 1
+            entry["rank_tied"] = not entry.get("rank_out") and len(same_rank) > 1
             entry["rank_tiebreaker"] = "pace" if pace_tiebreak_applied else ""
             entry.pop("_avg_pace_seconds", None)
 
@@ -2847,7 +2863,8 @@ class RunningMateData:
         leader = (data.get("entries") or [{}])[0] if data.get("entries") else {}
         return {
             "period_label": data.get("period_label"),
-            "my_rank": me.get("rank"),
+            "my_rank": None if me.get("rank_out") else me.get("rank"),
+            "my_rank_status": me.get("rank_status") or "",
             "my_distance_km": me.get("distance_km"),
             "leader_name": leader.get("name"),
             "leader_distance_km": leader.get("distance_km"),
@@ -5097,8 +5114,8 @@ class RunningMateData:
     def _ranking_motivation(self, entries, me, period):
         if not me:
             return "랭킹 참여를 켜면 친구들과 거리 흐름을 비교할 수 있어."
-        if not entries or not (me.get("distance_km") or 0):
-            return "첫 기록을 올리면 이번 기간 랭킹이 바로 시작돼."
+        if me.get("rank_out") or not entries or not (me.get("distance_km") or 0):
+            return "아직 달리지 않아서 순위 밖이야. 첫 기록을 올리면 랭킹이 바로 시작돼."
 
         tied_count = len([
             row for row in entries

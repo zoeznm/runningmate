@@ -861,7 +861,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         *ngFor="let entry of displayedRankingEntries; let rankingIndex = index; trackBy: trackRankingEntry",
                         class="ranking-row",
                         [class.me]="entry.is_viewer",
-                        [class.top-three]="entry.rank <= 3",
+                        [class.top-three]="!entry.rank_out && entry.rank <= 3",
                         [class.blurred]="isRankingEntryBlurred(entry, rankingIndex)",
                         [ngClass]="entry.medal",
                         [attr.role]="isRankingEntryBlurred(entry, rankingIndex) ? 'listitem' : 'button'",
@@ -875,7 +875,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         div(class="ranking-row-top")
                             div([class]="rankingRankClass(entry)")
                                 i(*ngIf="entry.medal", class="fa-solid fa-medal", aria-hidden="true")
-                                span(*ngIf="!entry.medal") {{entry.rank}}
+                                span(*ngIf="!entry.medal") {{rankingRankText(entry)}}
                             div(class="ranking-avatar")
                                 img(*ngIf="entry.profile_image", [src]="entry.profile_image", [attr.alt]="entry.name")
                                 span(*ngIf="!entry.profile_image") {{rankingAvatarText(entry.name)}}
@@ -888,6 +888,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             div(class="ranking-distance") {{rankingDistanceText(entry)}}
                         div(class="ranking-bar-track", [attr.aria-label]="entry.name + ' 1위 대비 ' + entry.bar_percent + '%'")
                             div(class="ranking-bar-fill", [style.width.%]="entry.bar_percent")
+                        div(*ngIf="isRankingEntryBlurred(entry, rankingIndex) && entry.rank_out", class="ranking-row-status") {{rankingMetaText(entry)}}
 
                 section(*ngIf="activeRankingScope === 'global'", class="ranking-me-card ranking-me-card-bottom", [class.off]="!rankingParticipationEnabled")
                     div(class="ranking-me-main")

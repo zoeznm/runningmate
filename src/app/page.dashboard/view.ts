@@ -528,6 +528,9 @@ interface RankingEntry {
     privacy: 'public' | 'private';
     rank_tied: boolean;
     rank_tiebreaker: 'pace' | '';
+    rank_out: boolean;
+    rank_label: string;
+    rank_status: string;
 }
 
 interface RankingPayloadData {
@@ -2234,16 +2237,18 @@ export class Component implements AfterViewInit, OnDestroy {
     public get displayedRankingEntries(): RankingEntry[] {
         if (this.activeRankingScope !== 'global') return this.rankingEntries;
 
-        const topEntries = this.rankingEntries.slice(0, 3);
+        const topEntries = this.rankingEntries
+            .filter((entry) => !entry.rank_out)
+            .slice(0, 3);
         const topEntryIds = new Set(topEntries.map((entry) => entry.user_id));
         const blurredEntries = this.rankingEntries
-            .slice(3)
             .filter((entry) => !entry.is_viewer && !topEntryIds.has(entry.user_id));
         return [...topEntries, ...blurredEntries];
     }
 
     public get rankingMyTitle(): string {
         if (!this.rankingMe) return '내 순위 없음';
+        if (this.rankingMe.rank_out) return this.rankingMe.rank_status || '달리지 않아서 순위 밖';
         return `내 순위 ${this.rankingMe.rank}위`;
     }
 
@@ -2265,13 +2270,19 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public rankingMetaText(entry: RankingEntry): string {
+        if (entry.rank_out) return entry.rank_status || '달리지 않아서 순위 밖';
         if (entry.rank_tied) return `${entry.run_count}회 · 공동 순위`;
         if (entry.rank_tiebreaker === 'pace') return `${entry.run_count}회 · 평균 페이스 우선`;
         return `${entry.run_count}회 · 거리만 공개`;
     }
 
+    public rankingRankText(entry: RankingEntry): string {
+        if (entry.rank_out) return '밖';
+        return String(entry.rank || '-');
+    }
+
     public isRankingEntryBlurred(entry: RankingEntry, index: number): boolean {
-        return this.activeRankingScope === 'global' && index >= 3 && !entry.is_viewer;
+        return this.activeRankingScope === 'global' && !entry.is_viewer && (entry.rank_out || index >= 3);
     }
 
     public get rankingEmptyDescription(): string {
@@ -4236,7 +4247,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public rankingEntryProfileLabel(entry: RankingEntry, index: number = -1): string {
         if (index >= 0 && this.isRankingEntryBlurred(entry, index)) {
-            return `${entry.rank}위 랭킹`;
+            return entry.rank_out ? '달리지 않아서 순위 밖' : `${entry.rank}위 랭킹`;
         }
         const name = entry?.name || '러너';
         return entry?.is_viewer ? '내 프로필 보기' : `${name} 프로필 보기`;
@@ -7261,6 +7272,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public rankingRankClass(entry: RankingEntry): string {
+        if (entry.rank_out) return 'ranking-rank outside';
         return entry.medal ? `ranking-rank ${entry.medal}` : 'ranking-rank';
     }
 
@@ -9937,13 +9949,20 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!userId) return null;
 
         const distance = this.round2(this.toNumber(source['distance_km'] ?? source['distanceKm']) || 0);
-        const rank = Math.max(1, Math.round(this.toNumber(source['rank']) || 1));
+        const rankOut = Boolean(source['rank_out'] ?? source['rankOut']) || distance <= 0;
+        const rank = rankOut ? 0 : Math.max(1, Math.round(this.toNumber(source['rank']) || 1));
         const rawMedal = source['medal'];
         const medal: RankingEntry['medal'] = rawMedal === 'gold' || rawMedal === 'silver' || rawMedal === 'bronze'
             ? rawMedal
             : '';
         const rawRankTiebreaker = source['rank_tiebreaker'] ?? source['rankTiebreaker'];
         const rankTiebreaker: RankingEntry['rank_tiebreaker'] = rawRankTiebreaker === 'pace' ? 'pace' : '';
+        const rankStatus = typeof (source['rank_status'] ?? source['rankStatus']) === 'string'
+            ? String(source['rank_status'] ?? source['rankStatus']).trim()
+            : '';
+        const rankLabel = typeof (source['rank_label'] ?? source['rankLabel']) === 'string'
+            ? String(source['rank_label'] ?? source['rankLabel']).trim()
+            : '';
 
         return {
             rank,
@@ -9965,7 +9984,10 @@ export class Component implements AfterViewInit, OnDestroy {
             medal,
             privacy: source['privacy'] === 'private' ? 'private' : 'public',
             rank_tied: Boolean(source['rank_tied'] ?? source['rankTied']),
-            rank_tiebreaker: rankTiebreaker
+            rank_tiebreaker: rankTiebreaker,
+            rank_out: rankOut,
+            rank_label: rankLabel || (rankOut ? '순위 밖' : `${rank}위`),
+            rank_status: rankStatus || (rankOut ? '달리지 않아서 순위 밖' : '')
         };
     }
 
