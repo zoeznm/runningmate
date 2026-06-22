@@ -3165,6 +3165,9 @@ export class Component implements AfterViewInit, OnDestroy {
         if (screen === 'calendar') {
             await this.runDeferredDashboardTask(() => this.loadDayNotes());
             await this.runDeferredDashboardTask(() => this.loadRestDays());
+            if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+                await this.runDeferredDashboardTask(() => this.loadCycles());
+            }
             await this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth());
         }
         if (screen === 'weight') {
@@ -5447,6 +5450,9 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
         void this.loadGoalsForActiveMonth();
         void this.loadWeatherForActiveMonth();
+        if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+            void this.loadCycles({ preserveStatus: true });
+        }
     }
 
     public startCalendarSwipe(event: TouchEvent): void {
@@ -5837,7 +5843,13 @@ export class Component implements AfterViewInit, OnDestroy {
             }
 
             const savedNote = this.cycleNoteText.trim();
-            this.setCycles(Array.isArray(payload.cycles) ? payload.cycles : payload.data ? [payload.data] : [], payload.summary);
+            const rows = this.cycleRowsFromPayload(payload, true);
+            if (rows) {
+                this.setCycles(rows, payload?.summary);
+            }
+            if (!rows || !Array.isArray(payload?.cycles)) {
+                await this.loadCycles({ preserveStatus: true });
+            }
             this.cycleNoteText = savedNote;
             this.isCycleNoteEditing = false;
             this.cycleStartDate = logDate;
@@ -5878,7 +5890,12 @@ export class Component implements AfterViewInit, OnDestroy {
                 return;
             }
 
-            this.setCycles(Array.isArray(payload.data) ? payload.data : [], payload.summary);
+            const rows = this.cycleRowsFromPayload(payload);
+            if (rows) {
+                this.setCycles(rows, payload?.summary);
+            } else {
+                await this.loadCycles({ preserveStatus: true });
+            }
             this.showToast('주기 기록을 삭제했어.', 'success');
         } catch {
             this.showToast('주기 삭제 중 오류가 발생했어.', 'error');
@@ -7948,7 +7965,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private async loadCycles(): Promise<void> {
+    private async loadCycles(options: { preserveStatus?: boolean } = {}): Promise<void> {
         if (!this.shouldShowCycleFeature || !this.isCycleFeatureEnabled) {
             this.setCycles([], EMPTY_CYCLE_SUMMARY);
             return;
@@ -7959,13 +7976,41 @@ export class Component implements AfterViewInit, OnDestroy {
                 headers: this.cycleRequestHeaders()
             });
             const payload = await response.json();
-            const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
+            const rows = this.cycleRowsFromPayload(payload) || [];
             this.setCycles(rows, payload?.summary);
-            this.cycleStatus = rows.length ? '' : '생리 기록 없음';
+            if (!options.preserveStatus) {
+                this.cycleStatus = rows.length ? '' : '생리 기록 없음';
+            }
         } catch {
-            this.setCycles([], EMPTY_CYCLE_SUMMARY);
-            this.cycleStatus = '주기 데이터를 불러오지 못했어.';
+            if (!options.preserveStatus) {
+                this.setCycles([], EMPTY_CYCLE_SUMMARY);
+                this.cycleStatus = '주기 데이터를 불러오지 못했어.';
+            }
         }
+    }
+
+    private cycleRowsFromPayload(payload: unknown, allowSingleDataUpsert: boolean = false): unknown[] | null {
+        if (Array.isArray(payload)) return payload;
+
+        const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+        if (Array.isArray(source['cycles'])) return source['cycles'];
+        if (Array.isArray(source['data'])) return source['data'];
+
+        const singleRow = source['data'];
+        if (!allowSingleDataUpsert || !singleRow || typeof singleRow !== 'object') return null;
+
+        const normalized = this.normalizeCycleLog(singleRow);
+        if (!normalized) return null;
+
+        return [
+            normalized,
+            ...this.cycleLogs.filter((log) => (
+                log.id !== normalized.id &&
+                !(log.cycle_phase === normalized.cycle_phase &&
+                    log.start_date === normalized.start_date &&
+                    log.end_date === normalized.end_date)
+            ))
+        ];
     }
 
     private async loadWeatherForActiveMonth(): Promise<void> {
@@ -9277,6 +9322,9 @@ export class Component implements AfterViewInit, OnDestroy {
             .filter((row): row is CycleLog => Boolean(row))
             .sort((a, b) => b.start_date.localeCompare(a.start_date));
         this.cycleSummary = this.normalizeCycleSummary(summary);
+        if (!this.isCycleNoteEditing) {
+            this.syncCycleDraftWithSelectedDate();
+        }
         this.refreshDerivedState();
         this.cdr.detectChanges();
     }
@@ -12643,12 +12691,12 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private syncCycleDraftWithSelectedDate(): void {
+    private syncCycleDraftWithSelectedDate(forceSelectedDate: boolean = false): void {
         const date = this.selectedCalendarDate || this.todayDateKey;
-        if (!this.normalizeDateKey(this.cycleStartDate)) {
+        if (forceSelectedDate || !this.normalizeDateKey(this.cycleStartDate)) {
             this.cycleStartDate = date;
         }
-        if (!this.normalizeDateKey(this.cycleEndDate)) {
+        if (forceSelectedDate || !this.normalizeDateKey(this.cycleEndDate) || this.cycleEndDate < this.cycleStartDate) {
             this.cycleEndDate = this.cycleStartDate;
         }
         const log = this.selectedCalendarCycleLog;
@@ -12738,10 +12786,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.syncSelectedCalendarMemo();
         this.syncUploadJournalWithSelectedDate();
         if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
-            this.cycleStartDate = date;
-            if (!this.normalizeDateKey(this.cycleEndDate) || this.cycleEndDate < date) {
-                this.cycleEndDate = date;
-            }
+            this.syncCycleDraftWithSelectedDate(true);
         }
         this.selectedCalendarRuns = this.buildSelectedCalendarRuns();
         this.cdr.detectChanges();
