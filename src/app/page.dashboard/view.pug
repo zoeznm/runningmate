@@ -70,6 +70,14 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
             div(class="live-run-page-content")
                 section(*ngIf="!completedLiveRun", class="live-run-active-stage")
                     div(class="live-run-active-head")
+                        button(
+                            type="button",
+                            class="live-run-cancel-action",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunActive",
+                            aria-label="저장하지 않고 러닝 종료",
+                            title="저장하지 않고 러닝 종료",
+                            (click)="discardLiveRun()")
+                            i(class="fa-solid fa-xmark", aria-hidden="true")
                         div
                             div(class="live-run-active-label") 실시간 러닝
                             div(class="live-run-active-status") {{liveRunStatus}}

@@ -6575,9 +6575,9 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async discardLiveRun(): Promise<void> {
         if (!this.isLiveRunActive || this.isLiveRunSaving) return;
-        if (!(await this.openConfirmDialog('현재 러닝 측정을 취소할까요? 기록은 저장되지 않습니다.', {
-            title: '러닝 취소',
-            confirmLabel: '취소',
+        if (!(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
+            title: '러닝 종료',
+            confirmLabel: '저장 없이 종료',
             tone: 'danger',
             iconClass: 'fa-stop'
         }))) return;
@@ -6588,11 +6588,15 @@ export class Component implements AfterViewInit, OnDestroy {
         this.isLiveRunBusy = true;
         this.cdr.detectChanges();
         try {
-            this.liveRun = this.normalizeLiveRunMetrics(await plugin.stopLiveRun());
+            await plugin.stopLiveRun();
+            this.liveRun = this.emptyLiveRunMetrics();
             this.liveRunStatus = '러닝 측정을 취소했어.';
+            this.showToast('러닝 측정을 저장하지 않고 종료했어.', 'success');
+            this.setScreen('home');
         } catch {
             this.liveRun = this.emptyLiveRunMetrics();
             this.liveRunStatus = '러닝 측정을 취소했어.';
+            this.setScreen('home');
         } finally {
             this.isLiveRunBusy = false;
             this.cdr.detectChanges();

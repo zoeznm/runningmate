@@ -2318,8 +2318,39 @@ button span {
 .live-run-active-head {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 14px;
+    gap: 12px;
+}
+
+.live-run-active-head > div:not(.live-run-active-chip) {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.live-run-cancel-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-ink) 10%, transparent);
+    color: var(--primary-ink);
+    cursor: pointer;
+    font-size: 16px;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.live-run-cancel-action:disabled {
+    cursor: default;
+    opacity: 0.42;
+}
+
+.live-run-cancel-action:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--primary-ink) 72%, transparent);
+    outline-offset: 2px;
 }
 
 .live-run-active-label {
