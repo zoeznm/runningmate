@@ -1630,8 +1630,10 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly appShellTextProperty: string = '--app-shell-text';
     private readonly dashboardDarkBackground: string = '#12121c';
     private readonly dashboardLightBackground: string = '#f7f7f9';
+    private readonly loadingScreenBackground: string = '#000000';
     private readonly dashboardDarkTextColor: string = '#e8e8f0';
     private readonly dashboardLightTextColor: string = '#1a1a2e';
+    private readonly loadingScreenTextColor: string = '#ffffff';
     private dashboardThemeMeta: HTMLMetaElement | null = null;
     private dashboardAppRootElement: HTMLElement | null = null;
     private dashboardChromeSyncTimers: number[] = [];
@@ -6838,6 +6840,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async loadInitialDashboardData(): Promise<void> {
         this.isInitialLoading = true;
+        this.syncDashboardChrome();
         this.deferredDashboardDataStarted = false;
         this.initialCoreDataLoaded = false;
         this.initialLoadingSteps.clear();
@@ -6887,6 +6890,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.initialLoadingSteps.clear();
             this.initialLoadingDetail = '';
             this.isInitialLoading = false;
+            this.syncDashboardChrome();
             this.cdr.detectChanges();
             if (shouldStartDeferredData) {
                 this.startWeatherAutoRefresh();
@@ -12472,10 +12476,12 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardScreenBackground(): string {
+        if (this.isInitialLoading) return this.loadingScreenBackground;
         return this.isDark ? this.dashboardDarkBackground : this.dashboardLightBackground;
     }
 
     private dashboardShellTextColor(): string {
+        if (this.isInitialLoading) return this.loadingScreenTextColor;
         return this.isDark ? this.dashboardDarkTextColor : this.dashboardLightTextColor;
     }
 

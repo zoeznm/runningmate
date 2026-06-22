@@ -68,6 +68,15 @@ button span {
     background-color: var(--screen-bg, var(--dashboard-screen-bg));
 }
 
+.app-wrapper.loading-screen-mode,
+.app-wrapper.loading-screen-mode .phone-frame {
+    --dashboard-screen-bg: #000000;
+    --screen-bg: #000000;
+    background: #000000;
+    background-color: #000000;
+    color-scheme: dark;
+}
+
 .dark-screen {
     --dashboard-screen-bg: #12121c;
     --screen-bg: #12121c;
