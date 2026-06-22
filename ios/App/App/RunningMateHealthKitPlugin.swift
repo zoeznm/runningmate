@@ -3,9 +3,10 @@ import CoreLocation
 import CoreMotion
 import Foundation
 import HealthKit
+import WatchConnectivity
 
 @objc(RunningMateHealthKitPlugin)
-class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate {
+class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManagerDelegate, WCSessionDelegate {
     let identifier = "RunningMateHealthKitPlugin"
     let jsName = "RunningMateHealthKit"
     let pluginMethods: [CAPPluginMethod] = [
@@ -26,6 +27,12 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     private var pendingLocationAuthorization: ((Bool) -> Void)?
     private var liveRunTimer: Timer?
     private var liveHeartRateTimer: Timer?
+    private var watchConnectivityConfigured = false
+
+    override func load() {
+        super.load()
+        configureWatchConnectivity()
+    }
 
     @objc func isAvailable(_ call: CAPPluginCall) {
         call.resolve(["available": HKHealthStore.isHealthDataAvailable()])
@@ -95,6 +102,13 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 let session = LiveRunSession(runType: runType, weightKg: max(30.0, min(weightKg, 220.0)))
                 self.liveRunSession = session
                 self.requestHealthKitAccess { _, _ in }
+                self.configureWatchConnectivity()
+                self.sendWatchRunCommand("start", extra: [
+                    "runType": runType,
+                    "runId": session.id,
+                    "weightKg": session.weightKg,
+                    "startedAt": self.isoString(session.startDate)
+                ])
                 self.configureLocationTracking()
                 self.startLocationUpdates()
                 self.startPedometerUpdates(from: session.activeSegmentStart)
@@ -114,6 +128,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         }
 
         session.pause()
+        sendWatchRunCommand("pause", extra: ["runId": session.id])
         stopLocationUpdates()
         pedometer.stopUpdates()
         emitLiveRunUpdate(reason: "paused")
@@ -136,6 +151,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 }
 
                 session.resume()
+                self.sendWatchRunCommand("resume", extra: ["runId": session.id])
                 self.configureLocationTracking()
                 self.startLocationUpdates()
                 self.startPedometerUpdates(from: session.activeSegmentStart)
@@ -153,6 +169,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         }
 
         session.stop()
+        sendWatchRunCommand("stop", extra: ["runId": session.id])
         stopLiveRunSensors()
         let payload = liveRunPayload(for: session, ended: true)
         endLiveActivity(with: payload)
@@ -212,7 +229,9 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     }
 
     private func startLocationUpdates() {
-        liveLocationManager().startUpdatingLocation()
+        let manager = liveLocationManager()
+        manager.startUpdatingLocation()
+        manager.requestLocation()
     }
 
     private func stopLocationUpdates() {
@@ -299,9 +318,18 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
 
     private func liveRunPayload(for session: LiveRunSession, reason: String = "snapshot", ended: Bool = false) -> [String: Any] {
         let elapsedSeconds = session.elapsedSeconds
-        let distanceKm = session.distanceMeters / 1000.0
-        let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? session.steps / (elapsedSeconds / 60.0) : nil)
-        let calories = estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
+        let distanceMeters = max(session.distanceMeters, session.watchDistanceMeters ?? 0)
+        let distanceKm = distanceMeters / 1000.0
+        let steps = max(session.steps, session.watchSteps ?? 0)
+        let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? steps / (elapsedSeconds / 60.0) : nil)
+        let calories = session.watchCalories ?? estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
+        let paceSecondsPerKm: Double?
+        if distanceKm > 0.003 {
+            paceSecondsPerKm = elapsedSeconds / distanceKm
+        } else {
+            paceSecondsPerKm = session.instantPaceSecondsPerKm
+        }
+        let watchConnected = session.hasRecentWatchMetrics || watchSessionIsReachable()
         var payload: [String: Any] = [
             "active": !ended && session.status != .stopped,
             "id": session.id,
@@ -312,11 +340,14 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             "distance_km": rounded(distanceKm, places: 3),
             "duration": durationText(elapsedSeconds),
             "duration_seconds": Int(round(elapsedSeconds)),
-            "avg_pace": distanceKm > 0.01 ? paceText(elapsedSeconds / distanceKm) : "-",
+            "avg_pace": paceSecondsPerKm.map { paceText($0) } ?? "-",
             "calories": Int(round(calories)),
-            "step_count": Int(round(session.steps)),
+            "step_count": Int(round(steps)),
             "elevation_gain_m": Int(round(session.elevationGainMeters)),
-            "heart_rate_available": session.latestHeartRate != nil
+            "heart_rate_available": session.latestHeartRate != nil,
+            "watch_connected": watchConnected,
+            "watch_app_installed": watchAppInstalled(),
+            "metrics_source": watchConnected ? "apple_watch" : "iphone"
         ]
 
         if let cadence = cadence, cadence.isFinite {
@@ -332,6 +363,131 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             payload["ended_at"] = isoString(endDate)
         }
         return payload
+    }
+
+    private func configureWatchConnectivity() {
+        guard WCSession.isSupported() else { return }
+
+        let session = WCSession.default
+        if !watchConnectivityConfigured || session.delegate == nil {
+            session.delegate = self
+            watchConnectivityConfigured = true
+        }
+        if session.activationState == .notActivated {
+            session.activate()
+        }
+    }
+
+    private func sendWatchRunCommand(_ command: String, extra: [String: Any] = [:]) {
+        guard WCSession.isSupported() else { return }
+
+        configureWatchConnectivity()
+        let watchSession = WCSession.default
+        var message: [String: Any] = [
+            "type": "liveRunCommand",
+            "command": command,
+            "timestamp": Date().timeIntervalSince1970
+        ]
+        extra.forEach { message[$0.key] = $0.value }
+
+        if watchSession.activationState != .activated {
+            watchSession.activate()
+        }
+        if watchSession.isReachable {
+            watchSession.sendMessage(message, replyHandler: nil, errorHandler: nil)
+            return
+        }
+        try? watchSession.updateApplicationContext(message)
+        watchSession.transferUserInfo(message)
+    }
+
+    private func handleWatchMessage(_ message: [String: Any]) {
+        guard let type = message["type"] as? String else { return }
+
+        switch type {
+        case "liveRunMetrics":
+            handleWatchRunMetrics(message)
+        case "liveRunError":
+            let messageText = (message["message"] as? String) ?? "Apple Watch 러닝 데이터를 가져오지 못했어."
+            notifyListeners("liveRunError", data: [
+                "message": messageText,
+                "code": "watch_error"
+            ])
+        default:
+            break
+        }
+    }
+
+    private func handleWatchRunMetrics(_ message: [String: Any]) {
+        DispatchQueue.main.async {
+            guard let session = self.liveRunSession else { return }
+            if let runId = message["runId"] as? String, !runId.isEmpty, runId != session.id {
+                return
+            }
+
+            session.latestWatchMetricsAt = Date()
+            if let heartRate = self.numericValue(message["heart_rate"] ?? message["heartRate"]), heartRate > 0 {
+                let timestamp = self.numericValue(message["timestamp"]) ?? Date().timeIntervalSince1970
+                session.latestHeartRate = heartRate
+                if timestamp > session.lastWatchHeartRateTimestamp {
+                    session.lastWatchHeartRateTimestamp = timestamp
+                    session.heartRateSum += heartRate
+                    session.heartRateSampleCount += 1
+                }
+            }
+            if let avgHeartRate = self.numericValue(message["avg_heart_rate"] ?? message["avgHeartRate"]), avgHeartRate > 0, session.heartRateSampleCount == 0 {
+                session.latestHeartRate = avgHeartRate
+                session.heartRateSum = avgHeartRate
+                session.heartRateSampleCount = 1
+            }
+            if let distanceMeters = self.numericValue(message["distance_m"] ?? message["distanceMeters"]), distanceMeters >= 0 {
+                session.watchDistanceMeters = max(session.watchDistanceMeters ?? 0, distanceMeters)
+            }
+            if let calories = self.numericValue(message["calories"] ?? message["active_energy_kcal"] ?? message["activeEnergyKcal"]), calories >= 0 {
+                session.watchCalories = max(session.watchCalories ?? 0, calories)
+            }
+            if let stepCount = self.numericValue(message["step_count"] ?? message["stepCount"]), stepCount >= 0 {
+                session.watchSteps = max(session.watchSteps ?? 0, stepCount)
+            }
+            if let cadence = self.numericValue(message["cadence"]), cadence > 0 {
+                session.cadenceStepsPerMinute = cadence
+            }
+            if let pace = self.numericValue(message["pace_seconds_per_km"] ?? message["paceSecondsPerKm"]), pace > 0 {
+                session.instantPaceSecondsPerKm = pace
+            }
+
+            self.emitLiveRunUpdate(reason: "apple_watch")
+        }
+    }
+
+    private func watchAppInstalled() -> Bool {
+        guard WCSession.isSupported() else { return false }
+        configureWatchConnectivity()
+        let session = WCSession.default
+        return session.isPaired && session.isWatchAppInstalled
+    }
+
+    private func watchSessionIsReachable() -> Bool {
+        guard WCSession.isSupported() else { return false }
+        configureWatchConnectivity()
+        return WCSession.default.isReachable
+    }
+
+    private func numericValue(_ value: Any?) -> Double? {
+        if let double = value as? Double, double.isFinite {
+            return double
+        }
+        if let int = value as? Int {
+            return Double(int)
+        }
+        if let number = value as? NSNumber {
+            let double = number.doubleValue
+            return double.isFinite ? double : nil
+        }
+        if let string = value as? String, let double = Double(string), double.isFinite {
+            return double
+        }
+        return nil
     }
 
     private func estimatedCalories(distanceKm: Double, elapsedSeconds: TimeInterval, weightKg: Double) -> Double {
@@ -423,6 +579,12 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 }
             }
             session.lastLocation = location
+            if location.speed > 0.6 {
+                let instantPace = 1000.0 / location.speed
+                if instantPace >= 120 && instantPace <= 1200 {
+                    session.instantPaceSecondsPerKm = instantPace
+                }
+            }
 
             if location.verticalAccuracy >= 0 && location.verticalAccuracy <= 30 {
                 if let lastAltitude = session.lastAltitude {
@@ -443,6 +605,33 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             "message": "위치 정보를 가져오지 못했어.",
             "code": "location_error"
         ])
+    }
+
+    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+        DispatchQueue.main.async {
+            if activationState == .activated {
+                self.emitLiveRunUpdate(reason: "watch_connected")
+            }
+        }
+    }
+
+    func sessionDidBecomeInactive(_ session: WCSession) {
+    }
+
+    func sessionDidDeactivate(_ session: WCSession) {
+        session.activate()
+    }
+
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        handleWatchMessage(message)
+    }
+
+    func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
+        handleWatchMessage(applicationContext)
+    }
+
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
+        handleWatchMessage(userInfo)
     }
 
     private func requestHealthKitAccess(completion: @escaping (Bool, Error?) -> Void) {
@@ -663,8 +852,12 @@ private final class LiveRunSession {
     var pausedDuration: TimeInterval = 0
     var endDate: Date?
     var distanceMeters: Double = 0
+    var watchDistanceMeters: Double?
+    var instantPaceSecondsPerKm: Double?
     var elevationGainMeters: Double = 0
     var steps: Double = 0
+    var watchSteps: Double?
+    var watchCalories: Double?
     var stepOffset: Double = 0
     var cadenceStepsPerMinute: Double?
     var lastLocation: CLLocation?
@@ -672,6 +865,8 @@ private final class LiveRunSession {
     var latestHeartRate: Double?
     var heartRateSum: Double = 0
     var heartRateSampleCount: Int = 0
+    var lastWatchHeartRateTimestamp: TimeInterval = 0
+    var latestWatchMetricsAt: Date?
     var heartRateSampleIds = Set<UUID>()
 
     init(runType: String, weightKg: Double) {
@@ -704,6 +899,7 @@ private final class LiveRunSession {
         activeSegmentStart = now
         lastLocation = nil
         lastAltitude = nil
+        instantPaceSecondsPerKm = nil
         cadenceStepsPerMinute = nil
     }
 
@@ -715,5 +911,10 @@ private final class LiveRunSession {
         endDate = Date()
         stepOffset = steps
         pausedAt = nil
+    }
+
+    var hasRecentWatchMetrics: Bool {
+        guard let latestWatchMetricsAt = latestWatchMetricsAt else { return false }
+        return Date().timeIntervalSince(latestWatchMetricsAt) < 15
     }
 }
