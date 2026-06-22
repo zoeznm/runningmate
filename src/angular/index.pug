@@ -111,11 +111,12 @@ html(lang="ko")
                 align-items: center;
                 justify-content: center;
                 flex-direction: column;
+                box-sizing: border-box;
                 width: 100%;
                 min-height: 100vh;
-                min-height: 100dvh;
+                min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
                 gap: 10px;
-                padding: 24px;
+                padding: 24px 24px calc(24px + env(safe-area-inset-bottom, 0px));
                 background: var(--app-shell-bg, #12121c);
                 background-color: var(--app-shell-bg, #12121c);
                 color: var(--app-shell-text, #e8e8f0);
