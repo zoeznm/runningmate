@@ -5,5 +5,6 @@ import WidgetKit
 struct RunMateLiveActivityBundle: WidgetBundle {
     var body: some Widget {
         RunMateLiveRunWidget()
+        RunMateWeeklyGoalWidget()
     }
 }

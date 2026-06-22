@@ -24,6 +24,9 @@
 		B4A100042F65000100000004 /* RunMateLiveActivityBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A100132F65000100000013 /* RunMateLiveActivityBundle.swift */; };
 		B4A100052F65000100000005 /* RunMateLiveRunWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A100142F65000100000014 /* RunMateLiveRunWidget.swift */; };
 		B4A100062F65000100000006 /* RunMateLiveActivityExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B4A100152F65000100000015 /* RunMateLiveActivityExtension.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		B4A110012F67000100000001 /* RunningMateWidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A110102F67000100000010 /* RunningMateWidgetStore.swift */; };
+		B4A110022F67000100000002 /* RunningMateWidgetStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A110102F67000100000010 /* RunningMateWidgetStore.swift */; };
+		B4A110032F67000100000003 /* RunMateWeeklyGoalWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A110112F67000100000011 /* RunMateWeeklyGoalWidget.swift */; };
 		B4A200012F66000100000001 /* RunMateWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A200112F66000100000011 /* RunMateWatchApp.swift */; };
 		B4A200022F66000100000002 /* RunMateWatchWorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4A200122F66000100000012 /* RunMateWatchWorkoutManager.swift */; };
 		B4A200032F66000100000003 /* RunMateWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = B4A200142F66000100000014 /* RunMateWatch.app */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -92,6 +95,9 @@
 		B4A100132F65000100000013 /* RunMateLiveActivityBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunMateLiveActivityBundle.swift; sourceTree = "<group>"; };
 		B4A100142F65000100000014 /* RunMateLiveRunWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunMateLiveRunWidget.swift; sourceTree = "<group>"; };
 		B4A100152F65000100000015 /* RunMateLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RunMateLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4A110102F67000100000010 /* RunningMateWidgetStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningMateWidgetStore.swift; sourceTree = "<group>"; };
+		B4A110112F67000100000011 /* RunMateWeeklyGoalWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunMateWeeklyGoalWidget.swift; sourceTree = "<group>"; };
+		B4A110122F67000100000012 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		B4A200102F66000100000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B4A200112F66000100000011 /* RunMateWatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunMateWatchApp.swift; sourceTree = "<group>"; };
 		B4A200122F66000100000012 /* RunMateWatchWorkoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunMateWatchWorkoutManager.swift; sourceTree = "<group>"; };
@@ -153,6 +159,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				B3F83B9C2F5E4E1E9A910003 /* RunningMateBridgeViewController.swift */,
 				B3F83B9D2F5E4E1E9A910004 /* RunningMateHealthKitPlugin.swift */,
+				B4A110102F67000100000010 /* RunningMateWidgetStore.swift */,
 				B4A100102F65000100000010 /* RunningMateLiveRunAttributes.swift */,
 				B4A100112F65000100000011 /* RunningMateLiveActivityController.swift */,
 				B3F83BA02F5E4E1E9A910007 /* RunningMateAuthPlugin.swift */,
@@ -171,8 +178,10 @@
 			isa = PBXGroup;
 			children = (
 				B4A100122F65000100000012 /* Info.plist */,
+				B4A110122F67000100000012 /* App.entitlements */,
 				B4A100132F65000100000013 /* RunMateLiveActivityBundle.swift */,
 				B4A100142F65000100000014 /* RunMateLiveRunWidget.swift */,
+				B4A110112F67000100000011 /* RunMateWeeklyGoalWidget.swift */,
 			);
 			path = RunMateLiveActivity;
 			sourceTree = "<group>";
@@ -339,6 +348,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				B3F83B9A2F5E4E1E9A910001 /* RunningMateBridgeViewController.swift in Sources */,
 				B3F83B9B2F5E4E1E9A910002 /* RunningMateHealthKitPlugin.swift in Sources */,
+				B4A110012F67000100000001 /* RunningMateWidgetStore.swift in Sources */,
 				B4A100012F65000100000001 /* RunningMateLiveRunAttributes.swift in Sources */,
 				B4A100022F65000100000002 /* RunningMateLiveActivityController.swift in Sources */,
 				B3F83B9F2F5E4E1E9A910006 /* RunningMateAuthPlugin.swift in Sources */,
@@ -352,6 +362,8 @@
 				B4A100032F65000100000003 /* RunningMateLiveRunAttributes.swift in Sources */,
 				B4A100042F65000100000004 /* RunMateLiveActivityBundle.swift in Sources */,
 				B4A100052F65000100000005 /* RunMateLiveRunWidget.swift in Sources */,
+				B4A110022F67000100000002 /* RunningMateWidgetStore.swift in Sources */,
+				B4A110032F67000100000003 /* RunMateWeeklyGoalWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -560,6 +572,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = RunMateLiveActivity/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7DWCMD5XPA;
@@ -584,6 +597,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = RunMateLiveActivity/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7DWCMD5XPA;

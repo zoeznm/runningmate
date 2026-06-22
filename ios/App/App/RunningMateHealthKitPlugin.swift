@@ -73,6 +73,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 DispatchQueue.main.async {
                     switch result {
                     case .success(let workouts):
+                        RunningMateWidgetStore.syncRecentRuns(from: workouts)
                         call.resolve(["workouts": workouts])
                     case .failure(let error):
                         call.reject("애플워치 기록을 불러오지 못했어.", "healthkit_query_failed", error)
@@ -172,6 +173,13 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         sendWatchRunCommand("stop", extra: ["runId": session.id])
         stopLiveRunSensors()
         let payload = liveRunPayload(for: session, ended: true)
+        RunningMateWidgetStore.recordCompletedRun(
+            id: session.id,
+            startDate: session.startDate,
+            endDate: session.endDate ?? Date(),
+            distanceKm: numericValue(payload["distance_km"]) ?? 0,
+            durationSeconds: session.elapsedSeconds
+        )
         endLiveActivity(with: payload)
         notifyListeners("liveRunEnded", data: payload)
         liveRunSession = nil
