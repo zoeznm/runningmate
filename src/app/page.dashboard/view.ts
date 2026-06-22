@@ -526,6 +526,8 @@ interface RankingEntry {
     highlight: boolean;
     medal: 'gold' | 'silver' | 'bronze' | '';
     privacy: 'public' | 'private';
+    rank_tied: boolean;
+    rank_tiebreaker: 'pace' | '';
 }
 
 interface RankingPayloadData {
@@ -2260,6 +2262,12 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public rankingDistanceText(entry: RankingEntry): string {
         return this.distanceText(entry.distance_km);
+    }
+
+    public rankingMetaText(entry: RankingEntry): string {
+        if (entry.rank_tied) return `${entry.run_count}회 · 공동 순위`;
+        if (entry.rank_tiebreaker === 'pace') return `${entry.run_count}회 · 평균 페이스 우선`;
+        return `${entry.run_count}회 · 거리만 공개`;
     }
 
     public isRankingEntryBlurred(entry: RankingEntry, index: number): boolean {
@@ -9934,6 +9942,8 @@ export class Component implements AfterViewInit, OnDestroy {
         const medal: RankingEntry['medal'] = rawMedal === 'gold' || rawMedal === 'silver' || rawMedal === 'bronze'
             ? rawMedal
             : '';
+        const rawRankTiebreaker = source['rank_tiebreaker'] ?? source['rankTiebreaker'];
+        const rankTiebreaker: RankingEntry['rank_tiebreaker'] = rawRankTiebreaker === 'pace' ? 'pace' : '';
 
         return {
             rank,
@@ -9953,7 +9963,9 @@ export class Component implements AfterViewInit, OnDestroy {
             is_mutual: Boolean(source['is_mutual'] ?? source['isMutual']),
             highlight: Boolean(source['highlight']),
             medal,
-            privacy: source['privacy'] === 'private' ? 'private' : 'public'
+            privacy: source['privacy'] === 'private' ? 'private' : 'public',
+            rank_tied: Boolean(source['rank_tied'] ?? source['rankTied']),
+            rank_tiebreaker: rankTiebreaker
         };
     }
 

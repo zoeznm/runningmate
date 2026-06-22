@@ -884,7 +884,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                     span {{entry.name}}
                                     em(*ngIf="entry.is_viewer") 나
                                     em(*ngIf="!entry.is_viewer && activeRankingScope === 'global' && (entry.is_following || entry.is_mutual)") 런메이트
-                                div(class="ranking-meta") {{entry.run_count}}회 · 거리만 공개
+                                div(class="ranking-meta") {{rankingMetaText(entry)}}
                             div(class="ranking-distance") {{rankingDistanceText(entry)}}
                         div(class="ranking-bar-track", [attr.aria-label]="entry.name + ' 1위 대비 ' + entry.bar_percent + '%'")
                             div(class="ranking-bar-fill", [style.width.%]="entry.bar_percent")

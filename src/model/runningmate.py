@@ -2670,7 +2670,10 @@ class RunningMateData:
                 if self._ranking_profile_visible(profiles.get(user_id) or {}, user_id == viewer_id)
             ]
         rows = self.load_runs(include_media=False)
-        totals = {user_id: {"distance_km": 0, "run_count": 0} for user_id in target_ids}
+        totals = {
+            user_id: {"distance_km": 0, "run_count": 0, "duration_seconds": 0}
+            for user_id in target_ids
+        }
 
         for row in rows:
             date = self._date_obj(row.get("date"))
@@ -2681,14 +2684,27 @@ class RunningMateData:
             if run_user_id not in target_ids:
                 continue
 
-            totals.setdefault(run_user_id, {"distance_km": 0, "run_count": 0})
-            totals[run_user_id]["distance_km"] += row.get("distance_km") or 0
+            try:
+                distance = float(row.get("distance_km") or 0)
+            except Exception:
+                distance = 0
+            distance = distance if math.isfinite(distance) and distance > 0 else 0
+            duration_seconds = self._run_duration_seconds(row)
+
+            totals.setdefault(run_user_id, {"distance_km": 0, "run_count": 0, "duration_seconds": 0})
+            totals[run_user_id]["distance_km"] += distance
             totals[run_user_id]["run_count"] += 1
+            if duration_seconds is not None and math.isfinite(duration_seconds) and duration_seconds > 0:
+                totals[run_user_id]["duration_seconds"] += duration_seconds
 
         entries = []
         for user_id in target_ids:
             profile = profiles.get(user_id) or self._ranking_profile({}, user_id)
-            distance = round(totals.get(user_id, {}).get("distance_km", 0), 2)
+            user_total = totals.get(user_id, {})
+            raw_distance = user_total.get("distance_km", 0) or 0
+            distance = round(raw_distance, 2)
+            duration_seconds = user_total.get("duration_seconds", 0) or 0
+            avg_pace_seconds = round(duration_seconds / raw_distance) if raw_distance and duration_seconds else None
             is_following = user_id in viewer_following_ids
             is_follower = user_id in viewer_follower_ids
             entry = {
@@ -2703,16 +2719,46 @@ class RunningMateData:
                 "is_follower": is_follower,
                 "is_mutual": is_following and is_follower,
                 "privacy": "private" if profile.get("is_private") else "public",
+                "_avg_pace_seconds": avg_pace_seconds,
             }
             entries.append(entry)
 
-        entries = sorted(entries, key=lambda row: (-row.get("distance_km", 0), row.get("name") or "", row.get("user_id") or ""))
+        entries = sorted(entries, key=lambda row: (
+            -row.get("distance_km", 0),
+            row.get("_avg_pace_seconds") if row.get("_avg_pace_seconds") is not None else math.inf,
+            row.get("name") or "",
+            row.get("user_id") or "",
+        ))
         max_distance = max([row.get("distance_km") or 0 for row in entries] or [0])
+        rank_key = None
+        current_rank = 0
         for index, entry in enumerate(entries, start=1):
-            entry["rank"] = index
+            next_rank_key = (entry.get("distance_km") or 0, entry.get("_avg_pace_seconds"))
+            if next_rank_key != rank_key:
+                current_rank = index
+                rank_key = next_rank_key
+            entry["rank"] = current_rank
             entry["bar_percent"] = round(((entry.get("distance_km") or 0) / max_distance) * 100) if max_distance else 0
             entry["highlight"] = bool(entry.get("is_viewer"))
-            entry["medal"] = "gold" if index == 1 else "silver" if index == 2 else "bronze" if index == 3 else ""
+            entry["medal"] = "gold" if current_rank == 1 else "silver" if current_rank == 2 else "bronze" if current_rank == 3 else ""
+
+        distance_groups = {}
+        rank_groups = {}
+        for entry in entries:
+            distance_groups.setdefault(entry.get("distance_km") or 0, []).append(entry)
+            rank_groups.setdefault(entry.get("rank") or 0, []).append(entry)
+
+        for entry in entries:
+            same_distance = distance_groups.get(entry.get("distance_km") or 0, [])
+            same_rank = rank_groups.get(entry.get("rank") or 0, [])
+            pace_tiebreak_applied = (
+                len(same_distance) > 1
+                and len({row.get("rank") for row in same_distance}) > 1
+                and any(row.get("_avg_pace_seconds") is not None for row in same_distance)
+            )
+            entry["rank_tied"] = len(same_rank) > 1
+            entry["rank_tiebreaker"] = "pace" if pace_tiebreak_applied else ""
+            entry.pop("_avg_pace_seconds", None)
 
         for entry in entries:
             entry["name"] = self._ranking_display_name(
@@ -5053,17 +5099,38 @@ class RunningMateData:
             return "랭킹 참여를 켜면 친구들과 거리 흐름을 비교할 수 있어."
         if not entries or not (me.get("distance_km") or 0):
             return "첫 기록을 올리면 이번 기간 랭킹이 바로 시작돼."
+
+        tied_count = len([
+            row for row in entries
+            if row.get("rank") == me.get("rank") and (row.get("distance_km") or 0) == (me.get("distance_km") or 0)
+        ])
+        period_text = "이번달" if period == "this_month" else "이번주"
+        if tied_count > 1:
+            return f"현재 공동 {me.get('rank')}위야. {period_text} 페이스를 유지해보자."
+
         if me.get("rank") == 1:
-            runner_up = entries[1] if len(entries) > 1 else None
+            runner_up = next((row for row in entries if row.get("rank") != 1 and row.get("distance_km")), None)
             if runner_up and runner_up.get("distance_km"):
                 gap = round((me.get("distance_km") or 0) - (runner_up.get("distance_km") or 0), 2)
                 return f"{runner_up.get('name')}를 {gap:.2f}km 차로 앞서고 있어."
             return "현재 1위야. 이번 기간 페이스를 유지해보자."
 
-        ahead = entries[(me.get("rank") or 1) - 2] if (me.get("rank") or 0) > 1 and len(entries) >= (me.get("rank") or 0) - 1 else None
+        try:
+            me_index = entries.index(me)
+        except ValueError:
+            me_index = -1
+
+        ahead = None
+        if me_index > 0:
+            for row in reversed(entries[:me_index]):
+                if (row.get("rank") or 0) < (me.get("rank") or 0):
+                    ahead = row
+                    break
+
         if ahead:
             gap = round((ahead.get("distance_km") or 0) - (me.get("distance_km") or 0), 2)
-            period_text = "이번달" if period == "this_month" else "이번주"
+            if gap <= 0 and me.get("rank_tiebreaker") == "pace":
+                return f"{period_text} 거리는 동률이라 평균 페이스로 순위가 갈리고 있어."
             return f"{period_text} {ahead.get('name')}를 {gap:.2f}km 차로 추격 중!"
         return "조금만 더 뛰면 순위를 올릴 수 있어."
 
