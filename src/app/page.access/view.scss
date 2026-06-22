@@ -1624,6 +1624,13 @@
     object-fit: contain;
 }
 
+.social-provider-fa {
+    display: block;
+    color: currentColor;
+    font-size: 24px;
+    line-height: 1;
+}
+
 .social-hidden-text {
     display: none;
 }
@@ -2220,6 +2227,7 @@
 
 .social-provider-img,
 .social-apple-picture,
+.social-provider-fa,
 .social-apple-picture .social-provider-img {
     width: 24px;
     height: 24px;
