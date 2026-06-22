@@ -263,13 +263,11 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             DispatchQueue.main.async {
                 guard self.liveRunSession === session, session.status == .running else { return }
 
-                session.steps = session.stepOffset + data.numberOfSteps.doubleValue
-                if CMPedometer.isCadenceAvailable(), let cadence = data.currentCadence?.doubleValue, cadence.isFinite {
-                    session.cadenceStepsPerMinute = max(0, cadence * 60.0)
-                } else {
-                    let minutes = max(session.elapsedSeconds / 60.0, 0.1)
-                    session.cadenceStepsPerMinute = session.steps / minutes
-                }
+                session.updateStepMetrics(
+                    segmentSteps: data.numberOfSteps.doubleValue,
+                    currentCadenceStepsPerSecond: data.currentCadence?.doubleValue,
+                    at: Date()
+                )
                 self.emitLiveRunUpdate(reason: "pedometer")
             }
         }
@@ -279,6 +277,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         guard liveRunTimer == nil else { return }
 
         liveRunTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.queryLivePedometerSnapshot()
             self?.emitLiveRunUpdate(reason: "tick")
         }
         if let liveRunTimer = liveRunTimer {
@@ -302,6 +301,29 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         liveRunTimer = nil
         liveHeartRateTimer?.invalidate()
         liveHeartRateTimer = nil
+    }
+
+    private func queryLivePedometerSnapshot() {
+        guard CMPedometer.isStepCountingAvailable(),
+              let session = liveRunSession,
+              session.status == .running else {
+            return
+        }
+
+        pedometer.queryPedometerData(from: session.activeSegmentStart, to: Date()) { [weak self, weak session] data, _ in
+            guard let self = self, let session = session, let data = data else { return }
+
+            DispatchQueue.main.async {
+                guard self.liveRunSession === session, session.status == .running else { return }
+
+                session.updateStepMetrics(
+                    segmentSteps: data.numberOfSteps.doubleValue,
+                    currentCadenceStepsPerSecond: data.currentCadence?.doubleValue,
+                    at: Date()
+                )
+                self.emitLiveRunUpdate(reason: "pedometer_snapshot")
+            }
+        }
     }
 
     private func emitLiveRunUpdate(reason: String) {
@@ -336,7 +358,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         let steps = max(session.steps, session.watchSteps ?? 0)
         let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? steps / (elapsedSeconds / 60.0) : nil)
         let calories = session.watchCalories ?? estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
-        let averagePaceSecondsPerKm = distanceKm > 0.003 ? elapsedSeconds / distanceKm : nil
+        let averagePaceSecondsPerKm = distanceMeters >= 1.0 && elapsedSeconds > 0 ? elapsedSeconds / max(distanceKm, 0.001) : nil
         let currentPaceSecondsPerKm = session.instantPaceSecondsPerKm ?? averagePaceSecondsPerKm
         let watchConnected = session.hasRecentWatchMetrics || watchSessionIsReachable()
         var payload: [String: Any] = [
@@ -664,17 +686,17 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
 
             if let lastLocation = session.lastLocation {
                 let delta = location.distance(from: lastLocation)
+                let timeDelta = location.timestamp.timeIntervalSince(lastLocation.timestamp)
                 if delta >= 1.5 && delta <= 220 {
                     session.distanceMeters += delta
                 }
+                session.updateInstantPace(distanceMeters: delta, elapsedSeconds: timeDelta)
             }
             session.appendRouteLocation(location)
             session.lastLocation = location
             if location.speed > 0.6 {
                 let instantPace = 1000.0 / location.speed
-                if instantPace >= 120 && instantPace <= 1200 {
-                    session.instantPaceSecondsPerKm = instantPace
-                }
+                session.updateInstantPace(secondsPerKm: instantPace)
             }
 
             if location.verticalAccuracy >= 0 && location.verticalAccuracy <= 30 {
@@ -951,6 +973,8 @@ private final class LiveRunSession {
     var watchCalories: Double?
     var stepOffset: Double = 0
     var cadenceStepsPerMinute: Double?
+    var lastCadenceSampleAt: Date?
+    var lastCadenceSampleSteps: Double = 0
     var lastLocation: CLLocation?
     var lastAltitude: Double?
     var routeLocations: [CLLocation] = []
@@ -993,6 +1017,59 @@ private final class LiveRunSession {
         lastAltitude = nil
         instantPaceSecondsPerKm = nil
         cadenceStepsPerMinute = nil
+        lastCadenceSampleAt = nil
+        lastCadenceSampleSteps = stepOffset
+    }
+
+    func updateInstantPace(distanceMeters: Double, elapsedSeconds: TimeInterval) {
+        guard distanceMeters >= 1.0,
+              elapsedSeconds >= 0.75,
+              elapsedSeconds <= 20 else {
+            return
+        }
+
+        updateInstantPace(secondsPerKm: elapsedSeconds / (distanceMeters / 1000.0))
+    }
+
+    func updateInstantPace(secondsPerKm: Double) {
+        guard secondsPerKm.isFinite,
+              secondsPerKm >= 90,
+              secondsPerKm <= 1800 else {
+            return
+        }
+
+        if let current = instantPaceSecondsPerKm {
+            instantPaceSecondsPerKm = current * 0.65 + secondsPerKm * 0.35
+        } else {
+            instantPaceSecondsPerKm = secondsPerKm
+        }
+    }
+
+    func updateStepMetrics(segmentSteps: Double, currentCadenceStepsPerSecond: Double?, at date: Date) {
+        let normalizedSegmentSteps = max(0, segmentSteps)
+        let totalSteps = stepOffset + normalizedSegmentSteps
+        steps = max(steps, totalSteps)
+
+        if let currentCadenceStepsPerSecond = currentCadenceStepsPerSecond,
+           currentCadenceStepsPerSecond.isFinite,
+           currentCadenceStepsPerSecond > 0 {
+            cadenceStepsPerMinute = currentCadenceStepsPerSecond * 60.0
+        } else if let lastCadenceSampleAt = lastCadenceSampleAt {
+            let elapsed = date.timeIntervalSince(lastCadenceSampleAt)
+            let stepDelta = steps - lastCadenceSampleSteps
+            if elapsed >= 1.0, stepDelta >= 1 {
+                cadenceStepsPerMinute = stepDelta / (elapsed / 60.0)
+            } else if cadenceStepsPerMinute == nil, elapsedSeconds > 0 {
+                cadenceStepsPerMinute = steps / max(elapsedSeconds / 60.0, 0.1)
+            }
+        } else if elapsedSeconds > 0 {
+            cadenceStepsPerMinute = steps / max(elapsedSeconds / 60.0, 0.1)
+        }
+
+        if lastCadenceSampleAt == nil || date.timeIntervalSince(lastCadenceSampleAt ?? date) >= 1.0 {
+            lastCadenceSampleAt = date
+            lastCadenceSampleSteps = steps
+        }
     }
 
     func appendRouteLocation(_ location: CLLocation) {

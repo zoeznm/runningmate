@@ -6323,11 +6323,13 @@ export class Component implements AfterViewInit, OnDestroy {
     public get liveRunCurrentPaceText(): string {
         return this.liveRun.current_pace && this.liveRun.current_pace !== '-'
             ? this.displayPace(this.liveRun.current_pace)
-            : '-';
+            : this.isLiveRunActive ? '측정 중' : '-';
     }
 
     public get liveRunPaceText(): string {
-        return this.liveRun.avg_pace && this.liveRun.avg_pace !== '-' ? this.displayPace(this.liveRun.avg_pace) : '-';
+        return this.liveRun.avg_pace && this.liveRun.avg_pace !== '-'
+            ? this.displayPace(this.liveRun.avg_pace)
+            : this.isLiveRunActive ? '측정 중' : '-';
     }
 
     public get liveRunHeartRateText(): string {
@@ -6337,7 +6339,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get liveRunCadenceText(): string {
         const cadence = this.toNumber(this.liveRun.cadence);
-        return cadence !== null ? `${Math.round(cadence)} spm` : '--';
+        return cadence !== null ? `${Math.round(cadence)} spm` : this.isLiveRunActive ? '측정 중' : '--';
     }
 
     public get liveRunCaloriesText(): string {
