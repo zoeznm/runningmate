@@ -11823,6 +11823,18 @@ export class Component implements AfterViewInit, OnDestroy {
             this.dashboardAppRootElement.style.background = color;
         }
         this.dashboardThemeMeta?.setAttribute('content', color);
+        this.setNativeSafeAreaBackground(color).catch(() => null);
+    }
+
+    private nativeAuthPlugin(): any {
+        return (window as any).Capacitor?.Plugins?.RunningMateAuth || null;
+    }
+
+    private async setNativeSafeAreaBackground(color: string): Promise<void> {
+        if (!isNativeLocalOrigin()) return;
+        const plugin = this.nativeAuthPlugin();
+        if (!plugin?.setSafeAreaBackground) return;
+        await plugin.setSafeAreaBackground({ color });
     }
 
     private syncDashboardViewportHeight(): void {

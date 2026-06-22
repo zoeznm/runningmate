@@ -158,6 +158,7 @@ export class Component implements OnInit, OnDestroy {
         document.documentElement.style.background = '#020406';
         if (document.body) document.body.style.background = '#020406';
         if (this.appRootElement) this.appRootElement.style.background = '#020406';
+        this.setNativeSafeAreaBackground('#020406').catch(() => null);
         this.syncAccessViewportHeight();
         window.addEventListener('resize', this.updateAccessViewportHeight, { passive: true });
         window.addEventListener('orientationchange', this.updateAccessViewportHeight, { passive: true });
@@ -189,6 +190,17 @@ export class Component implements OnInit, OnDestroy {
         document.documentElement.style.background = this.previousRootBackground;
         if (document.body) document.body.style.background = this.previousBodyBackground;
         if (this.appRootElement) this.appRootElement.style.background = this.previousAppRootBackground;
+    }
+
+    private nativeAuthPlugin(): any {
+        return (window as any).Capacitor?.Plugins?.RunningMateAuth || null;
+    }
+
+    private async setNativeSafeAreaBackground(color: string): Promise<void> {
+        if (!isNativeLocalOrigin()) return;
+        const plugin = this.nativeAuthPlugin();
+        if (!plugin?.setSafeAreaBackground) return;
+        await plugin.setSafeAreaBackground({ color });
     }
 
     private syncAccessViewportHeight() {
@@ -735,32 +747,25 @@ export class Component implements OnInit, OnDestroy {
         await this.showLanding();
     }
 
-    public startSocialSignup(provider: string) {
+    public async startSocialSignup(provider: string) {
         if (!this.socialLoginEnabled) return;
         const normalized = String(provider || '').trim().toLowerCase();
         if (!['naver', 'google', 'apple'].includes(normalized)) return;
         if (isNativeLocalOrigin()) {
-            this.openNativeSocialAuth(`${RUNNINGMATE_API_ORIGIN}/api/auth/oauth/${normalized}/start?client=native`);
+            await this.openNativeSocialAuth(`${RUNNINGMATE_API_ORIGIN}/api/auth/oauth/${normalized}/start?client=native`);
             return;
         }
         const url = `/api/auth/oauth/${normalized}/start`;
         location.assign(url);
     }
 
-    private openNativeSocialAuth(url: string) {
+    private async openNativeSocialAuth(url: string): Promise<void> {
         try {
-            const opened = window.open(url, '_system', 'noopener,noreferrer');
-            if (opened) return;
-        } catch { }
-        try {
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.target = '_blank';
-            anchor.rel = 'noopener noreferrer';
-            document.body.appendChild(anchor);
-            anchor.click();
-            anchor.remove();
-            return;
+            const plugin = this.nativeAuthPlugin();
+            if (plugin?.openExternalAuth) {
+                await plugin.openExternalAuth({ url });
+                return;
+            }
         } catch { }
         location.assign(url);
     }

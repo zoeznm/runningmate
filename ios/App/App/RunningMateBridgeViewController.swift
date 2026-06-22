@@ -3,8 +3,13 @@ import Capacitor
 import UIKit
 
 class RunningMateBridgeViewController: CAPBridgeViewController {
+    private var appBackgroundOverride: UIColor?
     private var appBackgroundColor: UIColor {
-        UIColor { traits in
+        if let appBackgroundOverride = appBackgroundOverride {
+            return appBackgroundOverride
+        }
+
+        return UIColor { traits in
             if traits.userInterfaceStyle == .light {
                 return UIColor(red: 247.0 / 255.0, green: 247.0 / 255.0, blue: 249.0 / 255.0, alpha: 1.0)
             }
@@ -46,6 +51,15 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
         webView?.scrollView.backgroundColor = appBackgroundColor
     }
 
+    func setAppBackgroundColor(_ hexString: String) {
+        if let color = UIColor(runningMateHexString: hexString) {
+            appBackgroundOverride = color
+        } else {
+            appBackgroundOverride = nil
+        }
+        applyAppBackground()
+    }
+
     override var preferredStatusBarStyle: UIStatusBarStyle {
         .lightContent
     }
@@ -53,6 +67,7 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(RunningMateHealthKitPlugin())
+        bridge?.registerPluginInstance(RunningMateAuthPlugin())
     }
 
     func handleOAuthRedirect(_ url: URL) -> Bool {
@@ -77,5 +92,22 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
             self?.webView?.load(URLRequest(url: targetURL))
         }
         return true
+    }
+}
+
+private extension UIColor {
+    convenience init?(runningMateHexString hexString: String) {
+        let normalized = hexString.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+
+        guard normalized.count == 6,
+              let value = UInt32(normalized, radix: 16) else {
+            return nil
+        }
+
+        let red = CGFloat((value & 0xFF0000) >> 16) / 255.0
+        let green = CGFloat((value & 0x00FF00) >> 8) / 255.0
+        let blue = CGFloat(value & 0x0000FF) / 255.0
+        self.init(red: red, green: green, blue: blue, alpha: 1.0)
     }
 }

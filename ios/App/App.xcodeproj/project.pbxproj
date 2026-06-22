@@ -17,6 +17,7 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		B3F83B9A2F5E4E1E9A910001 /* RunningMateBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F83B9C2F5E4E1E9A910003 /* RunningMateBridgeViewController.swift */; };
 		B3F83B9B2F5E4E1E9A910002 /* RunningMateHealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F83B9D2F5E4E1E9A910004 /* RunningMateHealthKitPlugin.swift */; };
+		B3F83B9F2F5E4E1E9A910006 /* RunningMateAuthPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F83BA02F5E4E1E9A910007 /* RunningMateAuthPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +34,7 @@
 		B3F83B9C2F5E4E1E9A910003 /* RunningMateBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningMateBridgeViewController.swift; sourceTree = "<group>"; };
 		B3F83B9D2F5E4E1E9A910004 /* RunningMateHealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningMateHealthKitPlugin.swift; sourceTree = "<group>"; };
 		B3F83B9E2F5E4E1E9A910005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		B3F83BA02F5E4E1E9A910007 /* RunningMateAuthPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningMateAuthPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +73,7 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				B3F83B9C2F5E4E1E9A910003 /* RunningMateBridgeViewController.swift */,
 				B3F83B9D2F5E4E1E9A910004 /* RunningMateHealthKitPlugin.swift */,
+				B3F83BA02F5E4E1E9A910007 /* RunningMateAuthPlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -166,6 +169,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				B3F83B9A2F5E4E1E9A910001 /* RunningMateBridgeViewController.swift in Sources */,
 				B3F83B9B2F5E4E1E9A910002 /* RunningMateHealthKitPlugin.swift in Sources */,
+				B3F83B9F2F5E4E1E9A910006 /* RunningMateAuthPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

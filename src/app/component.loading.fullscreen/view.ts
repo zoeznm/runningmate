@@ -1,4 +1,5 @@
 import { ChangeDetectorRef, Input, OnDestroy, OnInit } from '@angular/core';
+import { isNativeLocalOrigin } from 'src/app/shared/api-base';
 
 const DEFAULT_LOADING_TIPS: string[] = [
     '오늘의 러닝 기록을 한곳에 모으고 있어요.',
@@ -18,6 +19,7 @@ export class Component implements OnInit, OnDestroy {
     private tipTimer: number = 0;
 
     public ngOnInit(): void {
+        this.setNativeSafeAreaBackground('#020406').catch(() => null);
         this.startTipRotation();
     }
 
@@ -51,5 +53,16 @@ export class Component implements OnInit, OnDestroy {
         if (!this.tipTimer || typeof window === 'undefined') return;
         window.clearInterval(this.tipTimer);
         this.tipTimer = 0;
+    }
+
+    private nativeAuthPlugin(): any {
+        return (window as any).Capacitor?.Plugins?.RunningMateAuth || null;
+    }
+
+    private async setNativeSafeAreaBackground(color: string): Promise<void> {
+        if (!isNativeLocalOrigin()) return;
+        const plugin = this.nativeAuthPlugin();
+        if (!plugin?.setSafeAreaBackground) return;
+        await plugin.setSafeAreaBackground({ color });
     }
 }
