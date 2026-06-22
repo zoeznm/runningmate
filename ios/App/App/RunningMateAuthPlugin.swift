@@ -79,11 +79,11 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
         }
 
         if #available(iOS 13.0, *) {
-            if let window = UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .flatMap { $0.windows }
-                .first(where: { $0.isKeyWindow }) {
-                return window
+            for scene in UIApplication.shared.connectedScenes {
+                guard let windowScene = scene as? UIWindowScene else { continue }
+                for window in windowScene.windows where window.isKeyWindow {
+                    return window
+                }
             }
         }
 
