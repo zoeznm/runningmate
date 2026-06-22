@@ -2229,6 +2229,17 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.convertDistanceTextUnits(this.rankingMotivationText);
     }
 
+    public get displayedRankingEntries(): RankingEntry[] {
+        if (this.activeRankingScope !== 'global') return this.rankingEntries;
+
+        const topEntries = this.rankingEntries.slice(0, 3);
+        const topEntryIds = new Set(topEntries.map((entry) => entry.user_id));
+        const blurredEntries = this.rankingEntries
+            .slice(3)
+            .filter((entry) => !entry.is_viewer && !topEntryIds.has(entry.user_id));
+        return [...topEntries, ...blurredEntries];
+    }
+
     public get rankingMyTitle(): string {
         if (!this.rankingMe) return '내 순위 없음';
         return `내 순위 ${this.rankingMe.rank}위`;
@@ -2249,6 +2260,10 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public rankingDistanceText(entry: RankingEntry): string {
         return this.distanceText(entry.distance_km);
+    }
+
+    public isRankingEntryBlurred(entry: RankingEntry, index: number): boolean {
+        return this.activeRankingScope === 'global' && index >= 3 && !entry.is_viewer;
     }
 
     public get rankingEmptyDescription(): string {
@@ -4196,9 +4211,10 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    public openRankingProfile(entry: RankingEntry, event?: Event): void {
+    public openRankingProfile(entry: RankingEntry, event?: Event, index: number = -1): void {
         event?.preventDefault();
         event?.stopPropagation();
+        if (index >= 0 && this.isRankingEntryBlurred(entry, index)) return;
         if (!entry?.user_id) return;
 
         if (entry.is_viewer) {
@@ -4210,7 +4226,10 @@ export class Component implements AfterViewInit, OnDestroy {
         this.openViewedProfile(this.rankingEntryToSocialProfile(entry));
     }
 
-    public rankingEntryProfileLabel(entry: RankingEntry): string {
+    public rankingEntryProfileLabel(entry: RankingEntry, index: number = -1): string {
+        if (index >= 0 && this.isRankingEntryBlurred(entry, index)) {
+            return `${entry.rank}위 랭킹`;
+        }
         const name = entry?.name || '러너';
         return entry?.is_viewer ? '내 프로필 보기' : `${name} 프로필 보기`;
     }

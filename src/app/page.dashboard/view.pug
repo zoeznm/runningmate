@@ -833,7 +833,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         [attr.aria-selected]="activeRankingPeriod === option.id",
                         (click)="setRankingPeriod(option.id)") {{option.label}}
 
-                section(class="ranking-me-card", [class.off]="!rankingParticipationEnabled")
+                section(*ngIf="activeRankingScope !== 'global'", class="ranking-me-card", [class.off]="!rankingParticipationEnabled")
                     div(class="ranking-me-main")
                         div(class="ranking-me-label") {{rankingFinalized ? '마감 순위' : '내 순위'}}
                         div(class="ranking-me-title") {{rankingMyTitle}}
@@ -858,18 +858,20 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
 
                 div(*ngIf="rankingEntries.length", class="ranking-list", role="list")
                     article(
-                        *ngFor="let entry of rankingEntries; trackBy: trackRankingEntry",
+                        *ngFor="let entry of displayedRankingEntries; let rankingIndex = index; trackBy: trackRankingEntry",
                         class="ranking-row",
                         [class.me]="entry.is_viewer",
                         [class.top-three]="entry.rank <= 3",
+                        [class.blurred]="isRankingEntryBlurred(entry, rankingIndex)",
                         [ngClass]="entry.medal",
-                        role="button",
-                        tabindex="0",
-                        [attr.aria-label]="rankingEntryProfileLabel(entry)",
-                        [attr.title]="rankingEntryProfileLabel(entry)",
-                        (click)="openRankingProfile(entry, $event)",
-                        (keydown.enter)="openRankingProfile(entry, $event)",
-                        (keydown.space)="openRankingProfile(entry, $event)")
+                        [attr.role]="isRankingEntryBlurred(entry, rankingIndex) ? 'listitem' : 'button'",
+                        [attr.tabindex]="isRankingEntryBlurred(entry, rankingIndex) ? -1 : 0",
+                        [attr.aria-disabled]="isRankingEntryBlurred(entry, rankingIndex) ? true : null",
+                        [attr.aria-label]="rankingEntryProfileLabel(entry, rankingIndex)",
+                        [attr.title]="rankingEntryProfileLabel(entry, rankingIndex)",
+                        (click)="openRankingProfile(entry, $event, rankingIndex)",
+                        (keydown.enter)="openRankingProfile(entry, $event, rankingIndex)",
+                        (keydown.space)="openRankingProfile(entry, $event, rankingIndex)")
                         div(class="ranking-row-top")
                             div([class]="rankingRankClass(entry)")
                                 i(*ngIf="entry.medal", class="fa-solid fa-medal", aria-hidden="true")
@@ -886,6 +888,15 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             div(class="ranking-distance") {{rankingDistanceText(entry)}}
                         div(class="ranking-bar-track", [attr.aria-label]="entry.name + ' 1위 대비 ' + entry.bar_percent + '%'")
                             div(class="ranking-bar-fill", [style.width.%]="entry.bar_percent")
+
+                section(*ngIf="activeRankingScope === 'global'", class="ranking-me-card ranking-me-card-bottom", [class.off]="!rankingParticipationEnabled")
+                    div(class="ranking-me-main")
+                        div(class="ranking-me-label") {{rankingFinalized ? '마감 순위' : '내 순위'}}
+                        div(class="ranking-me-title") {{rankingMyTitle}}
+                        div(class="ranking-me-sub") {{rankingMeSubText}}
+                    div(class="ranking-me-distance")
+                        | {{rankingMyDistanceText}}
+                        span {{distanceUnitLabel}}
 
         div(class="screen-page", [class.active]="activeScreen === 'achievements'", id="screen-achievements")
             div(class="achievement-content")
