@@ -115,12 +115,32 @@ enum RunningMateWidgetStore {
         reloadWeeklyGoalWidget()
     }
 
+    @discardableResult
+    static func replaceCompletedRuns(from workouts: [[String: Any]]) -> Int {
+        var runs: [RunningMateCompletedRunRecord] = []
+
+        for workout in workouts {
+            guard let parsed = record(from: workout),
+                  qualifies(distanceKm: parsed.distanceKm, durationSeconds: parsed.durationSeconds),
+                  !containsDuplicateRun(in: runs, id: parsed.id, startDate: parsed.startDate, endDate: parsed.endDate) else {
+                continue
+            }
+            runs.append(parsed)
+        }
+
+        saveCompletedRuns(runs)
+        reloadWeeklyGoalWidget()
+        return runs.count
+    }
+
     private static func record(from workout: [String: Any]) -> RunningMateCompletedRunRecord? {
-        let startDate = dateValue(workout["startDate"] ?? workout["started_at"]) ?? Date()
-        let endDate = dateValue(workout["endDate"] ?? workout["ended_at"]) ?? startDate
-        let distanceKm = doubleValue(workout["distance_km"]) ?? 0
+        let startDate = dateValue(workout["startDate"] ?? workout["started_at"] ?? workout["date"]) ?? Date()
         let durationSeconds = doubleValue(workout["durationSeconds"] ?? workout["duration_seconds"])
-            ?? max(0, endDate.timeIntervalSince(startDate))
+            ?? durationValue(workout["duration"])
+            ?? 0
+        let endDate = dateValue(workout["endDate"] ?? workout["ended_at"]) ?? startDate.addingTimeInterval(max(0, durationSeconds))
+        let distanceKm = doubleValue(workout["distance_km"]) ?? 0
+        let normalizedDurationSeconds = max(durationSeconds, max(0, endDate.timeIntervalSince(startDate)))
         let id = stringValue(workout["id"])
             ?? "\(Int(startDate.timeIntervalSince1970))-\(Int(endDate.timeIntervalSince1970))"
 
@@ -129,7 +149,7 @@ enum RunningMateWidgetStore {
             startDate: startDate,
             endDate: endDate,
             distanceKm: distanceKm,
-            durationSeconds: durationSeconds
+            durationSeconds: normalizedDurationSeconds
         )
     }
 
@@ -219,6 +239,10 @@ enum RunningMateWidgetStore {
     private static func dateValue(_ value: Any?) -> Date? {
         guard let string = value as? String else { return nil }
 
+        if let date = dayFormatter.date(from: string) {
+            return date
+        }
+
         let fractionalFormatter = ISO8601DateFormatter()
         fractionalFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = fractionalFormatter.date(from: string) {
@@ -229,4 +253,23 @@ enum RunningMateWidgetStore {
         formatter.formatOptions = [.withInternetDateTime]
         return formatter.date(from: string)
     }
+
+    private static func durationValue(_ value: Any?) -> TimeInterval? {
+        guard let string = value as? String, !string.isEmpty else { return nil }
+
+        let parts = string.split(separator: ":").compactMap { Double($0) }
+        guard parts.count == 2 || parts.count == 3 else { return nil }
+        if parts.count == 3 {
+            return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        }
+        return parts[0] * 60 + parts[1]
+    }
+
+    private static var dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
 }

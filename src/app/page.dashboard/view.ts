@@ -8954,6 +8954,7 @@ export class Component implements AfterViewInit, OnDestroy {
         const monthChanged = this.activeYearMonth !== nextYearMonth;
         this.activeYearMonth = nextYearMonth;
         this.refreshDerivedState();
+        this.syncWidgetRuns();
         this.cdr.detectChanges();
         if (options.loadRelatedData !== false) {
             void this.loadGoalsForActiveMonth();
@@ -8961,6 +8962,23 @@ export class Component implements AfterViewInit, OnDestroy {
                 void this.loadWeatherForActiveMonth();
             }
         }
+    }
+
+    private syncWidgetRuns(): void {
+        const plugin = this.liveRunPlugin();
+        if (!isNativeLocalOrigin() || !plugin?.syncWidgetRuns) return;
+
+        const runs = this.runs
+            .filter((run) => this.isRunningRecord(run))
+            .map((run) => ({
+                id: run.id || `${run.date}-${run.distance_km}-${run.duration || ''}`,
+                date: run.date,
+                distance_km: run.distance_km,
+                duration: run.duration || null,
+                duration_seconds: this.durationSeconds(run)
+            }));
+
+        plugin.syncWidgetRuns({ runs }).catch(() => null);
     }
 
     private setBadges(rows: unknown[]): void {
