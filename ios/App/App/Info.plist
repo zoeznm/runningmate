@@ -48,6 +48,10 @@
 	<string>러닝 중 걸음 수와 케이던스를 실시간으로 계산하기 위해 동작 및 피트니스 데이터를 사용합니다.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>러닝 기록 캡처, 사진, 영상을 선택해 업로드하기 위해 사진 보관함을 사용합니다.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

@@ -99,8 +99,10 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 self.startLocationUpdates()
                 self.startPedometerUpdates(from: session.activeSegmentStart)
                 self.startLiveRunTimers()
-                self.emitLiveRunUpdate(reason: "started")
-                call.resolve(self.liveRunPayload(for: session))
+                let payload = self.liveRunPayload(for: session, reason: "started")
+                self.startLiveActivity(with: payload)
+                self.notifyListeners("liveRunUpdate", data: payload)
+                call.resolve(payload)
             }
         }
     }
@@ -153,6 +155,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         session.stop()
         stopLiveRunSensors()
         let payload = liveRunPayload(for: session, ended: true)
+        endLiveActivity(with: payload)
         notifyListeners("liveRunEnded", data: payload)
         liveRunSession = nil
         call.resolve(payload)
@@ -271,7 +274,27 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
 
     private func emitLiveRunUpdate(reason: String) {
         guard let session = liveRunSession else { return }
-        notifyListeners("liveRunUpdate", data: liveRunPayload(for: session, reason: reason))
+        let payload = liveRunPayload(for: session, reason: reason)
+        updateLiveActivity(with: payload, force: reason != "tick")
+        notifyListeners("liveRunUpdate", data: payload)
+    }
+
+    private func startLiveActivity(with payload: [String: Any]) {
+        if #available(iOS 16.1, *) {
+            RunningMateLiveActivityController.shared.start(with: payload)
+        }
+    }
+
+    private func updateLiveActivity(with payload: [String: Any], force: Bool = false) {
+        if #available(iOS 16.1, *) {
+            RunningMateLiveActivityController.shared.update(with: payload, force: force)
+        }
+    }
+
+    private func endLiveActivity(with payload: [String: Any]) {
+        if #available(iOS 16.1, *) {
+            RunningMateLiveActivityController.shared.end(with: payload)
+        }
     }
 
     private func liveRunPayload(for session: LiveRunSession, reason: String = "snapshot", ended: Bool = false) -> [String: Any] {
