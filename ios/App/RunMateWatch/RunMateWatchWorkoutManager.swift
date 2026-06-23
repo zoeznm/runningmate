@@ -26,6 +26,8 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     private var metricsTimer: Timer?
     private var lastMetricsSentAt: Date = .distantPast
     private var lastHeartRateTimestamp: TimeInterval = 0
+    private var workoutState: HKWorkoutSessionState = .notStarted
+    private var isStoppingWorkout = false
 
     private var latestHeartRate: Double?
     private var heartRateSum: Double = 0
@@ -73,18 +75,38 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func pause() {
-        workoutSession?.pause()
-        statusText = "일시정지"
-        canPause = false
-        canResume = workoutSession != nil
+        guard let session = workoutSession else {
+            cleanupWorkout()
+            return
+        }
+
+        guard session.state == .running else {
+            syncWorkoutControls(for: session.state)
+            sendMetrics(force: true)
+            return
+        }
+
+        workoutState = .paused
+        syncWorkoutControls(for: .paused)
+        session.pause()
         sendMetrics(force: true)
     }
 
     func resume() {
-        workoutSession?.resume()
-        statusText = "러닝 중"
-        canPause = workoutSession != nil
-        canResume = false
+        guard let session = workoutSession else {
+            cleanupWorkout()
+            return
+        }
+
+        guard session.state == .paused else {
+            syncWorkoutControls(for: session.state)
+            sendMetrics(force: true)
+            return
+        }
+
+        workoutState = .running
+        syncWorkoutControls(for: .running)
+        session.resume()
         sendMetrics(force: true)
     }
 
@@ -93,10 +115,19 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
             cleanupWorkout()
             return
         }
+        guard !isStoppingWorkout else {
+            sendMetrics(force: true)
+            return
+        }
 
+        isStoppingWorkout = true
+        workoutState = .ended
         metricsTimer?.invalidate()
         metricsTimer = nil
-        workoutSession?.end()
+        if workoutSession?.state != .ended {
+            workoutSession?.end()
+        }
+        syncWorkoutControls(for: .ended)
         sendMetrics(force: true)
 
         let endedAt = Date()
@@ -123,6 +154,8 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
             self.workoutBuilder = builder
             self.startedAt = Date()
             self.runId = runId
+            self.workoutState = .notStarted
+            self.isStoppingWorkout = false
             self.latestHeartRate = nil
             self.heartRateSum = 0
             self.heartRateCount = 0
@@ -132,13 +165,11 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
             self.stepCount = 0
             self.elapsedText = "00:00"
             self.caloriesText = "0 kcal"
-            self.statusText = "러닝 중"
-            self.canPause = true
-            self.canResume = false
-            self.canStop = true
+            self.syncWorkoutControls(for: .running)
             self.isWorkoutActive = true
 
             let startDate = startedAt ?? Date()
+            self.workoutState = .running
             session.startActivity(with: startDate)
             builder.beginCollection(withStart: startDate) { [weak self] _, error in
                 DispatchQueue.main.async {
@@ -326,10 +357,41 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func currentStatus() -> String {
-        if canResume {
+        switch workoutState {
+        case .paused:
             return "paused"
+        case .running:
+            return "running"
+        case .ended:
+            return "stopped"
+        default:
+            return workoutSession == nil ? "stopped" : "running"
         }
-        return workoutSession == nil ? "stopped" : "running"
+    }
+
+    private func syncWorkoutControls(for state: HKWorkoutSessionState) {
+        workoutState = state
+        switch state {
+        case .running:
+            statusText = "러닝 중"
+            canPause = true
+            canResume = false
+            canStop = true
+        case .paused:
+            statusText = "일시정지"
+            canPause = false
+            canResume = true
+            canStop = true
+        case .ended:
+            statusText = "러닝 완료"
+            canPause = false
+            canResume = false
+            canStop = false
+        default:
+            canPause = false
+            canResume = false
+            canStop = workoutSession != nil
+        }
     }
 
     private func cleanupWorkout() {
@@ -346,6 +408,8 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         distanceMeters = 0
         activeEnergyKcal = 0
         stepCount = 0
+        workoutState = .notStarted
+        isStoppingWorkout = false
         heartRateText = "-- bpm"
         distanceText = "0.00 km"
         paceText = "-- /km"
@@ -391,25 +455,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
 extension RunMateWatchWorkoutManager: HKWorkoutSessionDelegate {
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState, from fromState: HKWorkoutSessionState, date: Date) {
         DispatchQueue.main.async {
-            switch toState {
-            case .running:
-                self.statusText = "러닝 중"
-                self.canPause = true
-                self.canResume = false
-                self.canStop = true
-            case .paused:
-                self.statusText = "일시정지"
-                self.canPause = false
-                self.canResume = true
-                self.canStop = true
-            case .ended:
-                self.statusText = "러닝 완료"
-                self.canPause = false
-                self.canResume = false
-                self.canStop = false
-            default:
-                break
-            }
+            self.syncWorkoutControls(for: toState)
             self.sendMetrics(force: true)
         }
     }

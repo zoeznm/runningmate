@@ -77,10 +77,6 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             aria-label="저장하지 않고 러닝 종료",
                             title="저장하지 않고 러닝 종료",
                             data-live-run-cancel="true",
-                            (pointerdown)="requestDiscardLiveRun($event)",
-                            (touchstart)="requestDiscardLiveRun($event)",
-                            (pointerup)="requestDiscardLiveRun($event)",
-                            (touchend)="requestDiscardLiveRun($event)",
                             (click)="requestDiscardLiveRun($event)")
                             i(class="fa-solid fa-xmark", aria-hidden="true")
                         div
