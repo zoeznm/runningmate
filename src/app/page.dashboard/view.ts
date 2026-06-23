@@ -9091,8 +9091,12 @@ export class Component implements AfterViewInit, OnDestroy {
         const plugin = this.liveRunPlugin();
         if (!isNativeLocalOrigin() || !plugin?.syncWidgetRuns) return;
 
+        const weekStart = this.weekStart(new Date());
+        const weekStartKey = this.dateKey(weekStart);
+        const weekEndKey = this.dateKey(this.addDays(weekStart, 7));
         const runs = this.runs
             .filter((run) => this.isRunningRecord(run))
+            .filter((run) => run.date >= weekStartKey && run.date < weekEndKey)
             .map((run) => ({
                 id: run.id || `${run.date}-${run.distance_km}-${run.duration || ''}`,
                 date: run.date,
@@ -9101,7 +9105,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 duration_seconds: this.durationSeconds(run)
             }));
 
-        plugin.syncWidgetRuns({ runs }).catch(() => null);
+        plugin.syncWidgetRuns({ runs, week_start: weekStartKey, week_end: weekEndKey }).catch(() => null);
     }
 
     private setBadges(rows: unknown[]): void {
@@ -9168,6 +9172,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.activeJournalViewer = updated.journal ? updated : null;
         }
         this.refreshDerivedState();
+        this.syncWidgetRuns();
         this.cdr.detectChanges();
         void this.loadTrainingLoad();
     }

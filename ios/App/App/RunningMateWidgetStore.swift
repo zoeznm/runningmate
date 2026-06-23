@@ -30,11 +30,20 @@ enum RunningMateWidgetStore {
     static let weeklyGoalCount = 5
 
     private static let completedRunsKey = "runningmate.widget.completedRuns.v1"
-    private static let minimumRunDurationSeconds: TimeInterval = 60
+    private static let syncedWeekKey = "runningmate.widget.syncedWeek.v1"
     private static let minimumRunDistanceKm = 0.05
 
     static func weeklyProgress(referenceDate: Date = Date()) -> RunningMateWeeklyProgress {
         let interval = weekInterval(containing: referenceDate)
+        guard defaults.string(forKey: syncedWeekKey) == weekKey(for: interval.start) else {
+            return RunningMateWeeklyProgress(
+                weekStart: interval.start,
+                weekEnd: interval.end,
+                goalCount: weeklyGoalCount,
+                completedRuns: []
+            )
+        }
+
         let runs = loadCompletedRuns()
             .filter { $0.endDate >= interval.start && $0.endDate < interval.end }
             .sorted { $0.endDate < $1.endDate }
@@ -117,11 +126,14 @@ enum RunningMateWidgetStore {
 
     @discardableResult
     static func replaceCompletedRuns(from workouts: [[String: Any]]) -> Int {
+        let interval = weekInterval(containing: Date())
         var runs: [RunningMateCompletedRunRecord] = []
 
         for workout in workouts {
             guard let parsed = record(from: workout),
                   qualifies(distanceKm: parsed.distanceKm, durationSeconds: parsed.durationSeconds),
+                  parsed.endDate >= interval.start,
+                  parsed.endDate < interval.end,
                   !containsDuplicateRun(in: runs, id: parsed.id, startDate: parsed.startDate, endDate: parsed.endDate) else {
                 continue
             }
@@ -129,6 +141,7 @@ enum RunningMateWidgetStore {
         }
 
         saveCompletedRuns(runs)
+        defaults.set(weekKey(for: interval.start), forKey: syncedWeekKey)
         reloadWeeklyGoalWidget()
         return runs.count
     }
@@ -154,7 +167,7 @@ enum RunningMateWidgetStore {
     }
 
     private static func qualifies(distanceKm: Double, durationSeconds: TimeInterval) -> Bool {
-        distanceKm >= minimumRunDistanceKm || durationSeconds >= minimumRunDurationSeconds
+        distanceKm >= minimumRunDistanceKm
     }
 
     private static func containsDuplicateRun(
@@ -210,6 +223,14 @@ enum RunningMateWidgetStore {
         let start = calendar.date(from: components) ?? calendar.startOfDay(for: date)
         let end = calendar.date(byAdding: .day, value: 7, to: start) ?? date.addingTimeInterval(7 * 24 * 60 * 60)
         return (start, end)
+    }
+
+    private static func weekKey(for weekStart: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: weekStart)
     }
 
     private static func stringValue(_ value: Any?) -> String? {

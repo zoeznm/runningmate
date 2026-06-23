@@ -20,10 +20,7 @@ private struct RunMateWeeklyGoalProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (RunMateWeeklyGoalEntry) -> Void) {
-        let progress = context.isPreview
-            ? RunningMateWidgetStore.sampleProgress()
-            : RunningMateWidgetStore.weeklyProgress()
-        completion(RunMateWeeklyGoalEntry(date: Date(), progress: progress))
+        completion(RunMateWeeklyGoalEntry(date: Date(), progress: RunningMateWidgetStore.weeklyProgress()))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<RunMateWeeklyGoalEntry>) -> Void) {
