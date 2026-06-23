@@ -2330,6 +2330,8 @@ button span {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    z-index: 3;
     flex: 0 0 auto;
     width: 40px;
     height: 40px;
@@ -2339,6 +2341,8 @@ button span {
     color: var(--primary-ink);
     cursor: pointer;
     font-size: 16px;
+    pointer-events: auto;
+    touch-action: manipulation;
     -webkit-appearance: none;
     appearance: none;
 }
@@ -11738,12 +11742,14 @@ button span {
 }
 
 .app-confirm-backdrop {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    z-index: 45;
+    z-index: 3000;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 100vw;
+    min-height: var(--dashboard-viewport-height);
     background: rgba(5, 10, 14, 0.58);
     padding: max(18px, env(safe-area-inset-top)) 18px max(18px, env(safe-area-inset-bottom));
     backdrop-filter: blur(14px);

@@ -1491,6 +1491,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public liveRunStatus: string = '러닝 대기 중';
     public isLiveRunBusy: boolean = false;
     public isLiveRunSaving: boolean = false;
+    public isLiveRunDiscarding: boolean = false;
     public aiConnection: AiConnection | null = null;
     public chatText: string = '';
     public isChatSending: boolean = false;
@@ -6595,6 +6596,15 @@ export class Component implements AfterViewInit, OnDestroy {
         return `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
     }
 
+    public requestDiscardLiveRun(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        if (this.isLiveRunDiscarding || this.confirmDialog.visible) return;
+        void this.discardLiveRun();
+    }
+
     public get liveRunPrimaryText(): string {
         if (!this.isLiveRunSupported) return 'iPhone 앱 전용';
         if (this.isLiveRunActive) return this.isLiveRunPaused ? '재개' : '일시정지';
@@ -6748,21 +6758,25 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async discardLiveRun(): Promise<void> {
-        if (this.isLiveRunSaving) return;
-        if (!(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
-            title: '러닝 종료',
-            confirmLabel: '저장 없이 종료',
-            tone: 'danger',
-            iconClass: 'fa-stop'
-        }))) return;
-
-        const plugin = this.liveRunPlugin();
-        this.liveRunStartSequence += 1;
-
-        this.isLiveRunBusy = true;
-        this.liveRunStatus = '러닝 측정 취소 중';
+        if (this.isLiveRunDiscarding) return;
+        this.isLiveRunDiscarding = true;
         this.cdr.detectChanges();
+
         try {
+            if (!(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
+                title: '러닝 종료',
+                confirmLabel: '저장 없이 종료',
+                tone: 'danger',
+                iconClass: 'fa-stop'
+            }))) return;
+
+            const plugin = this.liveRunPlugin();
+            this.liveRunStartSequence += 1;
+
+            this.isLiveRunBusy = true;
+            this.isLiveRunSaving = false;
+            this.liveRunStatus = '러닝 측정 취소 중';
+            this.cdr.detectChanges();
             await this.discardNativeLiveRun(plugin);
             this.liveRun = this.emptyLiveRunMetrics();
             this.liveRunStatus = '러닝 측정을 취소했어.';
@@ -6774,6 +6788,8 @@ export class Component implements AfterViewInit, OnDestroy {
             this.setScreen('home');
         } finally {
             this.isLiveRunBusy = false;
+            this.isLiveRunSaving = false;
+            this.isLiveRunDiscarding = false;
             this.cdr.detectChanges();
         }
     }

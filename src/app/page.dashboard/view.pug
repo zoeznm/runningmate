@@ -73,10 +73,12 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         button(
                             type="button",
                             class="live-run-cancel-action",
-                            [disabled]="isLiveRunSaving",
+                            [disabled]="isLiveRunDiscarding",
                             aria-label="저장하지 않고 러닝 종료",
                             title="저장하지 않고 러닝 종료",
-                            (click)="discardLiveRun()")
+                            (pointerup)="requestDiscardLiveRun($event)",
+                            (touchend)="requestDiscardLiveRun($event)",
+                            (click)="requestDiscardLiveRun($event)")
                             i(class="fa-solid fa-xmark", aria-hidden="true")
                         div
                             div(class="live-run-active-label") 실시간 러닝
