@@ -57,30 +57,13 @@ def _profile_media(user_id, visible):
     for run in running.load_runs(include_media=True, user_id=user_id):
         if run.get("is_public") is False:
             continue
-        seen_urls = set()
-        capture_url = run.get("image_url")
-        if capture_url:
-            run_id = run.get("id") or "{}-capture".format(run.get("date") or len(items))
-            capture_media = {
-                "id": "{}-capture".format(run_id),
-                "run_id": run_id,
-                "media_url": capture_url,
-                "media_type": "photo",
-                "created_at": run.get("created_at") or "",
-            }
-            items.append({
-                "media": capture_media,
-                "run": run,
-            })
-            seen_urls.add(capture_url)
         for media in run.get("media") or []:
             media_url = media.get("media_url")
-            if media_url and media_url not in seen_urls:
+            if media_url:
                 items.append({
                     "media": media,
                     "run": run,
                 })
-                seen_urls.add(media_url)
     return items[:30]
 
 

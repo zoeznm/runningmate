@@ -2194,15 +2194,8 @@ export class Component implements AfterViewInit, OnDestroy {
         const owner = this.myFeedUser();
         return this.runs
             .filter((run) => run.is_public !== false)
-            .flatMap((run) => this.profileGalleryItemsForRun(run, owner))
+            .flatMap((run) => this.mediaGalleryItemsForRun(run, owner))
             .slice(0, 30);
-    }
-
-    private profileGalleryItemsForRun(run: RunRecord, owner?: FeedUser): GalleryItem[] {
-        const items: GalleryItem[] = [];
-        const capture = this.captureGalleryItemForRun(run, owner);
-        if (capture) items.push(capture);
-        return items.concat(this.mediaGalleryItemsForRun(run, owner));
     }
 
     private mediaGalleryItemsForRun(run: RunRecord, owner?: FeedUser): GalleryItem[] {
