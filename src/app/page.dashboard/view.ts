@@ -2926,7 +2926,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async useCurrentLocationWeather(): Promise<void> {
         if (this.isWeatherLocationBusy || this.isWeatherLoading) return;
-        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        if (!this.canRequestCurrentWeatherPosition()) {
             this.showToast('이 기기에서는 위치 권한을 사용할 수 없어.', 'error');
             return;
         }
@@ -2942,9 +2942,7 @@ export class Component implements AfterViewInit, OnDestroy {
             await this.loadWeatherForActiveMonth();
             this.showToast('현재 위치 기준으로 날씨를 불러왔어.', 'success');
         } catch (error) {
-            const message = error instanceof Error && error.message
-                ? error.message
-                : '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.';
+            const message = this.weatherLocationErrorMessage(error);
             this.showToast(message, 'error');
         } finally {
             this.isWeatherLocationBusy = false;
@@ -8398,28 +8396,26 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async refreshWeatherPositionIfAlreadyGranted(): Promise<void> {
-        if (typeof navigator === 'undefined' || !navigator.geolocation) return;
-
-        const permissions = (navigator as any).permissions;
-        if (!permissions || typeof permissions.query !== 'function') return;
-
-        try {
-            const status = await permissions.query({ name: 'geolocation' });
-            if (status?.state !== 'granted') return;
-        } catch {
-            return;
-        }
-
-        try {
-            const position = await this.requestCurrentWeatherPosition();
-            this.weatherPosition = position;
-            this.storeWeatherPosition(position);
-        } catch {
-            return;
-        }
+        return;
     }
 
-    private requestCurrentWeatherPosition(): Promise<WeatherPosition> {
+    private canRequestCurrentWeatherPosition(): boolean {
+        const plugin = this.liveRunPlugin();
+        if (plugin && typeof plugin.getCurrentLocation === 'function') return true;
+        return typeof navigator !== 'undefined' && Boolean(navigator.geolocation);
+    }
+
+    private async requestCurrentWeatherPosition(): Promise<WeatherPosition> {
+        const plugin = this.liveRunPlugin();
+        if (plugin && typeof plugin.getCurrentLocation === 'function') {
+            const position = await plugin.getCurrentLocation();
+            return this.normalizeWeatherPosition(position);
+        }
+
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+            throw new Error('이 기기에서는 위치 권한을 사용할 수 없어.');
+        }
+
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -8450,6 +8446,30 @@ export class Component implements AfterViewInit, OnDestroy {
                 }
             );
         });
+    }
+
+    private normalizeWeatherPosition(value: unknown): WeatherPosition {
+        const source = value && typeof value === 'object'
+            ? value as Record<string, unknown>
+            : {};
+        const lat = this.toNumber(source['lat'] ?? source['latitude']);
+        const lon = this.toNumber(source['lon'] ?? source['lng'] ?? source['longitude']);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            throw new Error('현재 위치를 확인하지 못했어.');
+        }
+        return {
+            lat: Math.round(lat * 100000) / 100000,
+            lon: Math.round(lon * 100000) / 100000
+        };
+    }
+
+    private weatherLocationErrorMessage(error: unknown): string {
+        if (error instanceof Error && error.message) return error.message;
+        if (error && typeof error === 'object') {
+            const message = (error as { message?: unknown }).message;
+            if (typeof message === 'string' && message.trim()) return message.trim();
+        }
+        return '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.';
     }
 
     private readStoredWeatherPosition(): WeatherPosition | null {

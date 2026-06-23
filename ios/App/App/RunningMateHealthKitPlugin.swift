@@ -19,14 +19,17 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         CAPPluginMethod(name: "stopLiveRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "discardLiveRun", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "syncWidgetRuns", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getLiveRunSnapshot", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "getLiveRunSnapshot", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getCurrentLocation", returnType: CAPPluginReturnPromise)
     ]
 
     private let healthStore = HKHealthStore()
     private let pedometer = CMPedometer()
     private var locationManager: CLLocationManager?
+    private var weatherLocationManager: CLLocationManager?
     private var liveRunSession: LiveRunSession?
     private var pendingLocationAuthorization: ((Bool) -> Void)?
+    private var pendingWeatherLocationCall: CAPPluginCall?
     private var liveRunTimer: Timer?
     private var watchConnectivityConfigured = false
 
@@ -212,6 +215,29 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         ])
     }
 
+    @objc func getCurrentLocation(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard self.pendingWeatherLocationCall == nil else {
+                call.reject("이미 위치를 확인하는 중이야.", "location_in_progress")
+                return
+            }
+
+            let manager = self.currentWeatherLocationManager()
+            switch manager.authorizationStatus {
+            case .authorizedAlways, .authorizedWhenInUse:
+                self.pendingWeatherLocationCall = call
+                manager.requestLocation()
+            case .notDetermined:
+                self.pendingWeatherLocationCall = call
+                manager.requestWhenInUseAuthorization()
+            case .denied, .restricted:
+                call.reject("위치 권한이 허용되지 않았어.", "location_permission_denied")
+            @unknown default:
+                call.reject("현재 위치를 확인하지 못했어.", "location_unavailable")
+            }
+        }
+    }
+
     @objc func getLiveRunSnapshot(_ call: CAPPluginCall) {
         guard let session = liveRunSession else {
             call.resolve(["active": false])
@@ -248,6 +274,35 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         manager.delegate = self
         locationManager = manager
         return manager
+    }
+
+    private func currentWeatherLocationManager() -> CLLocationManager {
+        if let weatherLocationManager = weatherLocationManager {
+            return weatherLocationManager
+        }
+
+        let manager = CLLocationManager()
+        manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        manager.distanceFilter = kCLDistanceFilterNone
+        weatherLocationManager = manager
+        return manager
+    }
+
+    private func resolveWeatherLocation(_ location: CLLocation) {
+        guard let call = pendingWeatherLocationCall else { return }
+        pendingWeatherLocationCall = nil
+        call.resolve([
+            "lat": rounded(location.coordinate.latitude, places: 5),
+            "lon": rounded(location.coordinate.longitude, places: 5),
+            "accuracy": rounded(location.horizontalAccuracy, places: 1)
+        ])
+    }
+
+    private func rejectWeatherLocation(_ message: String, code: String) {
+        guard let call = pendingWeatherLocationCall else { return }
+        pendingWeatherLocationCall = nil
+        call.reject(message, code)
     }
 
     private func configureLocationTracking() {
@@ -619,6 +674,21 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        if manager === weatherLocationManager {
+            guard pendingWeatherLocationCall != nil else { return }
+            switch manager.authorizationStatus {
+            case .authorizedAlways, .authorizedWhenInUse:
+                manager.requestLocation()
+            case .denied, .restricted:
+                rejectWeatherLocation("위치 권한이 허용되지 않았어.", code: "location_permission_denied")
+            case .notDetermined:
+                break
+            @unknown default:
+                rejectWeatherLocation("현재 위치를 확인하지 못했어.", code: "location_unavailable")
+            }
+            return
+        }
+
         guard let pendingLocationAuthorization = pendingLocationAuthorization else { return }
 
         switch manager.authorizationStatus {
@@ -637,6 +707,18 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        if manager === weatherLocationManager {
+            if let location = locations.last,
+               location.horizontalAccuracy >= 0,
+               location.coordinate.latitude.isFinite,
+               location.coordinate.longitude.isFinite {
+                resolveWeatherLocation(location)
+            } else {
+                rejectWeatherLocation("현재 위치를 확인하지 못했어.", code: "location_unavailable")
+            }
+            return
+        }
+
         guard let session = liveRunSession, session.status == .running else { return }
 
         for location in locations {
@@ -676,6 +758,11 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        if manager === weatherLocationManager {
+            rejectWeatherLocation("현재 위치를 확인하지 못했어.", code: "location_error")
+            return
+        }
+
         notifyListeners("liveRunError", data: [
             "message": "위치 정보를 가져오지 못했어.",
             "code": "location_error"
