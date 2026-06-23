@@ -5944,7 +5944,6 @@ export class Component implements AfterViewInit, OnDestroy {
                 id: this.selectedCalendarCycleLog?.id || undefined,
                 note: this.cycleNoteText.trim()
             }, {
-                headers: this.cycleRequestHeaders(),
                 retries: 2,
                 retryDelayMs: 500,
                 timeoutMs: 12000
@@ -5996,7 +5995,6 @@ export class Component implements AfterViewInit, OnDestroy {
                 consent: true,
                 id: log.id
             }, {
-                headers: this.cycleRequestHeaders(),
                 retries: 2,
                 retryDelayMs: 500,
                 timeoutMs: 12000
@@ -6040,7 +6038,6 @@ export class Component implements AfterViewInit, OnDestroy {
                 consent: true,
                 all: true
             }, {
-                headers: this.cycleRequestHeaders(),
                 retries: 2,
                 retryDelayMs: 500,
                 timeoutMs: 12000
@@ -8101,7 +8098,6 @@ export class Component implements AfterViewInit, OnDestroy {
 
         const requestSeq = ++this.cycleRequestSeq;
         const result = await apiFetch<any>('/api/cycles?enabled=1', {
-            headers: this.cycleRequestHeaders(),
             retries: 2,
             retryDelayMs: 500,
             timeoutMs: 12000
@@ -8110,10 +8106,12 @@ export class Component implements AfterViewInit, OnDestroy {
 
         if (!result.success) {
             if (!options.preserveStatus) {
-                if (!this.cycleLogs.length) {
-                    this.setCycles([], EMPTY_CYCLE_SUMMARY);
+                if (this.cycleLogs.length) {
+                    this.refreshDerivedState();
+                    this.cycleStatus = '기존 주기 기록 표시 중';
+                } else {
+                    this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 데이터를 불러오지 못했어.';
                 }
-                this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 데이터를 불러오지 못했어.';
             }
             return;
         }
@@ -8127,8 +8125,12 @@ export class Component implements AfterViewInit, OnDestroy {
             }
         } catch {
             if (!options.preserveStatus) {
-                this.setCycles([], EMPTY_CYCLE_SUMMARY);
-                this.cycleStatus = '주기 데이터를 불러오지 못했어.';
+                if (this.cycleLogs.length) {
+                    this.refreshDerivedState();
+                    this.cycleStatus = '기존 주기 기록 표시 중';
+                } else {
+                    this.cycleStatus = '주기 데이터를 불러오지 못했어.';
+                }
             }
         }
     }
@@ -12418,12 +12420,6 @@ export class Component implements AfterViewInit, OnDestroy {
         const month = Number(match[2]);
         if (!Number.isInteger(month) || month < 1 || month > 12) return null;
         return `${match[1]}-${String(month).padStart(2, '0')}`;
-    }
-
-    private cycleRequestHeaders(): HeadersInit {
-        return {
-            'X-Cycle-Consent': 'true'
-        };
     }
 
     private cloneDefaultSettings(): AppSettings {

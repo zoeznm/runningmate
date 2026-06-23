@@ -79,8 +79,7 @@ _privacy_headers()
 user_id = _current_user_id()
 if not user_id:
     wiz.response.status(401, success=False, message="로그인이 필요합니다.")
-
-if not _has_cycle_consent(payload):
+elif not _has_cycle_consent(payload):
     if request.method == "GET":
         wiz.response.json({
             "success": True,
