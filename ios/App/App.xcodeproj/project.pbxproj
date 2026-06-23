@@ -41,6 +41,15 @@
 		B4A2100A2F6800010000000A /* watch-icon-marketing.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A210192F68000100000019 /* watch-icon-marketing.png */; };
 		B4A2100B2F6800010000000B /* watch-icon-long-look-44x44@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A2101A2F6800010000001A /* watch-icon-long-look-44x44@2x.png */; };
 		B4A2100C2F6800010000000C /* AppIcon44x44@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A2101B2F6800010000001B /* AppIcon44x44@2x.png */; };
+		B4A220012F69000100000001 /* AppIcon24x24@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221012F69000100000001 /* AppIcon24x24@2x.png */; };
+		B4A220022F69000100000002 /* AppIcon27.5x27.5@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221022F69000100000002 /* AppIcon27.5x27.5@2x.png */; };
+		B4A220032F69000100000003 /* AppIcon29x29@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221032F69000100000003 /* AppIcon29x29@2x.png */; };
+		B4A220042F69000100000004 /* AppIcon29x29@3x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221042F69000100000004 /* AppIcon29x29@3x.png */; };
+		B4A220052F69000100000005 /* AppIcon40x40@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221052F69000100000005 /* AppIcon40x40@2x.png */; };
+		B4A220062F69000100000006 /* AppIcon50x50@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221062F69000100000006 /* AppIcon50x50@2x.png */; };
+		B4A220072F69000100000007 /* AppIcon86x86@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221072F69000100000007 /* AppIcon86x86@2x.png */; };
+		B4A220082F69000100000008 /* AppIcon98x98@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221082F69000100000008 /* AppIcon98x98@2x.png */; };
+		B4A220092F69000100000009 /* AppIcon108x108@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A221092F69000100000009 /* AppIcon108x108@2x.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -125,6 +134,15 @@
 		B4A210192F68000100000019 /* watch-icon-marketing.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/watch-icon-marketing.png"; sourceTree = "<group>"; };
 		B4A2101A2F6800010000001A /* watch-icon-long-look-44x44@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "WatchIcons/watch-icon-long-look-44x44@2x.png"; sourceTree = "<group>"; };
 		B4A2101B2F6800010000001B /* AppIcon44x44@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon44x44@2x.png"; sourceTree = "<group>"; };
+		B4A221012F69000100000001 /* AppIcon24x24@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon24x24@2x.png"; sourceTree = "<group>"; };
+		B4A221022F69000100000002 /* AppIcon27.5x27.5@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon27.5x27.5@2x.png"; sourceTree = "<group>"; };
+		B4A221032F69000100000003 /* AppIcon29x29@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon29x29@2x.png"; sourceTree = "<group>"; };
+		B4A221042F69000100000004 /* AppIcon29x29@3x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon29x29@3x.png"; sourceTree = "<group>"; };
+		B4A221052F69000100000005 /* AppIcon40x40@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon40x40@2x.png"; sourceTree = "<group>"; };
+		B4A221062F69000100000006 /* AppIcon50x50@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon50x50@2x.png"; sourceTree = "<group>"; };
+		B4A221072F69000100000007 /* AppIcon86x86@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon86x86@2x.png"; sourceTree = "<group>"; };
+		B4A221082F69000100000008 /* AppIcon98x98@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon98x98@2x.png"; sourceTree = "<group>"; };
+		B4A221092F69000100000009 /* AppIcon108x108@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon108x108@2x.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -219,7 +237,16 @@
 				B4A210132F68000100000013 /* watch-icon-settings@2x.png */,
 				B4A210142F68000100000014 /* watch-icon-settings@3x.png */,
 				B4A210152F68000100000015 /* watch-icon-app-launcher@2x.png */,
+				B4A221012F69000100000001 /* AppIcon24x24@2x.png */,
+				B4A221022F69000100000002 /* AppIcon27.5x27.5@2x.png */,
+				B4A221032F69000100000003 /* AppIcon29x29@2x.png */,
+				B4A221042F69000100000004 /* AppIcon29x29@3x.png */,
+				B4A221052F69000100000005 /* AppIcon40x40@2x.png */,
 				B4A2101B2F6800010000001B /* AppIcon44x44@2x.png */,
+				B4A221062F69000100000006 /* AppIcon50x50@2x.png */,
+				B4A221072F69000100000007 /* AppIcon86x86@2x.png */,
+				B4A221082F69000100000008 /* AppIcon98x98@2x.png */,
+				B4A221092F69000100000009 /* AppIcon108x108@2x.png */,
 				B4A2101A2F6800010000001A /* watch-icon-long-look-44x44@2x.png */,
 				B4A210172F68000100000017 /* watch-icon-short-look-38mm@2x.png */,
 				B4A210182F68000100000018 /* watch-icon-short-look-42mm@2x.png */,
@@ -374,7 +401,16 @@
 				B4A210042F68000100000004 /* watch-icon-settings@2x.png in Resources */,
 				B4A210052F68000100000005 /* watch-icon-settings@3x.png in Resources */,
 				B4A210062F68000100000006 /* watch-icon-app-launcher@2x.png in Resources */,
+				B4A220012F69000100000001 /* AppIcon24x24@2x.png in Resources */,
+				B4A220022F69000100000002 /* AppIcon27.5x27.5@2x.png in Resources */,
+				B4A220032F69000100000003 /* AppIcon29x29@2x.png in Resources */,
+				B4A220042F69000100000004 /* AppIcon29x29@3x.png in Resources */,
+				B4A220052F69000100000005 /* AppIcon40x40@2x.png in Resources */,
 				B4A2100C2F6800010000000C /* AppIcon44x44@2x.png in Resources */,
+				B4A220062F69000100000006 /* AppIcon50x50@2x.png in Resources */,
+				B4A220072F69000100000007 /* AppIcon86x86@2x.png in Resources */,
+				B4A220082F69000100000008 /* AppIcon98x98@2x.png in Resources */,
+				B4A220092F69000100000009 /* AppIcon108x108@2x.png in Resources */,
 				B4A2100B2F6800010000000B /* watch-icon-long-look-44x44@2x.png in Resources */,
 				B4A210082F68000100000008 /* watch-icon-short-look-38mm@2x.png in Resources */,
 				B4A210092F68000100000009 /* watch-icon-short-look-42mm@2x.png in Resources */,
