@@ -39,6 +39,14 @@
       "subtype": "38mm"
     },
     {
+      "filename": "AppIcon44x44@2x.png",
+      "idiom": "watch",
+      "role": "longLook",
+      "scale": "2x",
+      "size": "44x44",
+      "subtype": "42mm"
+    },
+    {
       "filename": "watch-icon-short-look-38mm@2x.png",
       "idiom": "watch",
       "role": "quickLook",

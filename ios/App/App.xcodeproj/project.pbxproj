@@ -40,6 +40,7 @@
 		B4A210092F68000100000009 /* watch-icon-short-look-42mm@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A210182F68000100000018 /* watch-icon-short-look-42mm@2x.png */; };
 		B4A2100A2F6800010000000A /* watch-icon-marketing.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A210192F68000100000019 /* watch-icon-marketing.png */; };
 		B4A2100B2F6800010000000B /* watch-icon-long-look-44x44@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A2101A2F6800010000001A /* watch-icon-long-look-44x44@2x.png */; };
+		B4A2100C2F6800010000000C /* AppIcon44x44@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = B4A2101B2F6800010000001B /* AppIcon44x44@2x.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -123,6 +124,7 @@
 		B4A210182F68000100000018 /* watch-icon-short-look-42mm@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/watch-icon-short-look-42mm@2x.png"; sourceTree = "<group>"; };
 		B4A210192F68000100000019 /* watch-icon-marketing.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/watch-icon-marketing.png"; sourceTree = "<group>"; };
 		B4A2101A2F6800010000001A /* watch-icon-long-look-44x44@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "WatchIcons/watch-icon-long-look-44x44@2x.png"; sourceTree = "<group>"; };
+		B4A2101B2F6800010000001B /* AppIcon44x44@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Assets.xcassets/AppIcon.appiconset/AppIcon44x44@2x.png"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -217,6 +219,7 @@
 				B4A210132F68000100000013 /* watch-icon-settings@2x.png */,
 				B4A210142F68000100000014 /* watch-icon-settings@3x.png */,
 				B4A210152F68000100000015 /* watch-icon-app-launcher@2x.png */,
+				B4A2101B2F6800010000001B /* AppIcon44x44@2x.png */,
 				B4A2101A2F6800010000001A /* watch-icon-long-look-44x44@2x.png */,
 				B4A210172F68000100000017 /* watch-icon-short-look-38mm@2x.png */,
 				B4A210182F68000100000018 /* watch-icon-short-look-42mm@2x.png */,
@@ -371,6 +374,7 @@
 				B4A210042F68000100000004 /* watch-icon-settings@2x.png in Resources */,
 				B4A210052F68000100000005 /* watch-icon-settings@3x.png in Resources */,
 				B4A210062F68000100000006 /* watch-icon-app-launcher@2x.png in Resources */,
+				B4A2100C2F6800010000000C /* AppIcon44x44@2x.png in Resources */,
 				B4A2100B2F6800010000000B /* watch-icon-long-look-44x44@2x.png in Resources */,
 				B4A210082F68000100000008 /* watch-icon-short-look-38mm@2x.png in Resources */,
 				B4A210092F68000100000009 /* watch-icon-short-look-42mm@2x.png in Resources */,
