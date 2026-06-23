@@ -1,5 +1,5 @@
-main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!isDark", [class.loading-screen-mode]="isInitialLoading", [class.live-run-screen-mode]="activeScreen === 'live-run'", id="appRoot", aria-label="러닝메이트 디자인 레퍼런스")
-    div([class]="phoneClass", [class.live-run-mode]="activeScreen === 'live-run'")
+main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!isDark", [class.loading-screen-mode]="isInitialLoading", [class.live-run-screen-mode]="activeScreen === 'live-run'", [class.live-run-paused-mode]="activeScreen === 'live-run' && isLiveRunPaused", id="appRoot", aria-label="러닝메이트 디자인 레퍼런스")
+    div([class]="phoneClass", [class.live-run-mode]="activeScreen === 'live-run'", [class.live-run-paused-mode]="activeScreen === 'live-run' && isLiveRunPaused")
         wiz-component-loading-fullscreen(*ngIf="isInitialLoading", message="RunMate", [detail]="initialLoadingDetail", [tips]="initialLoadingTips")
         div(*ngIf="!isInitialLoading && initialErrorMessage", class="dashboard-error-overlay")
             wiz-component-error-state([message]="initialErrorMessage", [onRetry]="retryInitialLoad")

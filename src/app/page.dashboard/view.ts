@@ -1651,11 +1651,15 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly loadingScreenBackground: string = '#000000';
     private readonly liveRunDarkBackground: string = '#24d6b5';
     private readonly liveRunLightBackground: string = '#0e7490';
+    private readonly liveRunPausedDarkBackground: string = '#000000';
+    private readonly liveRunPausedLightBackground: string = '#ffffff';
     private readonly dashboardDarkTextColor: string = '#e8e8f0';
     private readonly dashboardLightTextColor: string = '#1a1a2e';
     private readonly loadingScreenTextColor: string = '#ffffff';
     private readonly liveRunDarkTextColor: string = '#021513';
     private readonly liveRunLightTextColor: string = '#ffffff';
+    private readonly liveRunPausedDarkTextColor: string = '#ffffff';
+    private readonly liveRunPausedLightTextColor: string = '#1a1a2e';
     private dashboardThemeMeta: HTMLMetaElement | null = null;
     private dashboardAppRootElement: HTMLElement | null = null;
     private dashboardChromeSyncTimers: number[] = [];
@@ -6327,7 +6331,12 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private applyLiveRunMetrics(value: unknown): void {
+        const previousBackground = this.dashboardScreenBackground();
+        const previousTextColor = this.dashboardShellTextColor();
         this.liveRun = this.normalizeLiveRunMetrics(value);
+        if (previousBackground !== this.dashboardScreenBackground() || previousTextColor !== this.dashboardShellTextColor()) {
+            this.syncDashboardChrome();
+        }
         this.cdr.detectChanges();
     }
 
@@ -12850,6 +12859,9 @@ export class Component implements AfterViewInit, OnDestroy {
     private dashboardScreenBackground(): string {
         if (this.isInitialLoading) return this.loadingScreenBackground;
         if (this.activeScreen === 'live-run') {
+            if (this.isLiveRunPaused) {
+                return this.isDark ? this.liveRunPausedDarkBackground : this.liveRunPausedLightBackground;
+            }
             return this.isDark ? this.liveRunDarkBackground : this.liveRunLightBackground;
         }
         return this.isDark ? this.dashboardDarkBackground : this.dashboardLightBackground;
@@ -12858,6 +12870,9 @@ export class Component implements AfterViewInit, OnDestroy {
     private dashboardShellTextColor(): string {
         if (this.isInitialLoading) return this.loadingScreenTextColor;
         if (this.activeScreen === 'live-run') {
+            if (this.isLiveRunPaused) {
+                return this.isDark ? this.liveRunPausedDarkTextColor : this.liveRunPausedLightTextColor;
+            }
             return this.isDark ? this.liveRunDarkTextColor : this.liveRunLightTextColor;
         }
         return this.isDark ? this.dashboardDarkTextColor : this.dashboardLightTextColor;
