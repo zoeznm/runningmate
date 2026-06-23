@@ -8,6 +8,17 @@
     <string>RunMate</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIconFiles</key>
+    <array>
+        <string>watch-icon-notification-38mm@2x.png</string>
+        <string>watch-icon-notification-42mm@2x.png</string>
+        <string>watch-icon-settings@2x.png</string>
+        <string>watch-icon-settings@3x.png</string>
+        <string>watch-icon-app-launcher@2x.png</string>
+        <string>watch-icon-short-look-38mm@2x.png</string>
+        <string>watch-icon-short-look-42mm@2x.png</string>
+        <string>watch-icon-marketing.png</string>
+    </array>
     <key>CFBundleIdentifier</key>
     <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
     <key>CFBundleInfoDictionaryVersion</key>
