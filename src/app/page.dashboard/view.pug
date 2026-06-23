@@ -1093,162 +1093,178 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 (click)="saveCalendarActivity('home_training')")
                                 i(class="fa-solid fa-house-chimney", aria-hidden="true")
                                 span 홈트 기록
-                    div(*ngIf="!selectedCalendarRuns.length", class="calendar-upload-panel", [class.disabled]="!canUploadSelectedCalendarDate")
-                        div(class="calendar-upload-copy")
-                            div(class="calendar-upload-title") 기록 업로드
-                            div(class="calendar-upload-sub") {{calendarUploadHelpText}}
-                        div(class="run-type-section")
-                            div(class="run-type-section-title") 러닝 종류
-                            div(class="run-type-chip-row", role="radiogroup", aria-label="러닝 종류")
+                        button(
+                            type="button",
+                            class="calendar-live-run-start-btn",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving",
+                            (click)="openLiveRunScreen()")
+                            i(class="fa-solid", [ngClass]="isLiveRunBusy || isLiveRunSaving ? 'fa-spinner' : 'fa-person-running'", aria-hidden="true")
+                            span {{homeLiveRunButtonText}}
+                    div(*ngIf="!selectedCalendarRuns.length", class="calendar-upload-panel", [class.disabled]="!canUploadSelectedCalendarDate", [class.expanded]="calendarUploadExpanded")
+                        button(
+                            type="button",
+                            class="calendar-upload-toggle",
+                            [attr.aria-expanded]="calendarUploadExpanded",
+                            (click)="toggleCalendarUploadExpanded()")
+                            div(class="calendar-upload-copy")
+                                div(class="calendar-upload-title-row")
+                                    span(class="calendar-upload-title") 기록 업로드
+                                    small(*ngIf="!calendarUploadExpanded") 수동으로 기록 업로드
+                                div(*ngIf="calendarUploadExpanded", class="calendar-upload-sub") {{calendarUploadHelpText}}
+                            i(class="fa-solid", [ngClass]="calendarUploadExpanded ? 'fa-chevron-up' : 'fa-chevron-down'", aria-hidden="true")
+                        div(*ngIf="calendarUploadExpanded", class="calendar-upload-body")
+                            div(class="run-type-section")
+                                div(class="run-type-section-title") 러닝 종류
+                                div(class="run-type-chip-row", role="radiogroup", aria-label="러닝 종류")
+                                    button(
+                                        *ngFor="let type of runTypeOptions; trackBy: trackRunType",
+                                        type="button",
+                                        class="run-type-select-chip",
+                                        [ngClass]="runTypeClass(type.id)",
+                                        [class.active]="selectedRunType === type.id",
+                                        [attr.aria-checked]="selectedRunType === type.id",
+                                        role="radio",
+                                        (click)="selectRunType(type.id)") {{type.label}}
+                            input(
+                                id="calendarRunImageInput",
+                                class="sr-only",
+                                type="file",
+                                accept="image/*",
+                                multiple=true,
+                                [disabled]="isUploading || !canUploadSelectedCalendarDate",
+                                (change)="onCalendarFilesSelected($event)")
+                            div(class="calendar-upload-actions")
+                                label(
+                                    class="calendar-upload-btn",
+                                    for="calendarRunImageInput",
+                                    [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
+                                    i(class="fa-solid fa-upload", aria-hidden="true")
+                                    span {{calendarUploadButtonText}}
                                 button(
-                                    *ngFor="let type of runTypeOptions; trackBy: trackRunType",
                                     type="button",
-                                    class="run-type-select-chip",
-                                    [ngClass]="runTypeClass(type.id)",
-                                    [class.active]="selectedRunType === type.id",
-                                    [attr.aria-checked]="selectedRunType === type.id",
-                                    role="radio",
-                                    (click)="selectRunType(type.id)") {{type.label}}
-                        input(
-                            id="calendarRunImageInput",
-                            class="sr-only",
-                            type="file",
-                            accept="image/*",
-                            multiple=true,
-                            [disabled]="isUploading || !canUploadSelectedCalendarDate",
-                            (change)="onCalendarFilesSelected($event)")
-                        div(class="calendar-upload-actions")
-                            label(
-                                class="calendar-upload-btn",
-                                for="calendarRunImageInput",
-                                [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
-                                i(class="fa-solid fa-upload", aria-hidden="true")
-                                span {{calendarUploadButtonText}}
-                            button(
-                                type="button",
-                                class="calendar-manual-btn",
-                                [class.active]="manualEntryVisible && !manualEntryRunId",
-                                [attr.aria-pressed]="manualEntryVisible && !manualEntryRunId",
-                                [disabled]="isUploading || isManualRunSaving || !canUploadSelectedCalendarDate",
-                                (click)="!(manualEntryVisible && !manualEntryRunId) && openManualEntry()")
-                                i(class="fa-solid fa-pen-to-square", aria-hidden="true")
-                                span {{manualEntryVisible && !manualEntryRunId ? '수동 입력 중' : '수동 입력'}}
+                                    class="calendar-manual-btn",
+                                    [class.active]="manualEntryVisible && !manualEntryRunId",
+                                    [attr.aria-pressed]="manualEntryVisible && !manualEntryRunId",
+                                    [disabled]="isUploading || isManualRunSaving || !canUploadSelectedCalendarDate",
+                                    (click)="!(manualEntryVisible && !manualEntryRunId) && openManualEntry()")
+                                    i(class="fa-solid fa-pen-to-square", aria-hidden="true")
+                                    span {{manualEntryVisible && !manualEntryRunId ? '수동 입력 중' : '수동 입력'}}
+                            div(
+                                *ngIf="isUploading || uploadProgress > 0",
+                                class="upload-progress calendar-upload-progress",
+                                role="progressbar",
+                                aria-valuemin="0",
+                                aria-valuemax="100",
+                                [attr.aria-valuenow]="uploadProgress")
+                                div(class="upload-progress-track")
+                                    div(class="upload-progress-fill", [ngStyle]="uploadProgressStyle")
+                                div(class="upload-progress-meta")
+                                    span {{uploadStatus || '대기 중'}}
+                                    span {{uploadProgress}}%
+                            div(*ngIf="uploadStatus && !uploadProgress", class="upload-status") {{uploadStatus}}
+                            wiz-component-error-state(
+                                *ngIf="parseErrorMessage",
+                                [message]="parseErrorMessage",
+                                [onRetry]="switchToManualInput",
+                                retryLabel="수동 입력")
+                            form(*ngIf="manualEntryVisible", class="manual-run-form", (submit)="saveManualRun(); $event.preventDefault()")
+                                div(class="manual-run-form-head")
+                                    div
+                                        div(class="manual-run-title") 수동 입력
+                                        div(class="manual-run-sub") {{selectedCalendarDateText || '오늘'}} 기록으로 저장돼.
+                                    button(type="button", class="manual-run-close", aria-label="수동 입력 닫기", [disabled]="isManualRunSaving", (click)="closeManualEntry()")
+                                        i(class="fa-solid fa-xmark", aria-hidden="true")
+                                div(class="manual-run-grid")
+                                    label(class="manual-run-field")
+                                        span 거리
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="0.01", inputmode="decimal", placeholder="5.00", [(ngModel)]="manualRunForm.distance_km", name="manualDistance")
+                                            em {{distanceUnitLabel}}
+                                    label(class="manual-run-field")
+                                        span {{paceDisplaySettingsText}}
+                                        input(type="text", [placeholder]="appSettings.paceDisplay === 'speed' ? '10.0' : '5:30'", [(ngModel)]="manualRunForm.avg_pace", name="manualPace")
+                                    label(class="manual-run-field")
+                                        span 시간
+                                        input(type="text", placeholder="00:30:00", [(ngModel)]="manualRunForm.duration", name="manualDuration")
+                                    label(class="manual-run-field")
+                                        span 칼로리
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="1", inputmode="numeric", placeholder="250", [(ngModel)]="manualRunForm.calories", name="manualCalories")
+                                            em kcal
+                                    label(class="manual-run-field")
+                                        span 심박수
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="1", inputmode="numeric", placeholder="145", [(ngModel)]="manualRunForm.avg_heart_rate", name="manualHeartRate")
+                                            em bpm
+                                    label(class="manual-run-field")
+                                        span 케이던스
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="1", inputmode="numeric", placeholder="170", [(ngModel)]="manualRunForm.cadence", name="manualCadence")
+                                            em spm
+                                div(class="manual-run-actions")
+                                    button(type="button", class="manual-run-secondary", [disabled]="isManualRunSaving", (click)="closeManualEntry()") 취소
+                                    button(type="submit", class="manual-run-primary", [disabled]="isManualRunSaving")
+                                        wiz-component-loading-spinner(*ngIf="isManualRunSaving", size="sm", label="수동 기록 저장 중")
+                                        span {{isManualRunSaving ? '저장 중' : '저장'}}
+                    div(*ngIf="!selectedCalendarRuns.length", class="run-media-section calendar-draft-media-section")
+                        div(class="run-media-head")
+                            div
+                                div(class="run-media-title") 사진/영상 추가
+                                div(class="run-media-sub") {{calendarMediaDraftText}}
+                            input(
+                                '#calendarDraftMediaInput'="",
+                                id="calendarDraftMediaInput",
+                                class="sr-only",
+                                type="file",
+                                accept="image/*,video/*",
+                                multiple=true,
+                                [disabled]="isUploading || !canUploadSelectedCalendarDate",
+                                (change)="onCalendarMediaDraftSelected($event)")
+                            div(class="run-media-actions")
+                                button(
+                                    type="button",
+                                    class="run-privacy-toggle run-media-privacy-toggle",
+                                    [class.private]="!calendarUploadIsPublic",
+                                    [disabled]="isUploading",
+                                    [attr.aria-pressed]="calendarUploadIsPublic",
+                                    aria-label="업로드하면 피드에 표시 공개 또는 비공개 선택",
+                                    title="업로드하면 피드에 표시",
+                                    (click)="toggleCalendarUploadPrivacy($event)")
+                                    i(class="fa-solid", [ngClass]="calendarUploadIsPublic ? 'fa-eye' : 'fa-eye-slash'", aria-hidden="true")
+                                    span {{calendarUploadPrivacyText}}
+                                button(
+                                    type="button",
+                                    class="run-media-add-btn",
+                                    [disabled]="isUploading || !canUploadSelectedCalendarDate",
+                                    (click)="calendarDraftMediaInput.click()")
+                                    i(class="fa-solid", [ngClass]="isUploading ? 'fa-spinner' : 'fa-plus'", aria-hidden="true")
+                                    span {{calendarMediaDraftButtonText}}
                         div(*ngIf="shouldShowCalendarMediaAccessNotice", class="calendar-upload-note")
                             i(class="fa-solid fa-circle-info", aria-hidden="true")
                             span 모바일에서는 사진 보관함이나 파일 선택창이 열립니다. 사진 접근 권한을 묻는 경우 허용해야 업로드할 수 있습니다.
-                        div(class="run-media-section calendar-draft-media-section")
-                            div(class="run-media-head")
-                                div
-                                    div(class="run-media-title") 사진/영상 추가
-                                    div(class="run-media-sub") {{calendarMediaDraftText}}
-                                input(
-                                    '#calendarDraftMediaInput'="",
-                                    id="calendarDraftMediaInput",
-                                    class="sr-only",
-                                    type="file",
-                                    accept="image/*,video/*",
-                                    multiple=true,
-                                    [disabled]="isUploading || !canUploadSelectedCalendarDate",
-                                    (change)="onCalendarMediaDraftSelected($event)")
-                                div(class="run-media-actions")
-                                    button(
-                                        type="button",
-                                        class="run-privacy-toggle run-media-privacy-toggle",
-                                        [class.private]="!calendarUploadIsPublic",
-                                        [disabled]="isUploading",
-                                        [attr.aria-pressed]="calendarUploadIsPublic",
-                                        aria-label="업로드하면 피드에 표시 공개 또는 비공개 선택",
-                                        title="업로드하면 피드에 표시",
-                                        (click)="toggleCalendarUploadPrivacy($event)")
-                                        i(class="fa-solid", [ngClass]="calendarUploadIsPublic ? 'fa-eye' : 'fa-eye-slash'", aria-hidden="true")
-                                        span {{calendarUploadPrivacyText}}
-                                    button(
-                                        type="button",
-                                        class="run-media-add-btn",
-                                        [disabled]="isUploading || !canUploadSelectedCalendarDate",
-                                        (click)="calendarDraftMediaInput.click()")
-                                        i(class="fa-solid", [ngClass]="isUploading ? 'fa-spinner' : 'fa-plus'", aria-hidden="true")
-                                        span {{calendarMediaDraftButtonText}}
-                            div(*ngIf="calendarMediaDraftStatus", class="run-media-status") {{calendarMediaDraftStatus}}
-                        div(class="run-journal-section")
-                            div(class="run-journal-head")
-                                div
-                                    div(class="run-journal-title") 오늘의 일기
-                                    div(class="run-journal-sub") {{selectedCalendarDateText}} 기록에 함께 저장돼.
-                                div(class="run-journal-head-actions")
-                                    div(*ngIf="hasSavedUploadJournal", class="calendar-note-chip") 저장됨
-                                    button(
-                                        type="button",
-                                        class="run-journal-primary-btn upload-journal-head-save",
-                                        [disabled]="isUploadJournalSaveDisabled",
-                                        (click)="saveUploadJournal()")
-                                        i(class="fa-solid", [ngClass]="isUploadJournalSaving ? 'fa-spinner' : 'fa-floppy-disk'", aria-hidden="true")
-                                        span {{uploadJournalSaveButtonText}}
-                            textarea(
-                                class="run-journal-input",
-                                rows="3",
-                                maxlength="2000",
-                                placeholder="오늘 러닝은 어땠어? 기록을 남겨봐",
-                                [(ngModel)]="uploadJournalText",
-                                [disabled]="isUploading || isManualRunSaving")
-                            div(*ngIf="uploadJournalStatus", class="run-journal-status upload-journal-status") {{uploadJournalStatus}}
-                        div(
-                            *ngIf="isUploading || uploadProgress > 0",
-                            class="upload-progress calendar-upload-progress",
-                            role="progressbar",
-                            aria-valuemin="0",
-                            aria-valuemax="100",
-                            [attr.aria-valuenow]="uploadProgress")
-                            div(class="upload-progress-track")
-                                div(class="upload-progress-fill", [ngStyle]="uploadProgressStyle")
-                            div(class="upload-progress-meta")
-                                span {{uploadStatus || '대기 중'}}
-                                span {{uploadProgress}}%
-                        div(*ngIf="uploadStatus && !uploadProgress", class="upload-status") {{uploadStatus}}
-                        wiz-component-error-state(
-                            *ngIf="parseErrorMessage",
-                            [message]="parseErrorMessage",
-                            [onRetry]="switchToManualInput",
-                            retryLabel="수동 입력")
-                        form(*ngIf="manualEntryVisible", class="manual-run-form", (submit)="saveManualRun(); $event.preventDefault()")
-                            div(class="manual-run-form-head")
-                                div
-                                    div(class="manual-run-title") 수동 입력
-                                    div(class="manual-run-sub") {{selectedCalendarDateText || '오늘'}} 기록으로 저장돼.
-                                button(type="button", class="manual-run-close", aria-label="수동 입력 닫기", [disabled]="isManualRunSaving", (click)="closeManualEntry()")
-                                    i(class="fa-solid fa-xmark", aria-hidden="true")
-                            div(class="manual-run-grid")
-                                label(class="manual-run-field")
-                                    span 거리
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="0.01", inputmode="decimal", placeholder="5.00", [(ngModel)]="manualRunForm.distance_km", name="manualDistance")
-                                        em {{distanceUnitLabel}}
-                                label(class="manual-run-field")
-                                    span {{paceDisplaySettingsText}}
-                                    input(type="text", [placeholder]="appSettings.paceDisplay === 'speed' ? '10.0' : '5:30'", [(ngModel)]="manualRunForm.avg_pace", name="manualPace")
-                                label(class="manual-run-field")
-                                    span 시간
-                                    input(type="text", placeholder="00:30:00", [(ngModel)]="manualRunForm.duration", name="manualDuration")
-                                label(class="manual-run-field")
-                                    span 칼로리
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="1", inputmode="numeric", placeholder="250", [(ngModel)]="manualRunForm.calories", name="manualCalories")
-                                        em kcal
-                                label(class="manual-run-field")
-                                    span 심박수
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="1", inputmode="numeric", placeholder="145", [(ngModel)]="manualRunForm.avg_heart_rate", name="manualHeartRate")
-                                        em bpm
-                                label(class="manual-run-field")
-                                    span 케이던스
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="1", inputmode="numeric", placeholder="170", [(ngModel)]="manualRunForm.cadence", name="manualCadence")
-                                        em spm
-                            div(class="manual-run-actions")
-                                button(type="button", class="manual-run-secondary", [disabled]="isManualRunSaving", (click)="closeManualEntry()") 취소
-                                button(type="submit", class="manual-run-primary", [disabled]="isManualRunSaving")
-                                    wiz-component-loading-spinner(*ngIf="isManualRunSaving", size="sm", label="수동 기록 저장 중")
-                                    span {{isManualRunSaving ? '저장 중' : '저장'}}
+                        div(*ngIf="calendarMediaDraftStatus", class="run-media-status") {{calendarMediaDraftStatus}}
+                    div(*ngIf="!selectedCalendarRuns.length", class="run-journal-section")
+                        div(class="run-journal-head")
+                            div
+                                div(class="run-journal-title") 오늘의 일기
+                                div(class="run-journal-sub") {{selectedCalendarDateText}} 기록에 함께 저장돼.
+                            div(class="run-journal-head-actions")
+                                div(*ngIf="hasSavedUploadJournal", class="calendar-note-chip") 저장됨
+                                button(
+                                    type="button",
+                                    class="run-journal-primary-btn upload-journal-head-save",
+                                    [disabled]="isUploadJournalSaveDisabled",
+                                    (click)="saveUploadJournal()")
+                                    i(class="fa-solid", [ngClass]="isUploadJournalSaving ? 'fa-spinner' : 'fa-floppy-disk'", aria-hidden="true")
+                                    span {{uploadJournalSaveButtonText}}
+                        textarea(
+                            class="run-journal-input",
+                            rows="3",
+                            maxlength="2000",
+                            placeholder="오늘 러닝은 어땠어? 기록을 남겨봐",
+                            [(ngModel)]="uploadJournalText",
+                            [disabled]="isUploading || isManualRunSaving")
+                        div(*ngIf="uploadJournalStatus", class="run-journal-status upload-journal-status") {{uploadJournalStatus}}
                     input(
                         '#runMediaInput'="",
                         class="sr-only",

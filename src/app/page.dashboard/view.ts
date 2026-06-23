@@ -1474,6 +1474,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public calendarMediaDraftFiles: File[] = [];
     public calendarMediaDraftStatus: string = '';
     public calendarUploadIsPublic: boolean = true;
+    public calendarUploadExpanded: boolean = false;
     public manualEntryVisible: boolean = false;
     public manualEntryRunId: string | null = null;
     public recordReuploadTargetId: string | null = null;
@@ -4735,6 +4736,11 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
+    public toggleCalendarUploadExpanded(): void {
+        this.calendarUploadExpanded = !this.calendarUploadExpanded;
+        this.cdr.detectChanges();
+    }
+
     public async toggleRunPrivacy(run: CalendarRunDetail | RunRecord, event?: Event): Promise<void> {
         event?.preventDefault();
         event?.stopPropagation();
@@ -6491,6 +6497,7 @@ export class Component implements AfterViewInit, OnDestroy {
         if (targetRunId) this.recordReuploadTargetId = targetRunId;
         this.manualRunForm = this.manualRunFormForRun(targetRunId);
         this.manualEntryVisible = true;
+        if (!targetRunId) this.calendarUploadExpanded = true;
         this.parseErrorMessage = '';
         this.uploadProgress = 0;
         this.uploadStatus = targetRunId
@@ -13119,6 +13126,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.uploadStatus = '';
             this.calendarMediaDraftFiles = [];
             this.calendarMediaDraftStatus = '';
+            this.calendarUploadExpanded = false;
             this.resetRunRecordEditState();
         }
         this.selectedCalendarDate = date;
