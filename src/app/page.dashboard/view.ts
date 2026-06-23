@@ -6684,10 +6684,11 @@ export class Component implements AfterViewInit, OnDestroy {
 
             this.selectedCalendarDate = startedDate;
             this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
+            this.upsertRunRecord(saved.run || payload, { loadRelatedData: false });
             this.completedLiveRun = metrics;
             this.liveRunStatus = '러닝 저장 완료';
             this.showToast('러닝 기록을 저장했어.', 'success');
-            await this.loadRuns();
+            await this.loadRuns(false, true, true);
             this.selectedCalendarDate = startedDate;
             this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
             this.refreshDerivedState();
@@ -9151,6 +9152,37 @@ export class Component implements AfterViewInit, OnDestroy {
                 void this.loadWeatherForActiveMonth();
             }
         }
+    }
+
+    private upsertRunRecord(row: unknown, options: { loadRelatedData?: boolean } = {}): RunRecord | null {
+        const run = this.normalizeRun(row);
+        if (!run) return null;
+
+        this.runs = [
+            run,
+            ...this.runs.filter((item) => this.runIdentityKey(item) !== this.runIdentityKey(run))
+        ].sort((a, b) => b.date.localeCompare(a.date));
+        this.restDays = this.restDays.filter((date) => date !== run.date);
+        this.refreshDerivedState();
+        this.syncWidgetRuns();
+        this.cdr.detectChanges();
+        if (options.loadRelatedData !== false) {
+            void this.loadGoalsForActiveMonth();
+            void this.loadWeatherForActiveMonth();
+        }
+        return run;
+    }
+
+    private runIdentityKey(run: RunRecord): string {
+        if (run.id) return `id:${run.id}`;
+        return [
+            'local',
+            run.date,
+            run.run_type,
+            run.distance_km,
+            run.duration || '',
+            run.created_at || ''
+        ].join(':');
     }
 
     private syncWidgetRuns(): void {
