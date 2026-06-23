@@ -7,12 +7,16 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     static let shared = RunMateWatchWorkoutManager()
 
     @Published var statusText = "iPhone에서 러닝을 시작해줘"
+    @Published var connectionText = "iPhone 연결 대기"
     @Published var heartRateText = "-- bpm"
     @Published var distanceText = "0.00 km"
     @Published var paceText = "-- /km"
+    @Published var elapsedText = "00:00"
+    @Published var caloriesText = "0 kcal"
     @Published var canPause = false
     @Published var canResume = false
     @Published var canStop = false
+    @Published var isWorkoutActive = false
 
     private let healthStore = HKHealthStore()
     private var workoutSession: HKWorkoutSession?
@@ -45,10 +49,12 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         }
 
         guard HKHealthStore.isHealthDataAvailable() else {
+            statusText = "건강 데이터 사용 불가"
             sendError("Apple Watch에서 건강 데이터를 사용할 수 없어.")
             return
         }
 
+        statusText = "건강 권한 확인 중"
         requestHealthKitAccess { [weak self] success in
             DispatchQueue.main.async {
                 guard let self = self else { return }
@@ -60,6 +66,10 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
                 self.startWorkoutSession(runId: runId, runType: runType, configuration: configuration)
             }
         }
+    }
+
+    func startFromWatch() {
+        start(runId: "watch-\(UUID().uuidString)", runType: "jogging")
     }
 
     func pause() {
@@ -116,13 +126,17 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
             self.latestHeartRate = nil
             self.heartRateSum = 0
             self.heartRateCount = 0
+            self.lastHeartRateTimestamp = 0
             self.distanceMeters = 0
             self.activeEnergyKcal = 0
             self.stepCount = 0
+            self.elapsedText = "00:00"
+            self.caloriesText = "0 kcal"
             self.statusText = "러닝 중"
             self.canPause = true
             self.canResume = false
             self.canStop = true
+            self.isWorkoutActive = true
 
             let startDate = startedAt ?? Date()
             session.startActivity(with: startDate)
@@ -176,6 +190,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     private func startMetricsTimer() {
         metricsTimer?.invalidate()
         metricsTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateDisplayMetrics()
             self?.sendMetrics(force: false)
         }
         if let metricsTimer = metricsTimer {
@@ -219,7 +234,13 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
             break
         }
 
+        updateDisplayMetrics()
         paceText = formattedPace()
+    }
+
+    private func updateDisplayMetrics() {
+        elapsedText = formattedElapsed()
+        caloriesText = "\(Int(round(activeEnergyKcal))) kcal"
     }
 
     private func sendMetrics(force: Bool) {
@@ -296,6 +317,14 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         return String(format: "%d'%02d\" /km", total / 60, total % 60)
     }
 
+    private func formattedElapsed() -> String {
+        let total = Int(round(elapsedSeconds()))
+        if total >= 3600 {
+            return String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
+        }
+        return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+
     private func currentStatus() -> String {
         if canResume {
             return "paused"
@@ -320,10 +349,13 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         heartRateText = "-- bpm"
         distanceText = "0.00 km"
         paceText = "-- /km"
+        elapsedText = "00:00"
+        caloriesText = "0 kcal"
         statusText = "iPhone에서 러닝을 시작해줘"
         canPause = false
         canResume = false
         canStop = false
+        isWorkoutActive = false
     }
 
     private func activateConnectivity() {
@@ -413,10 +445,14 @@ extension RunMateWatchWorkoutManager: WCSessionDelegate {
         if let error = error {
             DispatchQueue.main.async {
                 self.statusText = error.localizedDescription
+                self.connectionText = "iPhone 연결 오류"
             }
             return
         }
-        sendMetrics(force: true)
+        DispatchQueue.main.async {
+            self.connectionText = activationState == .activated ? "iPhone 연결됨" : "iPhone 연결 대기"
+            self.sendMetrics(force: true)
+        }
     }
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
