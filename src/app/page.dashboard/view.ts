@@ -1545,6 +1545,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private liveRunStartSequence: number = 0;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
+    private runMediaLoadPromise: Promise<boolean> | null = null;
     private deferredDashboardDataStarted: boolean = false;
     private initialCoreDataLoaded: boolean = false;
     private agreementModalVisibleForLoading: boolean = false;
@@ -1864,10 +1865,21 @@ export class Component implements AfterViewInit, OnDestroy {
         if (this.activeScreen === 'calendar') {
             await this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth());
         }
-        if (this.activeScreen === 'gallery' && !this.runMediaLoaded) {
-            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true));
+        if ((this.activeScreen === 'gallery' || this.activeScreen === 'profile') && !this.runMediaLoaded) {
+            await this.runDeferredDashboardTask(() => this.ensureRunMediaLoaded());
         }
         this.cdr.detectChanges();
+    }
+
+    private async ensureRunMediaLoaded(): Promise<boolean> {
+        if (this.runMediaLoaded) return true;
+        if (this.runMediaLoadPromise) return this.runMediaLoadPromise;
+
+        this.runMediaLoadPromise = this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true)
+            .finally(() => {
+                this.runMediaLoadPromise = null;
+            });
+        return this.runMediaLoadPromise;
     }
 
     public readonly switchToManualInput = (): void => {
@@ -2179,26 +2191,82 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get myProfileMediaItems(): GalleryItem[] {
+        const owner = this.myFeedUser();
         return this.runs
             .filter((run) => run.is_public !== false)
-            .flatMap((run) => (run.media || []).map((media) => {
-                const km = this.distanceText(run.distance_km, true);
-                const date = this.displayDate(run.date, false);
-                return {
-                    id: media.id,
-                    km,
-                    date,
-                    stats: [],
-                    runType: run.run_type,
-                    altText: `${date} ${km} 러닝 첨부 ${this.mediaTypeLabel(media.media_type)}`,
-                    imageUrl: media.media_url,
-                    media,
-                    run,
-                    owner: this.myFeedUser(),
-                    mediaType: media.media_type
-                } as GalleryItem;
-            }))
-            .slice(0, 12);
+            .flatMap((run) => this.profileGalleryItemsForRun(run, owner))
+            .slice(0, 30);
+    }
+
+    private profileGalleryItemsForRun(run: RunRecord, owner?: FeedUser): GalleryItem[] {
+        const items: GalleryItem[] = [];
+        const capture = this.captureGalleryItemForRun(run, owner);
+        if (capture) items.push(capture);
+        return items.concat(this.mediaGalleryItemsForRun(run, owner));
+    }
+
+    private mediaGalleryItemsForRun(run: RunRecord, owner?: FeedUser): GalleryItem[] {
+        return (run.media || [])
+            .map((media) => this.galleryItemForRunMedia(run, media, owner));
+    }
+
+    private captureGalleryItemForRun(run: RunRecord, owner?: FeedUser): GalleryItem | null {
+        const imageUrl = run.image_url || '';
+        if (!imageUrl) return null;
+
+        const km = this.distanceText(run.distance_km, true);
+        const date = this.displayDate(run.date, false);
+        const runId = typeof run.id === 'string' && run.id ? run.id : '';
+        const itemId = runId ? `${runId}-capture` : `${run.date}-${imageUrl}`;
+        const media: RunMedia = {
+            id: itemId,
+            run_id: runId,
+            media_url: imageUrl,
+            media_type: 'photo',
+            created_at: run.created_at || ''
+        };
+
+        return {
+            id: media.id,
+            km,
+            date,
+            stats: [
+                { label: this.paceDisplaySettingsText, value: this.paceText(run.avg_pace) },
+                { label: '시간', value: this.shortDuration(run) },
+                { label: '칼로리', value: run.calories ?? '-' }
+            ],
+            runType: run.run_type,
+            altText: `${owner?.name ? owner.name + ' ' : ''}${date} ${km} 러닝 기록 캡처`,
+            imageUrl,
+            media,
+            run,
+            owner,
+            mediaType: 'photo'
+        };
+    }
+
+    private galleryItemForRunMedia(run: RunRecord, media: RunMedia, owner?: FeedUser): GalleryItem {
+        const km = this.distanceText(run.distance_km, true);
+        const date = this.displayDate(run.date, false);
+        const mediaLabel = this.mediaTypeLabel(media.media_type);
+
+        return {
+            id: media.id,
+            km,
+            date,
+            stats: [
+                { label: '종류', value: mediaLabel },
+                { label: '기록', value: km },
+                { label: '날짜', value: date }
+            ],
+            runType: run.run_type,
+            altText: `${owner?.name ? owner.name + ' ' : ''}${date} ${km} 러닝 첨부 ${mediaLabel}`,
+            imageUrl: media.media_url,
+            media,
+            run,
+            owner,
+            mediaType: media.media_type
+        };
     }
 
     public get rankingTitleText(): string {
@@ -3197,6 +3265,9 @@ export class Component implements AfterViewInit, OnDestroy {
         if (screen === 'profile') {
             this.isProfileEditOpen = false;
             await this.runDeferredDashboardTask(() => this.loadFriendLists(false));
+            if (!this.runMediaLoaded) {
+                await this.runDeferredDashboardTask(() => this.ensureRunMediaLoaded());
+            }
         }
         if (screen === 'calendar') {
             await this.runDeferredDashboardTask(() => this.loadDayNotes());
@@ -3213,7 +3284,7 @@ export class Component implements AfterViewInit, OnDestroy {
             await this.runDeferredDashboardTask(() => this.loadTrainingLoad());
         }
         if (screen === 'gallery' && !this.runMediaLoaded) {
-            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true));
+            await this.runDeferredDashboardTask(() => this.ensureRunMediaLoaded());
         }
         if (screen === 'chat' || screen === 'ai-settings') {
             if (!this.aiConnection) {
@@ -11680,49 +11751,17 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         if (this.galleryTab === 'media') {
+            const owner = this.myFeedUser();
             return this.runs
-                .flatMap((run) => (run.media || []).map((media) => {
-                    const km = this.distanceText(run.distance_km, true);
-                    const date = this.displayDate(run.date, false);
-                    return {
-                        id: media.id,
-                        km,
-                        date,
-                        stats: [
-                            { label: '종류', value: this.mediaTypeLabel(media.media_type) },
-                            { label: '기록', value: km },
-                            { label: '날짜', value: date }
-                        ],
-                        runType: run.run_type,
-                        altText: `${date} ${km} 러닝 첨부 ${this.mediaTypeLabel(media.media_type)}`,
-                        imageUrl: media.media_url,
-                        media,
-                        mediaType: media.media_type
-                    };
-                }))
+                .flatMap((run) => this.mediaGalleryItemsForRun(run, owner))
                 .slice(0, 60);
         }
 
+        const owner = this.myFeedUser();
         return this.runs
-            .filter((run) => Boolean(run.image_url))
-            .slice(0, 8)
-            .map((run) => {
-                const km = this.distanceText(run.distance_km, true);
-                const date = this.displayDate(run.date, false);
-                return {
-                    id: run.id || `${run.date}-${run.image_url}`,
-                    km,
-                    date,
-                    stats: [
-                        { label: this.paceDisplaySettingsText, value: this.paceText(run.avg_pace) },
-                        { label: '시간', value: this.shortDuration(run) },
-                        { label: '칼로리', value: run.calories ?? '-' }
-                    ],
-                    runType: run.run_type,
-                    altText: `${date} ${km} 러닝 기록 캡처`,
-                    imageUrl: run.image_url
-                };
-            });
+            .map((run) => this.captureGalleryItemForRun(run, owner))
+            .filter((item): item is GalleryItem => Boolean(item))
+            .slice(0, 60);
     }
 
     private buildChatMessages(): ChatMessage[] {
