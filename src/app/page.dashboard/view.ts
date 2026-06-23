@@ -1492,6 +1492,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public isLiveRunBusy: boolean = false;
     public isLiveRunSaving: boolean = false;
     public isLiveRunDiscarding: boolean = false;
+    public liveRunDiscardConfirmVisible: boolean = false;
     public aiConnection: AiConnection | null = null;
     public chatText: string = '';
     public isChatSending: boolean = false;
@@ -6660,8 +6661,31 @@ export class Component implements AfterViewInit, OnDestroy {
             event.stopPropagation();
             (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
         }
-        if (this.isLiveRunDiscarding || this.confirmDialog.visible) return;
-        void this.discardLiveRun();
+        if (this.activeScreen !== 'live-run' || this.completedLiveRun || this.isLiveRunDiscarding) return;
+        this.liveRunDiscardConfirmVisible = true;
+        this.cdr.detectChanges();
+    }
+
+    public cancelLiveRunDiscard(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (this.isLiveRunDiscarding) return;
+        this.liveRunDiscardConfirmVisible = false;
+        this.cdr.detectChanges();
+    }
+
+    public confirmLiveRunDiscard(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (this.isLiveRunDiscarding) return;
+        this.liveRunDiscardConfirmVisible = false;
+        void this.discardLiveRun(false);
     }
 
     public get liveRunPrimaryText(): string {
@@ -6678,6 +6702,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async openLiveRunScreen(): Promise<void> {
         this.completedLiveRun = null;
+        this.liveRunDiscardConfirmVisible = false;
         this.setScreen('live-run');
         if (!this.isLiveRunActive && !this.isLiveRunBusy && !this.isLiveRunSaving) {
             await this.startLiveRun();
@@ -6687,6 +6712,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public async startLiveRun(): Promise<void> {
         if (this.isLiveRunBusy || this.isLiveRunSaving || this.isLiveRunActive) return;
         this.completedLiveRun = null;
+        this.liveRunDiscardConfirmVisible = false;
         const plugin = this.liveRunPlugin();
         if (!this.isLiveRunSupported || !plugin?.startLiveRun) {
             this.liveRunStatus = '실시간 러닝은 iPhone 앱에서 사용할 수 있어.';
@@ -6807,6 +6833,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public closeLiveRunSummaryToCalendar(): void {
         const date = this.completedLiveRunDateKey;
         this.completedLiveRun = null;
+        this.liveRunDiscardConfirmVisible = false;
         this.liveRun = this.emptyLiveRunMetrics();
         this.liveRunStatus = '러닝 대기 중';
         this.selectedCalendarDate = date;
@@ -6816,13 +6843,11 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    public async discardLiveRun(): Promise<void> {
+    public async discardLiveRun(confirmFirst: boolean = true): Promise<void> {
         if (this.isLiveRunDiscarding) return;
-        this.isLiveRunDiscarding = true;
-        this.cdr.detectChanges();
 
         try {
-            if (!(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
+            if (confirmFirst && !(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
                 title: '러닝 종료',
                 confirmLabel: '저장 없이 종료',
                 tone: 'danger',
@@ -6832,6 +6857,8 @@ export class Component implements AfterViewInit, OnDestroy {
             const plugin = this.liveRunPlugin();
             this.liveRunStartSequence += 1;
 
+            this.isLiveRunDiscarding = true;
+            this.liveRunDiscardConfirmVisible = false;
             this.isLiveRunBusy = true;
             this.isLiveRunSaving = false;
             this.liveRunStatus = '러닝 측정 취소 중';
@@ -6842,10 +6869,12 @@ export class Component implements AfterViewInit, OnDestroy {
             this.showToast('러닝 측정을 저장하지 않고 종료했어.', 'success');
             this.setScreen('home');
         } catch {
+            this.liveRunDiscardConfirmVisible = false;
             this.liveRun = this.emptyLiveRunMetrics();
             this.liveRunStatus = '러닝 측정을 취소했어.';
             this.setScreen('home');
         } finally {
+            this.liveRunDiscardConfirmVisible = false;
             this.isLiveRunBusy = false;
             this.isLiveRunSaving = false;
             this.isLiveRunDiscarding = false;
