@@ -10,8 +10,8 @@ html(lang="ko")
 
         // pwa config
         meta(name='application-name' content='RunMate')
-        meta(name='msapplication-TileColor' content='#000000')
-        meta(name='theme-color' content='#000000')
+        meta(name='msapplication-TileColor' content='#12121c')
+        meta(name='theme-color' content='#12121c')
         meta(name='apple-mobile-web-app-capable' content='yes')
         meta(name='apple-mobile-web-app-title' content='RunMate')
         meta(name='apple-mobile-web-app-status-bar-style' content='black-translucent')
@@ -31,15 +31,39 @@ html(lang="ko")
 
         script(type="text/javascript").
             (function () {
-                var background = "#000000";
-                var text = "#ffffff";
+                var darkBackground = "#12121c";
+                var lightBackground = "#f7f7f9";
+                var darkText = "#e8e8f0";
+                var lightText = "#1a1a2e";
+                var background = darkBackground;
+                var text = darkText;
+
+                try {
+                    var rawSettings = window.localStorage && window.localStorage.getItem("runningmate-settings-v1");
+                    var settings = rawSettings ? JSON.parse(rawSettings) : {};
+                    var themeMode = settings && settings.themeMode;
+                    var prefersLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+
+                    if (themeMode === "light" || (themeMode === "system" && prefersLight)) {
+                        background = lightBackground;
+                        text = lightText;
+                    }
+                } catch (error) {}
+
                 document.documentElement.style.setProperty("--app-shell-bg", background);
                 document.documentElement.style.setProperty("--app-shell-text", text);
+                document.documentElement.style.setProperty("--dashboard-screen-bg", background);
                 document.documentElement.style.background = background;
+                document.documentElement.style.backgroundColor = background;
 
                 var themeMeta = document.querySelector("meta[name='theme-color']");
                 if (themeMeta) {
                     themeMeta.setAttribute("content", background);
+                }
+
+                var tileMeta = document.querySelector("meta[name='msapplication-TileColor']");
+                if (tileMeta) {
+                    tileMeta.setAttribute("content", background);
                 }
             })();
 
@@ -53,8 +77,9 @@ html(lang="ko")
                 height: -webkit-fill-available;
                 min-height: -webkit-fill-available;
                 margin: 0;
-                background: var(--app-shell-bg, #000000);
-                color: var(--app-shell-text, #ffffff);
+                background: var(--app-shell-bg, #12121c);
+                background-color: var(--app-shell-bg, #12121c);
+                color: var(--app-shell-text, #e8e8f0);
                 overflow: hidden;
                 display: block;
             }
@@ -69,6 +94,7 @@ html(lang="ko")
             html.is-dashboard-page app-root,
             body.is-dashboard-page app-root {
                 background: var(--dashboard-screen-bg, #12121c);
+                background-color: var(--dashboard-screen-bg, #12121c);
             }
 
             @supports (height: 100dvh) {
@@ -85,13 +111,15 @@ html(lang="ko")
                 align-items: center;
                 justify-content: center;
                 flex-direction: column;
+                box-sizing: border-box;
                 width: 100%;
                 min-height: 100vh;
-                min-height: 100dvh;
+                min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
                 gap: 10px;
-                padding: 24px;
-                background: var(--app-shell-bg, #000000);
-                color: var(--app-shell-text, #ffffff);
+                padding: 24px 24px calc(24px + env(safe-area-inset-bottom, 0px));
+                background: var(--app-shell-bg, #12121c);
+                background-color: var(--app-shell-bg, #12121c);
+                color: var(--app-shell-text, #e8e8f0);
                 font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 text-align: center;
             }
@@ -110,7 +138,7 @@ html(lang="ko")
 
             .app-shell-loader-title {
                 margin-top: 6px;
-                color: #ffffff;
+                color: var(--app-shell-text, #e8e8f0);
                 font-size: clamp(28px, 7vw, 34px);
                 font-weight: 900;
                 line-height: 1.1;

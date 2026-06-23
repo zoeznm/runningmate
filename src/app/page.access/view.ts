@@ -1,6 +1,6 @@
 import { ChangeDetectorRef, OnDestroy, OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
-import { apiFetch, jsonRequest } from 'src/app/shared/api';
+import { apiErrorMessage, apiFetch, jsonRequest, safeUserMessage } from 'src/app/shared/api';
 import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
 import { authenticatedUser, clearAuthTokens, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
 
@@ -309,7 +309,7 @@ export class Component implements OnInit, OnDestroy {
     public async alert(message: string, status: string = 'error') {
         return await this.service.modal.show({
             title: "",
-            message: message,
+            message: status === 'error' ? safeUserMessage(message, '잠깐 문제가 생겼어. 다시 시도해줘') : safeUserMessage(message, message),
             cancel: false,
             actionBtn: status,
             action: '확인',
@@ -675,7 +675,7 @@ export class Component implements OnInit, OnDestroy {
 
         if (!result.success) {
             if (this.identitySeq[type] !== seq) return;
-            this.setIdentityStatus(type, 'error', result.error?.message || '확인에 실패했어');
+            this.setIdentityStatus(type, 'error', apiErrorMessage(result.error, '확인에 실패했어'));
             return;
         }
 
@@ -683,7 +683,7 @@ export class Component implements OnInit, OnDestroy {
         const available = !!raw?.available || !!result.data?.available;
         const availableMessage = type === 'username' ? '사용 가능한 아이디야' : '사용 가능한 이메일이야';
         const duplicateMessage = type === 'username' ? '이미 사용 중인 아이디야' : '이미 사용 중인 이메일이야';
-        this.setIdentityStatus(type, available ? 'available' : 'duplicate', result.message || raw?.message || (available ? availableMessage : duplicateMessage));
+        this.setIdentityStatus(type, available ? 'available' : 'duplicate', safeUserMessage(result.message || raw?.message, available ? availableMessage : duplicateMessage));
     }
 
     public onUsernameInput(value: any) {
@@ -733,7 +733,7 @@ export class Component implements OnInit, OnDestroy {
             this.goDashboard();
             return;
         } else {
-            await this.alert(result.error?.message || "로그인에 실패했습니다.", 'error');
+            await this.alert(apiErrorMessage(result.error, "로그인에 실패했습니다."), 'error');
         }
         await this.service.render();
     }
@@ -872,7 +872,7 @@ export class Component implements OnInit, OnDestroy {
         const result = await jsonRequest('/api/auth/forgot-password', 'POST', { email });
         this.isForgotLoading = false;
         if (!result.success) {
-            await this.alert(result.error?.message || "메일 발송 요청에 실패했습니다.");
+            await this.alert(apiErrorMessage(result.error, "메일 발송 요청에 실패했습니다."));
             await this.service.render();
             return;
         }
@@ -915,7 +915,7 @@ export class Component implements OnInit, OnDestroy {
         this.isResetLoading = false;
 
         if (!result.success) {
-            await this.alert(result.error?.message || result.message || "비밀번호 재설정에 실패했습니다.");
+            await this.alert(apiErrorMessage(result.error, "비밀번호 재설정에 실패했습니다."));
             await this.service.render();
             return;
         }
@@ -1099,7 +1099,7 @@ export class Component implements OnInit, OnDestroy {
             this.goDashboard();
             return;
         }
-        await this.alert(result.error?.message || "회원가입에 실패했습니다.");
+        await this.alert(apiErrorMessage(result.error, "회원가입에 실패했습니다."));
         await this.service.render();
     }
 

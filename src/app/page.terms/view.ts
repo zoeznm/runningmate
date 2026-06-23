@@ -1,6 +1,6 @@
 import { OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
-import { apiFetch } from 'src/app/shared/api';
+import { apiErrorMessage, apiFetch } from 'src/app/shared/api';
 
 interface PolicySection {
     title: string;
@@ -40,7 +40,7 @@ export class Component implements OnInit {
             const result = await apiFetch<any>('/api/agreements', { retries: 0 });
             const policy = result.data?.current?.terms || null;
             if (!result.success || !policy) {
-                this.error = result.error?.message || '이용약관을 불러오지 못했습니다.';
+                this.error = apiErrorMessage(result.error, '이용약관을 불러오지 못했습니다.');
                 this.policy = null;
             } else {
                 this.policy = policy;

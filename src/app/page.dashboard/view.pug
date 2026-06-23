@@ -1,5 +1,5 @@
-main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!isDark", id="appRoot", aria-label="러닝메이트 디자인 레퍼런스")
-    div([class]="phoneClass")
+main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!isDark", [class.loading-screen-mode]="isInitialLoading", [class.live-run-screen-mode]="activeScreen === 'live-run'", [class.live-run-paused-mode]="activeScreen === 'live-run' && isLiveRunPaused", id="appRoot", aria-label="러닝메이트 디자인 레퍼런스")
+    div([class]="phoneClass", [class.live-run-mode]="activeScreen === 'live-run'", [class.live-run-paused-mode]="activeScreen === 'live-run' && isLiveRunPaused")
         wiz-component-loading-fullscreen(*ngIf="isInitialLoading", message="RunMate", [detail]="initialLoadingDetail", [tips]="initialLoadingTips")
         div(*ngIf="!isInitialLoading && initialErrorMessage", class="dashboard-error-overlay")
             wiz-component-error-state([message]="initialErrorMessage", [onRetry]="retryInitialLoad")
@@ -13,6 +13,21 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     div(class="avatar")
                         img(*ngIf="homeProfileImage", [src]="homeProfileImage", [attr.alt]="profileNameText")
                         span(*ngIf="!homeProfileImage") {{homeAvatarText}}
+
+                button(
+                    type="button",
+                    class="home-live-run-button",
+                    [class.active]="isLiveRunActive",
+                    [class.paused]="isLiveRunPaused",
+                    [disabled]="isLiveRunBusy || isLiveRunSaving",
+                    (click)="openLiveRunScreen()")
+                    span(class="home-live-run-icon")
+                        i(class="fa-solid", [ngClass]="isLiveRunBusy ? 'fa-spinner' : isLiveRunActive ? 'fa-chart-line' : 'fa-play'", aria-hidden="true")
+                    span(class="home-live-run-copy")
+                        span(class="home-live-run-eyebrow") 실시간 러닝
+                        strong {{homeLiveRunButtonText}}
+                    span(class="home-live-run-arrow", aria-hidden="true")
+                        i(class="fa-solid fa-chevron-right")
 
                 div(class="month-total-card")
                     div(class="month-label") 이번달 총 거리
@@ -50,6 +65,110 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                     div(class="home-weight-goal-side")
                         div(class="stat-label") 감량 필요
                         div(class="home-weight-goal-value") {{weightGoalRemainingText}}
+
+        div(class="screen-page", [class.active]="activeScreen === 'live-run'", id="screen-live-run")
+            div(class="live-run-page-content")
+                section(*ngIf="!completedLiveRun", class="live-run-active-stage")
+                    div(class="live-run-active-head")
+                        button(
+                            type="button",
+                            class="live-run-cancel-action",
+                            [disabled]="isLiveRunDiscarding",
+                            aria-label="저장하지 않고 러닝 종료",
+                            title="저장하지 않고 러닝 종료",
+                            data-live-run-cancel="true",
+                            (click)="requestDiscardLiveRun($event)")
+                            i(class="fa-solid fa-xmark", aria-hidden="true")
+                        div
+                            div(class="live-run-active-label") 실시간 러닝
+                            div(class="live-run-active-status") {{liveRunStatus}}
+                        div(class="live-run-active-chip", [class.running]="liveRun.status === 'running'", [class.paused]="liveRun.status === 'paused'")
+                            i(class="fa-solid", [ngClass]="liveRun.status === 'running' ? 'fa-satellite-dish' : liveRun.status === 'paused' ? 'fa-pause' : 'fa-location-arrow'", aria-hidden="true")
+                            span {{liveRun.status === 'running' ? '측정 중' : liveRun.status === 'paused' ? '일시정지' : '대기'}}
+
+                    div(class="live-run-big-distance")
+                        span 거리
+                        strong {{liveRunDistanceText}}
+
+                    div(class="live-run-live-grid")
+                        div(class="live-run-live-metric")
+                            span 현재 페이스
+                            strong {{liveRunCurrentPaceText}}
+                        div(class="live-run-live-metric")
+                            span 평균 페이스
+                            strong {{liveRunPaceText}}
+                        div(class="live-run-live-metric")
+                            span 심박수
+                            strong {{liveRunHeartRateText}}
+                        div(class="live-run-live-metric")
+                            span 시간
+                            strong {{liveRunElapsedText}}
+                        div(class="live-run-live-metric")
+                            span 케이던스
+                            strong {{liveRunCadenceText}}
+
+                    div(class="live-run-bottom-actions")
+                        button(
+                            type="button",
+                            class="live-run-pause-action",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunActive",
+                            (click)="toggleLiveRunPause()")
+                            i(class="fa-solid", [ngClass]="isLiveRunBusy ? 'fa-spinner' : isLiveRunPaused ? 'fa-play' : 'fa-pause'", aria-hidden="true")
+                            span {{isLiveRunBusy ? '처리 중' : isLiveRunPaused ? '재개' : '일시정지'}}
+                        button(
+                            type="button",
+                            class="live-run-save-action",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving || !isLiveRunActive",
+                            (click)="finishLiveRun()")
+                            i(class="fa-solid", [ngClass]="isLiveRunSaving ? 'fa-spinner' : 'fa-flag-checkered'", aria-hidden="true")
+                            span {{isLiveRunSaving ? '저장 중' : '종료 저장'}}
+
+                div(*ngIf="liveRunDiscardConfirmVisible && !completedLiveRun", class="live-run-discard-confirm-backdrop", role="dialog", aria-modal="true", aria-label="러닝 종료 확인", (click)="cancelLiveRunDiscard($event)")
+                    section(class="live-run-discard-confirm", (click)="$event.stopPropagation()")
+                        div(class="live-run-discard-confirm-icon")
+                            i(class="fa-solid fa-stop", aria-hidden="true")
+                        h3 저장하지 않고 러닝을 종료할까요?
+                        p 현재 측정 기록은 저장되지 않습니다.
+                        div(class="live-run-discard-confirm-actions")
+                            button(type="button", class="live-run-discard-confirm-cancel", [disabled]="isLiveRunDiscarding", (click)="cancelLiveRunDiscard($event)") 취소
+                            button(type="button", class="live-run-discard-confirm-accept", [disabled]="isLiveRunDiscarding", (click)="confirmLiveRunDiscard($event)")
+                                span {{isLiveRunDiscarding ? '종료 중' : '저장 없이 종료'}}
+
+                section(*ngIf="completedLiveRun", class="live-run-summary-stage")
+                    div(class="live-run-summary-map")
+                        button(type="button", class="live-run-summary-back", aria-label="기록 탭으로 돌아가기", title="기록 탭으로 돌아가기", (click)="closeLiveRunSummaryToCalendar()")
+                            i(class="fa-solid fa-chevron-left", aria-hidden="true")
+                        div(class="live-run-map-grid", aria-hidden="true")
+                        svg(class="live-run-map-route", viewBox="0 0 100 100", preserveAspectRatio="none", aria-hidden="true")
+                            polyline(class="live-run-route-line", [attr.points]="liveRunRoutePolyline")
+                        div(class="live-run-map-pin live-run-map-pin-start")
+                            i(class="fa-solid fa-circle", aria-hidden="true")
+                            span 출발
+                        div(class="live-run-map-pin live-run-map-pin-end")
+                            i(class="fa-solid fa-location-dot", aria-hidden="true")
+                            span 도착
+                        div(class="live-run-map-caption")
+                            strong {{completedLiveRunDateText}}
+                            span {{completedLiveRunRouteText}}
+
+                    div(class="live-run-summary-panel")
+                        div(class="live-run-summary-title") 러닝 저장 완료
+                        div(class="live-run-summary-grid")
+                            div(class="live-run-summary-metric")
+                                span 거리
+                                strong {{completedLiveRunDistanceText}}
+                            div(class="live-run-summary-metric")
+                                span 평균 페이스
+                                strong {{completedLiveRunPaceText}}
+                            div(class="live-run-summary-metric")
+                                span 심박수
+                                strong {{completedLiveRunHeartRateText}}
+                            div(class="live-run-summary-metric")
+                                span 시간
+                                strong {{completedLiveRunElapsedText}}
+                            div(class="live-run-summary-metric")
+                                span 케이던스
+                                strong {{completedLiveRunCadenceText}}
 
         div(class="screen-page", [class.active]="activeScreen === 'goals'", id="screen-goals")
             div(class="goals-content")
@@ -726,7 +845,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         [attr.aria-selected]="activeRankingPeriod === option.id",
                         (click)="setRankingPeriod(option.id)") {{option.label}}
 
-                section(class="ranking-me-card", [class.off]="!rankingParticipationEnabled")
+                section(*ngIf="activeRankingScope !== 'global'", class="ranking-me-card", [class.off]="!rankingParticipationEnabled")
                     div(class="ranking-me-main")
                         div(class="ranking-me-label") {{rankingFinalized ? '마감 순위' : '내 순위'}}
                         div(class="ranking-me-title") {{rankingMyTitle}}
@@ -751,22 +870,24 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
 
                 div(*ngIf="rankingEntries.length", class="ranking-list", role="list")
                     article(
-                        *ngFor="let entry of rankingEntries; trackBy: trackRankingEntry",
+                        *ngFor="let entry of displayedRankingEntries; let rankingIndex = index; trackBy: trackRankingEntry",
                         class="ranking-row",
                         [class.me]="entry.is_viewer",
-                        [class.top-three]="entry.rank <= 3",
+                        [class.top-three]="!entry.rank_out && entry.rank <= 3",
+                        [class.blurred]="isRankingEntryBlurred(entry, rankingIndex)",
                         [ngClass]="entry.medal",
-                        role="button",
-                        tabindex="0",
-                        [attr.aria-label]="rankingEntryProfileLabel(entry)",
-                        [attr.title]="rankingEntryProfileLabel(entry)",
-                        (click)="openRankingProfile(entry, $event)",
-                        (keydown.enter)="openRankingProfile(entry, $event)",
-                        (keydown.space)="openRankingProfile(entry, $event)")
+                        [attr.role]="isRankingEntryBlurred(entry, rankingIndex) ? 'listitem' : 'button'",
+                        [attr.tabindex]="isRankingEntryBlurred(entry, rankingIndex) ? -1 : 0",
+                        [attr.aria-disabled]="isRankingEntryBlurred(entry, rankingIndex) ? true : null",
+                        [attr.aria-label]="rankingEntryProfileLabel(entry, rankingIndex)",
+                        [attr.title]="rankingEntryProfileLabel(entry, rankingIndex)",
+                        (click)="openRankingProfile(entry, $event, rankingIndex)",
+                        (keydown.enter)="openRankingProfile(entry, $event, rankingIndex)",
+                        (keydown.space)="openRankingProfile(entry, $event, rankingIndex)")
                         div(class="ranking-row-top")
                             div([class]="rankingRankClass(entry)")
                                 i(*ngIf="entry.medal", class="fa-solid fa-medal", aria-hidden="true")
-                                span(*ngIf="!entry.medal") {{entry.rank}}
+                                span(*ngIf="!entry.medal") {{rankingRankText(entry)}}
                             div(class="ranking-avatar")
                                 img(*ngIf="entry.profile_image", [src]="entry.profile_image", [attr.alt]="entry.name")
                                 span(*ngIf="!entry.profile_image") {{rankingAvatarText(entry.name)}}
@@ -775,10 +896,20 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                     span {{entry.name}}
                                     em(*ngIf="entry.is_viewer") 나
                                     em(*ngIf="!entry.is_viewer && activeRankingScope === 'global' && (entry.is_following || entry.is_mutual)") 런메이트
-                                div(class="ranking-meta") {{entry.run_count}}회 · 거리만 공개
+                                div(class="ranking-meta") {{rankingMetaText(entry)}}
                             div(class="ranking-distance") {{rankingDistanceText(entry)}}
                         div(class="ranking-bar-track", [attr.aria-label]="entry.name + ' 1위 대비 ' + entry.bar_percent + '%'")
                             div(class="ranking-bar-fill", [style.width.%]="entry.bar_percent")
+                        div(*ngIf="isRankingEntryBlurred(entry, rankingIndex) && entry.rank_out", class="ranking-row-status") {{rankingMetaText(entry)}}
+
+                section(*ngIf="activeRankingScope === 'global'", class="ranking-me-card ranking-me-card-bottom", [class.off]="!rankingParticipationEnabled")
+                    div(class="ranking-me-main")
+                        div(class="ranking-me-label") {{rankingFinalized ? '마감 순위' : '내 순위'}}
+                        div(class="ranking-me-title") {{rankingMyTitle}}
+                        div(class="ranking-me-sub") {{rankingMeSubText}}
+                    div(class="ranking-me-distance")
+                        | {{rankingMyDistanceText}}
+                        span {{distanceUnitLabel}}
 
         div(class="screen-page", [class.active]="activeScreen === 'achievements'", id="screen-achievements")
             div(class="achievement-content")
@@ -962,162 +1093,178 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                 (click)="saveCalendarActivity('home_training')")
                                 i(class="fa-solid fa-house-chimney", aria-hidden="true")
                                 span 홈트 기록
-                    div(*ngIf="!selectedCalendarRuns.length", class="calendar-upload-panel", [class.disabled]="!canUploadSelectedCalendarDate")
-                        div(class="calendar-upload-copy")
-                            div(class="calendar-upload-title") 기록 업로드
-                            div(class="calendar-upload-sub") {{calendarUploadHelpText}}
-                        div(class="run-type-section")
-                            div(class="run-type-section-title") 러닝 종류
-                            div(class="run-type-chip-row", role="radiogroup", aria-label="러닝 종류")
+                        button(
+                            type="button",
+                            class="calendar-live-run-start-btn",
+                            [disabled]="isLiveRunBusy || isLiveRunSaving",
+                            (click)="openLiveRunScreen()")
+                            i(class="fa-solid", [ngClass]="isLiveRunBusy || isLiveRunSaving ? 'fa-spinner' : 'fa-person-running'", aria-hidden="true")
+                            span {{homeLiveRunButtonText}}
+                    div(*ngIf="!selectedCalendarRuns.length", class="calendar-upload-panel", [class.disabled]="!canUploadSelectedCalendarDate", [class.expanded]="calendarUploadExpanded")
+                        button(
+                            type="button",
+                            class="calendar-upload-toggle",
+                            [attr.aria-expanded]="calendarUploadExpanded",
+                            (click)="toggleCalendarUploadExpanded()")
+                            div(class="calendar-upload-copy")
+                                div(class="calendar-upload-title-row")
+                                    span(class="calendar-upload-title") 기록 업로드
+                                    small(*ngIf="!calendarUploadExpanded") 수동으로 기록 업로드
+                                div(*ngIf="calendarUploadExpanded", class="calendar-upload-sub") {{calendarUploadHelpText}}
+                            i(class="fa-solid", [ngClass]="calendarUploadExpanded ? 'fa-chevron-up' : 'fa-chevron-down'", aria-hidden="true")
+                        div(*ngIf="calendarUploadExpanded", class="calendar-upload-body")
+                            div(class="run-type-section")
+                                div(class="run-type-section-title") 러닝 종류
+                                div(class="run-type-chip-row", role="radiogroup", aria-label="러닝 종류")
+                                    button(
+                                        *ngFor="let type of runTypeOptions; trackBy: trackRunType",
+                                        type="button",
+                                        class="run-type-select-chip",
+                                        [ngClass]="runTypeClass(type.id)",
+                                        [class.active]="selectedRunType === type.id",
+                                        [attr.aria-checked]="selectedRunType === type.id",
+                                        role="radio",
+                                        (click)="selectRunType(type.id)") {{type.label}}
+                            input(
+                                id="calendarRunImageInput",
+                                class="sr-only",
+                                type="file",
+                                accept="image/*",
+                                multiple=true,
+                                [disabled]="isUploading || !canUploadSelectedCalendarDate",
+                                (change)="onCalendarFilesSelected($event)")
+                            div(class="calendar-upload-actions")
+                                label(
+                                    class="calendar-upload-btn",
+                                    for="calendarRunImageInput",
+                                    [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
+                                    i(class="fa-solid fa-upload", aria-hidden="true")
+                                    span {{calendarUploadButtonText}}
                                 button(
-                                    *ngFor="let type of runTypeOptions; trackBy: trackRunType",
                                     type="button",
-                                    class="run-type-select-chip",
-                                    [ngClass]="runTypeClass(type.id)",
-                                    [class.active]="selectedRunType === type.id",
-                                    [attr.aria-checked]="selectedRunType === type.id",
-                                    role="radio",
-                                    (click)="selectRunType(type.id)") {{type.label}}
-                        input(
-                            id="calendarRunImageInput",
-                            class="sr-only",
-                            type="file",
-                            accept="image/*",
-                            multiple=true,
-                            [disabled]="isUploading || !canUploadSelectedCalendarDate",
-                            (change)="onCalendarFilesSelected($event)")
-                        div(class="calendar-upload-actions")
-                            label(
-                                class="calendar-upload-btn",
-                                for="calendarRunImageInput",
-                                [class.disabled]="isUploading || !canUploadSelectedCalendarDate")
-                                i(class="fa-solid fa-upload", aria-hidden="true")
-                                span {{calendarUploadButtonText}}
-                            button(
-                                type="button",
-                                class="calendar-manual-btn",
-                                [class.active]="manualEntryVisible && !manualEntryRunId",
-                                [attr.aria-pressed]="manualEntryVisible && !manualEntryRunId",
-                                [disabled]="isUploading || isManualRunSaving || !canUploadSelectedCalendarDate",
-                                (click)="!(manualEntryVisible && !manualEntryRunId) && openManualEntry()")
-                                i(class="fa-solid fa-pen-to-square", aria-hidden="true")
-                                span {{manualEntryVisible && !manualEntryRunId ? '수동 입력 중' : '수동 입력'}}
+                                    class="calendar-manual-btn",
+                                    [class.active]="manualEntryVisible && !manualEntryRunId",
+                                    [attr.aria-pressed]="manualEntryVisible && !manualEntryRunId",
+                                    [disabled]="isUploading || isManualRunSaving || !canUploadSelectedCalendarDate",
+                                    (click)="!(manualEntryVisible && !manualEntryRunId) && openManualEntry()")
+                                    i(class="fa-solid fa-pen-to-square", aria-hidden="true")
+                                    span {{manualEntryVisible && !manualEntryRunId ? '수동 입력 중' : '수동 입력'}}
+                            div(
+                                *ngIf="isUploading || uploadProgress > 0",
+                                class="upload-progress calendar-upload-progress",
+                                role="progressbar",
+                                aria-valuemin="0",
+                                aria-valuemax="100",
+                                [attr.aria-valuenow]="uploadProgress")
+                                div(class="upload-progress-track")
+                                    div(class="upload-progress-fill", [ngStyle]="uploadProgressStyle")
+                                div(class="upload-progress-meta")
+                                    span {{uploadStatus || '대기 중'}}
+                                    span {{uploadProgress}}%
+                            div(*ngIf="uploadStatus && !uploadProgress", class="upload-status") {{uploadStatus}}
+                            wiz-component-error-state(
+                                *ngIf="parseErrorMessage",
+                                [message]="parseErrorMessage",
+                                [onRetry]="switchToManualInput",
+                                retryLabel="수동 입력")
+                            form(*ngIf="manualEntryVisible", class="manual-run-form", (submit)="saveManualRun(); $event.preventDefault()")
+                                div(class="manual-run-form-head")
+                                    div
+                                        div(class="manual-run-title") 수동 입력
+                                        div(class="manual-run-sub") {{selectedCalendarDateText || '오늘'}} 기록으로 저장돼.
+                                    button(type="button", class="manual-run-close", aria-label="수동 입력 닫기", [disabled]="isManualRunSaving", (click)="closeManualEntry()")
+                                        i(class="fa-solid fa-xmark", aria-hidden="true")
+                                div(class="manual-run-grid")
+                                    label(class="manual-run-field")
+                                        span 거리
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="0.01", inputmode="decimal", placeholder="5.00", [(ngModel)]="manualRunForm.distance_km", name="manualDistance")
+                                            em {{distanceUnitLabel}}
+                                    label(class="manual-run-field")
+                                        span {{paceDisplaySettingsText}}
+                                        input(type="text", [placeholder]="appSettings.paceDisplay === 'speed' ? '10.0' : '5:30'", [(ngModel)]="manualRunForm.avg_pace", name="manualPace")
+                                    label(class="manual-run-field")
+                                        span 시간
+                                        input(type="text", placeholder="00:30:00", [(ngModel)]="manualRunForm.duration", name="manualDuration")
+                                    label(class="manual-run-field")
+                                        span 칼로리
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="1", inputmode="numeric", placeholder="250", [(ngModel)]="manualRunForm.calories", name="manualCalories")
+                                            em kcal
+                                    label(class="manual-run-field")
+                                        span 심박수
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="1", inputmode="numeric", placeholder="145", [(ngModel)]="manualRunForm.avg_heart_rate", name="manualHeartRate")
+                                            em bpm
+                                    label(class="manual-run-field")
+                                        span 케이던스
+                                        div(class="manual-run-input-wrap")
+                                            input(type="number", min="0", step="1", inputmode="numeric", placeholder="170", [(ngModel)]="manualRunForm.cadence", name="manualCadence")
+                                            em spm
+                                div(class="manual-run-actions")
+                                    button(type="button", class="manual-run-secondary", [disabled]="isManualRunSaving", (click)="closeManualEntry()") 취소
+                                    button(type="submit", class="manual-run-primary", [disabled]="isManualRunSaving")
+                                        wiz-component-loading-spinner(*ngIf="isManualRunSaving", size="sm", label="수동 기록 저장 중")
+                                        span {{isManualRunSaving ? '저장 중' : '저장'}}
+                    div(*ngIf="!selectedCalendarRuns.length", class="run-media-section calendar-draft-media-section")
+                        div(class="run-media-head")
+                            div
+                                div(class="run-media-title") 사진/영상 추가
+                                div(class="run-media-sub") {{calendarMediaDraftText}}
+                            input(
+                                '#calendarDraftMediaInput'="",
+                                id="calendarDraftMediaInput",
+                                class="sr-only",
+                                type="file",
+                                accept="image/*,video/*",
+                                multiple=true,
+                                [disabled]="isUploading || !canUploadSelectedCalendarDate",
+                                (change)="onCalendarMediaDraftSelected($event)")
+                            div(class="run-media-actions")
+                                button(
+                                    type="button",
+                                    class="run-privacy-toggle run-media-privacy-toggle",
+                                    [class.private]="!calendarUploadIsPublic",
+                                    [disabled]="isUploading",
+                                    [attr.aria-pressed]="calendarUploadIsPublic",
+                                    aria-label="업로드하면 피드에 표시 공개 또는 비공개 선택",
+                                    title="업로드하면 피드에 표시",
+                                    (click)="toggleCalendarUploadPrivacy($event)")
+                                    i(class="fa-solid", [ngClass]="calendarUploadIsPublic ? 'fa-eye' : 'fa-eye-slash'", aria-hidden="true")
+                                    span {{calendarUploadPrivacyText}}
+                                button(
+                                    type="button",
+                                    class="run-media-add-btn",
+                                    [disabled]="isUploading || !canUploadSelectedCalendarDate",
+                                    (click)="calendarDraftMediaInput.click()")
+                                    i(class="fa-solid", [ngClass]="isUploading ? 'fa-spinner' : 'fa-plus'", aria-hidden="true")
+                                    span {{calendarMediaDraftButtonText}}
                         div(*ngIf="shouldShowCalendarMediaAccessNotice", class="calendar-upload-note")
                             i(class="fa-solid fa-circle-info", aria-hidden="true")
                             span 모바일에서는 사진 보관함이나 파일 선택창이 열립니다. 사진 접근 권한을 묻는 경우 허용해야 업로드할 수 있습니다.
-                        div(class="run-media-section calendar-draft-media-section")
-                            div(class="run-media-head")
-                                div
-                                    div(class="run-media-title") 사진/영상 추가
-                                    div(class="run-media-sub") {{calendarMediaDraftText}}
-                                input(
-                                    '#calendarDraftMediaInput'="",
-                                    id="calendarDraftMediaInput",
-                                    class="sr-only",
-                                    type="file",
-                                    accept="image/*,video/*",
-                                    multiple=true,
-                                    [disabled]="isUploading || !canUploadSelectedCalendarDate",
-                                    (change)="onCalendarMediaDraftSelected($event)")
-                                div(class="run-media-actions")
-                                    button(
-                                        type="button",
-                                        class="run-privacy-toggle run-media-privacy-toggle",
-                                        [class.private]="!calendarUploadIsPublic",
-                                        [disabled]="isUploading",
-                                        [attr.aria-pressed]="calendarUploadIsPublic",
-                                        aria-label="업로드하면 피드에 표시 공개 또는 비공개 선택",
-                                        title="업로드하면 피드에 표시",
-                                        (click)="toggleCalendarUploadPrivacy($event)")
-                                        i(class="fa-solid", [ngClass]="calendarUploadIsPublic ? 'fa-eye' : 'fa-eye-slash'", aria-hidden="true")
-                                        span {{calendarUploadPrivacyText}}
-                                    button(
-                                        type="button",
-                                        class="run-media-add-btn",
-                                        [disabled]="isUploading || !canUploadSelectedCalendarDate",
-                                        (click)="calendarDraftMediaInput.click()")
-                                        i(class="fa-solid", [ngClass]="isUploading ? 'fa-spinner' : 'fa-plus'", aria-hidden="true")
-                                        span {{calendarMediaDraftButtonText}}
-                            div(*ngIf="calendarMediaDraftStatus", class="run-media-status") {{calendarMediaDraftStatus}}
-                        div(class="run-journal-section")
-                            div(class="run-journal-head")
-                                div
-                                    div(class="run-journal-title") 오늘의 일기
-                                    div(class="run-journal-sub") {{selectedCalendarDateText}} 기록에 함께 저장돼.
-                                div(class="run-journal-head-actions")
-                                    div(*ngIf="hasSavedUploadJournal", class="calendar-note-chip") 저장됨
-                                    button(
-                                        type="button",
-                                        class="run-journal-primary-btn upload-journal-head-save",
-                                        [disabled]="isUploadJournalSaveDisabled",
-                                        (click)="saveUploadJournal()")
-                                        i(class="fa-solid", [ngClass]="isUploadJournalSaving ? 'fa-spinner' : 'fa-floppy-disk'", aria-hidden="true")
-                                        span {{uploadJournalSaveButtonText}}
-                            textarea(
-                                class="run-journal-input",
-                                rows="3",
-                                maxlength="2000",
-                                placeholder="오늘 러닝은 어땠어? 기록을 남겨봐",
-                                [(ngModel)]="uploadJournalText",
-                                [disabled]="isUploading || isManualRunSaving")
-                            div(*ngIf="uploadJournalStatus", class="run-journal-status upload-journal-status") {{uploadJournalStatus}}
-                        div(
-                            *ngIf="isUploading || uploadProgress > 0",
-                            class="upload-progress calendar-upload-progress",
-                            role="progressbar",
-                            aria-valuemin="0",
-                            aria-valuemax="100",
-                            [attr.aria-valuenow]="uploadProgress")
-                            div(class="upload-progress-track")
-                                div(class="upload-progress-fill", [ngStyle]="uploadProgressStyle")
-                            div(class="upload-progress-meta")
-                                span {{uploadStatus || '대기 중'}}
-                                span {{uploadProgress}}%
-                        div(*ngIf="uploadStatus && !uploadProgress", class="upload-status") {{uploadStatus}}
-                        wiz-component-error-state(
-                            *ngIf="parseErrorMessage",
-                            [message]="parseErrorMessage",
-                            [onRetry]="switchToManualInput",
-                            retryLabel="수동 입력")
-                        form(*ngIf="manualEntryVisible", class="manual-run-form", (submit)="saveManualRun(); $event.preventDefault()")
-                            div(class="manual-run-form-head")
-                                div
-                                    div(class="manual-run-title") 수동 입력
-                                    div(class="manual-run-sub") {{selectedCalendarDateText || '오늘'}} 기록으로 저장돼.
-                                button(type="button", class="manual-run-close", aria-label="수동 입력 닫기", [disabled]="isManualRunSaving", (click)="closeManualEntry()")
-                                    i(class="fa-solid fa-xmark", aria-hidden="true")
-                            div(class="manual-run-grid")
-                                label(class="manual-run-field")
-                                    span 거리
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="0.01", inputmode="decimal", placeholder="5.00", [(ngModel)]="manualRunForm.distance_km", name="manualDistance")
-                                        em {{distanceUnitLabel}}
-                                label(class="manual-run-field")
-                                    span {{paceDisplaySettingsText}}
-                                    input(type="text", [placeholder]="appSettings.paceDisplay === 'speed' ? '10.0' : '5:30'", [(ngModel)]="manualRunForm.avg_pace", name="manualPace")
-                                label(class="manual-run-field")
-                                    span 시간
-                                    input(type="text", placeholder="00:30:00", [(ngModel)]="manualRunForm.duration", name="manualDuration")
-                                label(class="manual-run-field")
-                                    span 칼로리
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="1", inputmode="numeric", placeholder="250", [(ngModel)]="manualRunForm.calories", name="manualCalories")
-                                        em kcal
-                                label(class="manual-run-field")
-                                    span 심박수
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="1", inputmode="numeric", placeholder="145", [(ngModel)]="manualRunForm.avg_heart_rate", name="manualHeartRate")
-                                        em bpm
-                                label(class="manual-run-field")
-                                    span 케이던스
-                                    div(class="manual-run-input-wrap")
-                                        input(type="number", min="0", step="1", inputmode="numeric", placeholder="170", [(ngModel)]="manualRunForm.cadence", name="manualCadence")
-                                        em spm
-                            div(class="manual-run-actions")
-                                button(type="button", class="manual-run-secondary", [disabled]="isManualRunSaving", (click)="closeManualEntry()") 취소
-                                button(type="submit", class="manual-run-primary", [disabled]="isManualRunSaving")
-                                    wiz-component-loading-spinner(*ngIf="isManualRunSaving", size="sm", label="수동 기록 저장 중")
-                                    span {{isManualRunSaving ? '저장 중' : '저장'}}
+                        div(*ngIf="calendarMediaDraftStatus", class="run-media-status") {{calendarMediaDraftStatus}}
+                    div(*ngIf="!selectedCalendarRuns.length", class="run-journal-section")
+                        div(class="run-journal-head")
+                            div
+                                div(class="run-journal-title") 오늘의 일기
+                                div(class="run-journal-sub") {{selectedCalendarDateText}} 기록에 함께 저장돼.
+                            div(class="run-journal-head-actions")
+                                div(*ngIf="hasSavedUploadJournal", class="calendar-note-chip") 저장됨
+                                button(
+                                    type="button",
+                                    class="run-journal-primary-btn upload-journal-head-save",
+                                    [disabled]="isUploadJournalSaveDisabled",
+                                    (click)="saveUploadJournal()")
+                                    i(class="fa-solid", [ngClass]="isUploadJournalSaving ? 'fa-spinner' : 'fa-floppy-disk'", aria-hidden="true")
+                                    span {{uploadJournalSaveButtonText}}
+                        textarea(
+                            class="run-journal-input",
+                            rows="3",
+                            maxlength="2000",
+                            placeholder="오늘 러닝은 어땠어? 기록을 남겨봐",
+                            [(ngModel)]="uploadJournalText",
+                            [disabled]="isUploading || isManualRunSaving")
+                        div(*ngIf="uploadJournalStatus", class="run-journal-status upload-journal-status") {{uploadJournalStatus}}
                     input(
                         '#runMediaInput'="",
                         class="sr-only",
@@ -2701,7 +2848,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         button(type="button", class="onboarding-confirm-primary", [disabled]="isOnboardingSaving", (click)="confirmOnboardingSkip()")
                             span {{isOnboardingSaving ? '처리 중' : '건너뛰기'}}
 
-            div(*ngIf="confirmDialog.visible", class="app-confirm-backdrop", role="presentation", (click)="resolveConfirmDialog(false)")
+            div(*ngIf="confirmDialog.visible", class="app-confirm-backdrop", role="presentation", (click)="dismissConfirmDialogFromBackdrop($event)")
                 section(
                     class="app-confirm-dialog",
                     [ngClass]="'app-confirm-dialog-' + confirmDialog.tone",

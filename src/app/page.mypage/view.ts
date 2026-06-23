@@ -1,6 +1,6 @@
 import { OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
-import { apiFetch, jsonRequest } from 'src/app/shared/api';
+import { apiErrorMessage, apiFetch, jsonRequest, safeUserMessage } from 'src/app/shared/api';
 import { clearAuthTokens, ensureAuthenticated } from 'src/app/shared/auth';
 import { ToastService } from 'src/app/shared/toast.service';
 
@@ -52,7 +52,7 @@ export class Component implements OnInit {
             if (code === 200) {
                 this.user = data;
             } else {
-                this.loadError = data?.message || data || '프로필을 불러오지 못했습니다.';
+                this.loadError = safeUserMessage(data?.message || data, '프로필을 불러오지 못했습니다.');
             }
             await this.loadAgreement();
         } catch {
@@ -97,7 +97,7 @@ export class Component implements OnInit {
         if (code === 200) {
             this.toast.success("프로필이 업데이트되었습니다.");
         } else {
-            this.toast.error(data || "업데이트에 실패했습니다.");
+            this.toast.error(safeUserMessage(data, "업데이트에 실패했습니다."));
         }
         await this.service.render();
     }
@@ -142,7 +142,7 @@ export class Component implements OnInit {
             this.toast.success("비밀번호가 변경됐어");
             this.passwordForm = { current_password: '', new_password: '', confirm_password: '', invalidate_other_sessions: true };
         } else {
-            this.toast.error(result.error?.message || "비밀번호 변경에 실패했습니다.");
+            this.toast.error(apiErrorMessage(result.error, "비밀번호 변경에 실패했습니다."));
         }
         await this.service.render();
     }
@@ -204,7 +204,7 @@ export class Component implements OnInit {
             }
             this.toast.success("마케팅 수신 동의가 변경되었습니다.");
         } else {
-            this.toast.error(result.error?.message || "마케팅 동의 변경에 실패했습니다.");
+            this.toast.error(apiErrorMessage(result.error, "마케팅 동의 변경에 실패했습니다."));
         }
 
         this.agreementSaving = false;
@@ -253,7 +253,7 @@ export class Component implements OnInit {
                 confirm_text: this.accountDeleteForm.confirm_text
             });
             if (!result.success) {
-                await this.service.modal.error(result.error?.message || result.message || "계정 삭제에 실패했습니다.");
+                await this.service.modal.error(apiErrorMessage(result.error, "계정 삭제에 실패했습니다."));
                 return;
             }
 

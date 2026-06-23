@@ -2,7 +2,7 @@ import { Component, OnInit, ChangeDetectorRef, enableProdMode } from '@angular/c
 import { Router } from '@angular/router';
 import { Service } from '@wiz/libs/portal/season/service';
 import { TranslateService } from '@ngx-translate/core';
-import { apiFetch, jsonRequest } from 'src/app/shared/api';
+import { apiErrorMessage, apiFetch, jsonRequest } from 'src/app/shared/api';
 import { ensureAuthenticated, installAuthFetchInterceptor, handleAuthFailure } from 'src/app/shared/auth';
 import { ToastService } from 'src/app/shared/toast.service';
 
@@ -165,7 +165,7 @@ export class AppComponent implements OnInit {
                 this.activeAgreementPolicy = '';
                 this.toast.clear();
             } else {
-                this.toast.error(result.error?.message || '약관 동의를 저장하지 못했습니다.');
+                this.toast.error(apiErrorMessage(result.error, '약관 동의를 저장하지 못했습니다.'));
             }
         } finally {
             this.agreementSaving = false;

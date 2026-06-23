@@ -58,7 +58,8 @@ def _profile_media(user_id, visible):
         if run.get("is_public") is False:
             continue
         for media in run.get("media") or []:
-            if media.get("media_url"):
+            media_url = media.get("media_url")
+            if media_url:
                 items.append({
                     "media": media,
                     "run": run,

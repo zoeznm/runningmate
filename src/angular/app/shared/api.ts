@@ -33,23 +33,80 @@ const ERROR_MESSAGES: Record<ApiErrorKind, string> = {
     unknown: '잠깐 문제가 생겼어. 다시 시도해줘'
 };
 
+const TECHNICAL_MESSAGE_PATTERNS: RegExp[] = [
+    /\b(TypeError|ReferenceError|SyntaxError|RangeError|DOMException|AbortError|NSURLError|URLError|NSError|Exception|Traceback|Stack trace|SQL|Postgres|Prisma|Sequelize)\b/i,
+    /\b(ECONNRESET|ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|NetworkError|FetchError|AbortError)\b/i,
+    /\b(Unable to|Could not|Cannot|Failed to|invalid state|current state|status code|HTTP\s?\d{3}|Unexpected token|JSON|undefined|null|NaN)\b/i,
+    /(<\/?[a-z][\s\S]*>|[{}])/i,
+    /(\/api\/|https?:\/\/|file:\/\/|\.swift\b|\.tsx?\b|\.jsx?\b|line\s+\d+|column\s+\d+)/i
+];
+
+const STATUS_ERROR_MESSAGES: Record<number, string> = {
+    400: '입력한 내용을 다시 확인해줘.',
+    401: '로그인이 만료됐어. 다시 로그인해줘.',
+    403: '이 작업을 할 권한이 없어.',
+    404: '대상을 찾지 못했어.',
+    409: '이미 처리된 요청이야.',
+    413: '파일 용량이 너무 커.',
+    429: '요청이 많아 잠시 후 다시 시도해줘.'
+};
+
 const delay = (ms: number): Promise<void> => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 export function standardApiError(kind: ApiErrorKind, overrides: Partial<ApiError> = {}): ApiError {
+    const fallback = apiErrorFallback(kind, overrides.status);
     return {
         kind,
-        message: overrides.message || ERROR_MESSAGES[kind],
+        message: safeUserMessage(overrides.message, fallback),
         status: overrides.status,
         details: overrides.details
     };
 }
 
-export function apiErrorMessage(error?: ApiError | null): string {
-    return error?.message || ERROR_MESSAGES.unknown;
+export function apiErrorMessage(error?: ApiError | null, fallback?: string): string {
+    return safeUserMessage(error?.message, fallback || apiErrorFallback(error?.kind, error?.status));
+}
+
+export function payloadUserMessage(payload: unknown, fallback: string = ERROR_MESSAGES.unknown): string {
+    return safeUserMessage(normalizeMessage(payload), fallback);
+}
+
+export function safeUserMessage(value: unknown, fallback: string = ERROR_MESSAGES.unknown): string {
+    const fallbackText = String(fallback || '').trim();
+    const raw = extractMessage(value).trim();
+    if (!raw) return fallbackText;
+
+    const message = raw.replace(/\s+/g, ' ').trim();
+    if (!message) return fallbackText;
+    if (message.length > 160) return fallbackText;
+    if (isTechnicalMessage(message)) return fallbackText;
+    return message;
 }
 
 export function isApiResult(value: unknown): value is ApiResult {
     return Boolean(value && typeof value === 'object' && 'success' in (value as Record<string, unknown>));
+}
+
+function apiErrorFallback(kind: ApiErrorKind | undefined, status?: number): string {
+    if (status && STATUS_ERROR_MESSAGES[status]) return STATUS_ERROR_MESSAGES[status];
+    if (status && status >= 500) return ERROR_MESSAGES.server;
+    return kind ? ERROR_MESSAGES[kind] : ERROR_MESSAGES.unknown;
+}
+
+function extractMessage(value: unknown): string {
+    if (typeof value === 'string') return value;
+    if (value instanceof Error) return value.message || '';
+    if (value && typeof value === 'object') {
+        const source = value as Record<string, unknown>;
+        if (typeof source['message'] === 'string') return source['message'];
+        if (typeof source['localizedDescription'] === 'string') return source['localizedDescription'];
+        if (source['error']) return extractMessage(source['error']);
+    }
+    return '';
+}
+
+function isTechnicalMessage(message: string): boolean {
+    return TECHNICAL_MESSAGE_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 function normalizeData<T>(payload: unknown): T {
@@ -108,9 +165,7 @@ function nonJsonPayload(response: Response, text: string, error: unknown): ApiRe
     const fallback = textResponseMessage(text);
     return {
         success: false,
-        message: isHtml
-            ? '서버가 API 응답 대신 화면 HTML을 반환했습니다. 배포 라우팅을 확인해주세요.'
-            : '서버 응답 형식이 올바르지 않습니다. 다시 시도해주세요.',
+        message: isHtml ? ERROR_MESSAGES.server : ERROR_MESSAGES.parse,
         data: {
             response_status: response.status,
             content_type: response.headers.get('content-type') || '',
@@ -123,14 +178,15 @@ function nonJsonPayload(response: Response, text: string, error: unknown): ApiRe
 
 function failureResult<T>(payload: unknown, status?: number): ApiResult<T> {
     const kind = failureKind(status);
+    const error = standardApiError(kind, {
+        status,
+        message: normalizeMessage(payload),
+        details: payload
+    });
     return {
         success: false,
-        error: standardApiError(kind, {
-            status,
-            message: normalizeMessage(payload) || ERROR_MESSAGES[kind],
-            details: payload
-        }),
-        message: normalizeMessage(payload),
+        error,
+        message: error.message,
         raw: payload
     };
 }
@@ -184,25 +240,29 @@ async function fetchOnce<T>(url: string, options: ApiFetchOptions, authRetried: 
         });
 
         if (response.status >= 500) {
+            const error = standardApiError('server', {
+                status: response.status,
+                message: normalizeMessage(payload),
+                details: payload
+            });
             return {
                 success: false,
-                error: standardApiError('server', {
-                    status: response.status,
-                    message: normalizeMessage(payload) || ERROR_MESSAGES.server,
-                    details: payload
-                }),
+                error,
+                message: error.message,
                 raw: payload
             };
         }
 
         if (!response.ok) {
+            const error = standardApiError('client', {
+                status: response.status,
+                message: normalizeMessage(payload),
+                details: payload
+            });
             return {
                 success: false,
-                error: standardApiError('client', {
-                    status: response.status,
-                    message: normalizeMessage(payload) || ERROR_MESSAGES.client,
-                    details: payload
-                }),
+                error,
+                message: error.message,
                 raw: payload
             };
         }
@@ -224,7 +284,7 @@ async function fetchOnce<T>(url: string, options: ApiFetchOptions, authRetried: 
         return {
             success: true,
             data: data as T,
-            message: normalizeMessage(payload),
+            message: safeUserMessage(normalizeMessage(payload), ''),
             raw: payload
         };
     } catch (error) {

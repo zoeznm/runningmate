@@ -70,7 +70,9 @@ app-root {
     min-height: 100%;
     height: -webkit-fill-available;
     min-height: -webkit-fill-available;
-    background: #12121c;
+    background: var(--app-shell-bg, #12121c);
+    background-color: var(--app-shell-bg, #12121c);
+    color: var(--app-shell-text, inherit);
     overflow: hidden;
     display: block;
 }
@@ -88,6 +90,7 @@ body.is-access-page app-root {
     inset: 0;
     width: 100%;
     background: #05070c;
+    background-color: #05070c;
     height: 100vh;
     height: var(--access-visual-height, 100dvh);
     min-height: 100vh;
@@ -101,6 +104,7 @@ body.is-dashboard-page,
 html.is-dashboard-page app-root,
 body.is-dashboard-page app-root {
     background: var(--dashboard-screen-bg, #12121c);
+    background-color: var(--dashboard-screen-bg, #12121c);
 }
 
 html.is-access-page,

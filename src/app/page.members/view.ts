@@ -1,6 +1,7 @@
 import { OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
 import { ensureAuthenticated } from 'src/app/shared/auth';
+import { safeUserMessage } from 'src/app/shared/api';
 import { ToastService } from 'src/app/shared/toast.service';
 
 export class Component implements OnInit {
@@ -44,7 +45,7 @@ export class Component implements OnInit {
             if (code === 200) {
                 this.members = data || [];
             } else {
-                this.errorMessage = data?.message || data || "멤버 목록을 불러오지 못했습니다.";
+                this.errorMessage = safeUserMessage(data?.message || data, "멤버 목록을 불러오지 못했습니다.");
             }
         } catch {
             this.errorMessage = "인터넷 연결을 확인해줘";
@@ -82,7 +83,7 @@ export class Component implements OnInit {
             this.showInviteModal = false;
             await this.load();
         } else {
-            this.toast.error(data || "초대에 실패했습니다.");
+            this.toast.error(safeUserMessage(data, "초대에 실패했습니다."));
         }
         await this.service.render();
     }

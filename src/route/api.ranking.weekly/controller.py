@@ -1,6 +1,7 @@
 import json
 
 
+auth = wiz.model("auth")
 running = wiz.model("runningmate")
 
 try:
@@ -48,6 +49,30 @@ def _current_user():
     if session is not None:
         user["id"] = session.get("id") or ""
         user["name"] = session.get("name") or user["name"]
+
+    if not user.get("id"):
+        try:
+            header = str(wiz.server.package.flask.request.headers.get("Authorization") or "")
+        except Exception:
+            header = ""
+
+        if header.lower().startswith("bearer "):
+            token = header.split(" ", 1)[1].strip()
+            try:
+                verified, error = auth.verify_token(token, token_type="access")
+            except Exception:
+                verified, error = None, "invalid_token"
+
+            if verified and not error:
+                token_user = verified.get("user") or {}
+                user["id"] = token_user.get("id") or verified.get("claims", {}).get("sub") or ""
+                user["name"] = token_user.get("display_name") or token_user.get("name") or user["name"]
+                user["profile_image"] = token_user.get("profile_image") or ""
+                try:
+                    if session is not None:
+                        session.set(**auth.session_payload(token_user))
+                except Exception:
+                    pass
 
     if struct is not None and user.get("id"):
         try:

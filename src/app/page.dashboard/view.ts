@@ -1,11 +1,11 @@
 import { AfterViewInit, ChangeDetectorRef, ElementRef, OnDestroy } from '@angular/core';
 import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, refreshAuthTokens } from 'src/app/shared/auth';
-import { apiFetch, apiErrorMessage, jsonRequest, standardApiError } from 'src/app/shared/api';
+import { apiFetch, apiErrorMessage, jsonRequest, payloadUserMessage, safeUserMessage, standardApiError } from 'src/app/shared/api';
 import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
 import { ToastService } from 'src/app/shared/toast.service';
 import { PredictionEngine, type HistoryInput } from 'cyclia';
 
-type ScreenKey = 'home' | 'goals' | 'challenges' | 'feed' | 'friends' | 'ranking' | 'achievements' | 'calendar' | 'weight' | 'chart' | 'gallery' | 'chat' | 'ai-settings' | 'settings' | 'profile';
+type ScreenKey = 'home' | 'live-run' | 'goals' | 'challenges' | 'feed' | 'friends' | 'ranking' | 'achievements' | 'calendar' | 'weight' | 'chart' | 'gallery' | 'chat' | 'ai-settings' | 'settings' | 'profile';
 type OnboardingStepKey = 'welcome' | 'menu-record' | 'menu-goal' | 'menu-community' | 'menu-ai' | 'menu-settings' | 'profile' | 'goal' | 'complete';
 type CalendarStatus = 'run' | 'rest' | 'no-run' | 'today' | 'future';
 type WeatherTone = 'sunny' | 'cloud' | 'rain' | 'snow' | 'mixed';
@@ -526,6 +526,11 @@ interface RankingEntry {
     highlight: boolean;
     medal: 'gold' | 'silver' | 'bronze' | '';
     privacy: 'public' | 'private';
+    rank_tied: boolean;
+    rank_tiebreaker: 'pace' | '';
+    rank_out: boolean;
+    rank_label: string;
+    rank_status: string;
 }
 
 interface RankingPayloadData {
@@ -855,6 +860,45 @@ interface SaveRunResult {
     run?: RunRecord;
     mediaRunId?: string;
     newlyEarnedBadges?: Badge[];
+}
+
+interface LiveRunMetrics {
+    active: boolean;
+    id?: string;
+    status: 'idle' | 'running' | 'paused' | 'stopped';
+    reason?: string;
+    run_type?: RunType | string;
+    started_at?: string;
+    ended_at?: string;
+    distance_km: number;
+    duration: string;
+    duration_seconds: number;
+    current_pace?: string | null;
+    avg_pace: string;
+    calories: number;
+    heart_rate?: number | null;
+    avg_heart_rate?: number | null;
+    cadence?: number | null;
+    step_count?: number | null;
+    elevation_gain_m?: number | null;
+    heart_rate_available?: boolean;
+    heart_rate_source?: string | null;
+    avg_heart_rate_source?: string | null;
+    watch_connected?: boolean;
+    watch_app_installed?: boolean;
+    metrics_source?: string | null;
+    start_location?: LiveRunRoutePoint | null;
+    end_location?: LiveRunRoutePoint | null;
+    route_points?: LiveRunRoutePoint[];
+}
+
+interface LiveRunRoutePoint {
+    lat: number;
+    lng: number;
+}
+
+interface PluginListenerHandle {
+    remove: () => Promise<void> | void;
 }
 
 interface AiLoginRefreshResult {
@@ -1430,6 +1474,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public calendarMediaDraftFiles: File[] = [];
     public calendarMediaDraftStatus: string = '';
     public calendarUploadIsPublic: boolean = true;
+    public calendarUploadExpanded: boolean = false;
     public manualEntryVisible: boolean = false;
     public manualEntryRunId: string | null = null;
     public recordReuploadTargetId: string | null = null;
@@ -1442,6 +1487,13 @@ export class Component implements AfterViewInit, OnDestroy {
         cadence: ''
     };
     public isManualRunSaving: boolean = false;
+    public liveRun: LiveRunMetrics = this.emptyLiveRunMetrics();
+    public completedLiveRun: LiveRunMetrics | null = null;
+    public liveRunStatus: string = '러닝 대기 중';
+    public isLiveRunBusy: boolean = false;
+    public isLiveRunSaving: boolean = false;
+    public isLiveRunDiscarding: boolean = false;
+    public liveRunDiscardConfirmVisible: boolean = false;
     public aiConnection: AiConnection | null = null;
     public chatText: string = '';
     public isChatSending: boolean = false;
@@ -1497,8 +1549,12 @@ export class Component implements AfterViewInit, OnDestroy {
     private cyclePredictionEngine = new PredictionEngine({ strategy: 'wma', lutealPhaseDays: 14, timezone: 'Asia/Seoul' });
     private weatherDays = new Map<string, WeatherDay>();
     private weatherCoverage: WeatherCoverage | null = null;
+    private liveRunNativePlugin: any = null;
+    private liveRunStartSequence: number = 0;
+    private liveRunCancelTouchStartedAt: number = 0;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
+    private runMediaLoadPromise: Promise<boolean> | null = null;
     private deferredDashboardDataStarted: boolean = false;
     private initialCoreDataLoaded: boolean = false;
     private agreementModalVisibleForLoading: boolean = false;
@@ -1548,6 +1604,8 @@ export class Component implements AfterViewInit, OnDestroy {
     };
     private readonly weatherRefreshIntervalMs: number = 30 * 60 * 1000;
     private readonly initialDashboardTaskTimeoutMs: number = 9000;
+    private readonly liveRunNativeCancelTimeoutMs: number = 3500;
+    private readonly confirmBackdropIgnoreMs: number = 500;
     private isCyclePreferenceSaving: boolean = false;
     private readonly initialLoadingStepPriority: string[] = [
         'auth',
@@ -1574,6 +1632,8 @@ export class Component implements AfterViewInit, OnDestroy {
     ];
     private initialLoadingSteps = new Map<string, string>();
     private onboardingTouchStartX: number | null = null;
+    private cycleRequestSeq: number = 0;
+    private rankingRequestSeq: number = 0;
     private weatherRequestSeq: number = 0;
     private weatherRefreshTimer: number | null = null;
     private weatherPosition: WeatherPosition | null = null;
@@ -1586,15 +1646,42 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly dashboardViewportClass: string = 'is-dashboard-page';
     private readonly dashboardViewportProperty: string = '--dashboard-visual-height';
     private readonly dashboardScreenBgProperty: string = '--dashboard-screen-bg';
+    private readonly appShellBgProperty: string = '--app-shell-bg';
+    private readonly appShellTextProperty: string = '--app-shell-text';
+    private readonly dashboardDarkBackground: string = '#12121c';
+    private readonly dashboardLightBackground: string = '#f7f7f9';
+    private readonly loadingScreenBackground: string = '#000000';
+    private readonly liveRunDarkBackground: string = '#24d6b5';
+    private readonly liveRunLightBackground: string = '#0e7490';
+    private readonly liveRunPausedDarkBackground: string = '#000000';
+    private readonly liveRunPausedLightBackground: string = '#ffffff';
+    private readonly dashboardDarkTextColor: string = '#e8e8f0';
+    private readonly dashboardLightTextColor: string = '#1a1a2e';
+    private readonly loadingScreenTextColor: string = '#ffffff';
+    private readonly liveRunDarkTextColor: string = '#021513';
+    private readonly liveRunLightTextColor: string = '#ffffff';
+    private readonly liveRunPausedDarkTextColor: string = '#ffffff';
+    private readonly liveRunPausedLightTextColor: string = '#1a1a2e';
     private dashboardThemeMeta: HTMLMetaElement | null = null;
     private dashboardAppRootElement: HTMLElement | null = null;
+    private dashboardChromeSyncTimers: number[] = [];
     private previousDashboardThemeColor: string = '';
     private previousRootBackground: string = '';
     private previousBodyBackground: string = '';
     private previousAppRootBackground: string = '';
+    private previousRootBackgroundColor: string = '';
+    private previousBodyBackgroundColor: string = '';
+    private previousAppRootBackgroundColor: string = '';
     private previousRootScreenBg: string = '';
     private previousBodyScreenBg: string = '';
     private previousAppRootScreenBg: string = '';
+    private previousRootShellBg: string = '';
+    private previousBodyShellBg: string = '';
+    private previousAppRootShellBg: string = '';
+    private previousRootShellText: string = '';
+    private previousBodyShellText: string = '';
+    private previousAppRootShellText: string = '';
+    private confirmDialogOpenedAt: number = 0;
     private readonly updateDashboardViewportHeight = (): void => {
         this.syncDashboardViewportHeight();
     };
@@ -1794,10 +1881,21 @@ export class Component implements AfterViewInit, OnDestroy {
         if (this.activeScreen === 'calendar') {
             await this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth());
         }
-        if (this.activeScreen === 'gallery' && !this.runMediaLoaded) {
-            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true));
+        if ((this.activeScreen === 'gallery' || this.activeScreen === 'profile') && !this.runMediaLoaded) {
+            await this.runDeferredDashboardTask(() => this.ensureRunMediaLoaded());
         }
         this.cdr.detectChanges();
+    }
+
+    private async ensureRunMediaLoaded(): Promise<boolean> {
+        if (this.runMediaLoaded) return true;
+        if (this.runMediaLoadPromise) return this.runMediaLoadPromise;
+
+        this.runMediaLoadPromise = this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true)
+            .finally(() => {
+                this.runMediaLoadPromise = null;
+            });
+        return this.runMediaLoadPromise;
     }
 
     public readonly switchToManualInput = (): void => {
@@ -1834,6 +1932,7 @@ export class Component implements AfterViewInit, OnDestroy {
     ];
 
     private readonly navActiveGroups: Partial<Record<ScreenKey, ScreenKey[]>> = {
+        home: ['home', 'live-run'],
         calendar: ['calendar', 'weight', 'chart', 'gallery'],
         goals: ['goals', 'challenges', 'achievements'],
         feed: ['feed', 'friends', 'ranking', 'profile'],
@@ -1842,6 +1941,7 @@ export class Component implements AfterViewInit, OnDestroy {
     };
     private readonly routeScreenMap: Record<string, ScreenKey> = {
         home: 'home',
+        'live-run': 'live-run',
         calendar: 'calendar',
         goals: 'goals',
         feed: 'feed',
@@ -2107,26 +2207,75 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get myProfileMediaItems(): GalleryItem[] {
+        const owner = this.myFeedUser();
         return this.runs
             .filter((run) => run.is_public !== false)
-            .flatMap((run) => (run.media || []).map((media) => {
-                const km = this.distanceText(run.distance_km, true);
-                const date = this.displayDate(run.date, false);
-                return {
-                    id: media.id,
-                    km,
-                    date,
-                    stats: [],
-                    runType: run.run_type,
-                    altText: `${date} ${km} 러닝 첨부 ${this.mediaTypeLabel(media.media_type)}`,
-                    imageUrl: media.media_url,
-                    media,
-                    run,
-                    owner: this.myFeedUser(),
-                    mediaType: media.media_type
-                } as GalleryItem;
-            }))
-            .slice(0, 12);
+            .flatMap((run) => this.mediaGalleryItemsForRun(run, owner))
+            .slice(0, 30);
+    }
+
+    private mediaGalleryItemsForRun(run: RunRecord, owner?: FeedUser): GalleryItem[] {
+        return (run.media || [])
+            .map((media) => this.galleryItemForRunMedia(run, media, owner));
+    }
+
+    private captureGalleryItemForRun(run: RunRecord, owner?: FeedUser): GalleryItem | null {
+        const imageUrl = run.image_url || '';
+        if (!imageUrl) return null;
+
+        const km = this.distanceText(run.distance_km, true);
+        const date = this.displayDate(run.date, false);
+        const runId = typeof run.id === 'string' && run.id ? run.id : '';
+        const itemId = runId ? `${runId}-capture` : `${run.date}-${imageUrl}`;
+        const media: RunMedia = {
+            id: itemId,
+            run_id: runId,
+            media_url: imageUrl,
+            media_type: 'photo',
+            created_at: run.created_at || ''
+        };
+
+        return {
+            id: media.id,
+            km,
+            date,
+            stats: [
+                { label: this.paceDisplaySettingsText, value: this.paceText(run.avg_pace) },
+                { label: '시간', value: this.shortDuration(run) },
+                { label: '칼로리', value: run.calories ?? '-' }
+            ],
+            runType: run.run_type,
+            altText: `${owner?.name ? owner.name + ' ' : ''}${date} ${km} 러닝 기록 캡처`,
+            imageUrl,
+            media,
+            run,
+            owner,
+            mediaType: 'photo'
+        };
+    }
+
+    private galleryItemForRunMedia(run: RunRecord, media: RunMedia, owner?: FeedUser): GalleryItem {
+        const km = this.distanceText(run.distance_km, true);
+        const date = this.displayDate(run.date, false);
+        const mediaLabel = this.mediaTypeLabel(media.media_type);
+
+        return {
+            id: media.id,
+            km,
+            date,
+            stats: [
+                { label: '종류', value: mediaLabel },
+                { label: '기록', value: km },
+                { label: '날짜', value: date }
+            ],
+            runType: run.run_type,
+            altText: `${owner?.name ? owner.name + ' ' : ''}${date} ${km} 러닝 첨부 ${mediaLabel}`,
+            imageUrl: media.media_url,
+            media,
+            run,
+            owner,
+            mediaType: media.media_type
+        };
     }
 
     public get rankingTitleText(): string {
@@ -2162,8 +2311,21 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.convertDistanceTextUnits(this.rankingMotivationText);
     }
 
+    public get displayedRankingEntries(): RankingEntry[] {
+        if (this.activeRankingScope !== 'global') return this.rankingEntries;
+
+        const topEntries = this.rankingEntries
+            .filter((entry) => !entry.rank_out)
+            .slice(0, 3);
+        const topEntryIds = new Set(topEntries.map((entry) => entry.user_id));
+        const blurredEntries = this.rankingEntries
+            .filter((entry) => !entry.is_viewer && !topEntryIds.has(entry.user_id));
+        return [...topEntries, ...blurredEntries];
+    }
+
     public get rankingMyTitle(): string {
         if (!this.rankingMe) return '내 순위 없음';
+        if (this.rankingMe.rank_out) return this.rankingMe.rank_status || '달리지 않아서 순위 밖';
         return `내 순위 ${this.rankingMe.rank}위`;
     }
 
@@ -2182,6 +2344,22 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public rankingDistanceText(entry: RankingEntry): string {
         return this.distanceText(entry.distance_km);
+    }
+
+    public rankingMetaText(entry: RankingEntry): string {
+        if (entry.rank_out) return entry.rank_status || '달리지 않아서 순위 밖';
+        if (entry.rank_tied) return `${entry.run_count}회 · 공동 순위`;
+        if (entry.rank_tiebreaker === 'pace') return `${entry.run_count}회 · 평균 페이스 우선`;
+        return `${entry.run_count}회 · 거리만 공개`;
+    }
+
+    public rankingRankText(entry: RankingEntry): string {
+        if (entry.rank_out) return '밖';
+        return String(entry.rank || '-');
+    }
+
+    public isRankingEntryBlurred(entry: RankingEntry, index: number): boolean {
+        return this.activeRankingScope === 'global' && !entry.is_viewer && (entry.rank_out || index >= 3);
     }
 
     public get rankingEmptyDescription(): string {
@@ -2749,7 +2927,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async useCurrentLocationWeather(): Promise<void> {
         if (this.isWeatherLocationBusy || this.isWeatherLoading) return;
-        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        if (!this.canRequestCurrentWeatherPosition()) {
             this.showToast('이 기기에서는 위치 권한을 사용할 수 없어.', 'error');
             return;
         }
@@ -2765,9 +2943,7 @@ export class Component implements AfterViewInit, OnDestroy {
             await this.loadWeatherForActiveMonth();
             this.showToast('현재 위치 기준으로 날씨를 불러왔어.', 'success');
         } catch (error) {
-            const message = error instanceof Error && error.message
-                ? error.message
-                : '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.';
+            const message = this.weatherLocationErrorMessage(error);
             this.showToast(message, 'error');
         } finally {
             this.isWeatherLocationBusy = false;
@@ -2952,7 +3128,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get appleMusicUploadHelpText(): string {
         if (!this.appleMusicConnection.configured) {
-            return this.appleMusicConnection.message || 'Apple Music Developer Token 설정이 필요해.';
+            return this.userMessage(this.appleMusicConnection.message, 'Apple Music 연결 설정이 필요해.');
         }
         if (!this.appSettings.appleMusicConnected) {
             return 'Apple Music을 연결하면 최근 재생곡 30개에서 고를 수 있어.';
@@ -3065,6 +3241,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public setScreen(screen: ScreenKey): void {
         this.activeScreen = screen;
         this.updateRouteScreen(screen);
+        this.syncDashboardChrome();
         void this.loadActiveScreenData(true);
     }
 
@@ -3095,10 +3272,16 @@ export class Component implements AfterViewInit, OnDestroy {
         if (screen === 'profile') {
             this.isProfileEditOpen = false;
             await this.runDeferredDashboardTask(() => this.loadFriendLists(false));
+            if (!this.runMediaLoaded) {
+                await this.runDeferredDashboardTask(() => this.ensureRunMediaLoaded());
+            }
         }
         if (screen === 'calendar') {
             await this.runDeferredDashboardTask(() => this.loadDayNotes());
             await this.runDeferredDashboardTask(() => this.loadRestDays());
+            if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+                await this.runDeferredDashboardTask(() => this.loadCycles());
+            }
             await this.runDeferredDashboardTask(() => this.loadWeatherForActiveMonth());
         }
         if (screen === 'weight') {
@@ -3108,7 +3291,7 @@ export class Component implements AfterViewInit, OnDestroy {
             await this.runDeferredDashboardTask(() => this.loadTrainingLoad());
         }
         if (screen === 'gallery' && !this.runMediaLoaded) {
-            await this.runDeferredDashboardTask(() => this.loadRuns(false, false, true, this.runsUrl({ includeMedia: true }), true));
+            await this.runDeferredDashboardTask(() => this.ensureRunMediaLoaded());
         }
         if (screen === 'chat' || screen === 'ai-settings') {
             if (!this.aiConnection) {
@@ -3244,7 +3427,7 @@ export class Component implements AfterViewInit, OnDestroy {
             }, { retries: 0 });
 
             if (!result.success) {
-                this.profileEditStatus = result.error?.message || '프로필을 저장하지 못했어.';
+                this.profileEditStatus = this.apiMessage(result.error, '프로필을 저장하지 못했어.');
                 this.showToast(this.profileEditStatus, 'error');
                 return;
             }
@@ -3316,7 +3499,7 @@ export class Component implements AfterViewInit, OnDestroy {
             }, { retries: 0 });
 
             if (!result.success) {
-                this.showToast(result.error?.message || '비밀번호 변경에 실패했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '비밀번호 변경에 실패했어.'), 'error');
                 return;
             }
 
@@ -3551,6 +3734,7 @@ export class Component implements AfterViewInit, OnDestroy {
             tone,
             iconClass: options.iconClass || (tone === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-question')
         };
+        this.confirmDialogOpenedAt = Date.now();
         this.cdr.detectChanges();
 
         return new Promise((resolve) => {
@@ -3558,9 +3742,20 @@ export class Component implements AfterViewInit, OnDestroy {
         });
     }
 
+    public dismissConfirmDialogFromBackdrop(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (Date.now() - this.confirmDialogOpenedAt < this.confirmBackdropIgnoreMs) return;
+        this.resolveConfirmDialog(false);
+    }
+
     public resolveConfirmDialog(confirmed: boolean): void {
         const resolver = this.confirmDialogResolver;
         this.confirmDialogResolver = null;
+        this.confirmDialogOpenedAt = 0;
         this.confirmDialog = {
             ...this.confirmDialog,
             visible: false
@@ -3617,7 +3812,7 @@ export class Component implements AfterViewInit, OnDestroy {
             }, { retries: 0, timeoutMs: 30000 });
 
             if (!result.success) {
-                this.showToast(result.error?.message || result.message || '계정 삭제에 실패했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '계정 삭제에 실패했어.'), 'error');
                 return;
             }
 
@@ -3844,7 +4039,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.goalStatus = payload?.message || '목표를 저장하지 못했어.';
+                this.goalStatus = this.payloadMessage(payload, '목표를 저장하지 못했어.');
                 return;
             }
 
@@ -3878,7 +4073,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.goalStatus = payload?.message || '목표를 삭제하지 못했어.';
+                this.goalStatus = this.payloadMessage(payload, '목표를 삭제하지 못했어.');
                 return;
             }
 
@@ -3976,7 +4171,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.challengeStatus = payload?.message || '챌린지를 만들지 못했어.';
+                this.challengeStatus = this.payloadMessage(payload, '챌린지를 만들지 못했어.');
                 return;
             }
 
@@ -4027,7 +4222,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const result = await response.json().catch(() => null);
             if (!result?.success) {
-                this.challengeStatus = result?.message || '챌린지를 삭제하지 못했어.';
+                this.challengeStatus = this.payloadMessage(result, '챌린지를 삭제하지 못했어.');
                 return;
             }
 
@@ -4125,9 +4320,10 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    public openRankingProfile(entry: RankingEntry, event?: Event): void {
+    public openRankingProfile(entry: RankingEntry, event?: Event, index: number = -1): void {
         event?.preventDefault();
         event?.stopPropagation();
+        if (index >= 0 && this.isRankingEntryBlurred(entry, index)) return;
         if (!entry?.user_id) return;
 
         if (entry.is_viewer) {
@@ -4139,7 +4335,10 @@ export class Component implements AfterViewInit, OnDestroy {
         this.openViewedProfile(this.rankingEntryToSocialProfile(entry));
     }
 
-    public rankingEntryProfileLabel(entry: RankingEntry): string {
+    public rankingEntryProfileLabel(entry: RankingEntry, index: number = -1): string {
+        if (index >= 0 && this.isRankingEntryBlurred(entry, index)) {
+            return entry.rank_out ? '달리지 않아서 순위 밖' : `${entry.rank}위 랭킹`;
+        }
         const name = entry?.name || '러너';
         return entry?.is_viewer ? '내 프로필 보기' : `${name} 프로필 보기`;
     }
@@ -4169,7 +4368,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success) {
-                this.friendStatus = payload?.message || '친구 검색에 실패했어.';
+                this.friendStatus = this.payloadMessage(payload, '친구 검색에 실패했어.');
                 return;
             }
 
@@ -4200,7 +4399,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await apiFetch<any>('/api/friends/code');
             if (!result.success) {
-                this.friendCodeStatus = result.error?.message || '친구코드를 불러오지 못했어.';
+                this.friendCodeStatus = this.apiMessage(result.error, '친구코드를 불러오지 못했어.');
                 return;
             }
 
@@ -4267,7 +4466,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>('/api/friends/code', 'POST', { code }, { retries: 0 });
             if (!result.success) {
-                this.friendCodeStatus = result.error?.message || '친구코드를 확인하지 못했어.';
+                this.friendCodeStatus = this.apiMessage(result.error, '친구코드를 확인하지 못했어.');
                 return;
             }
 
@@ -4306,7 +4505,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success) {
-                this.friendStatus = payload?.message || '팔로우 상태를 바꾸지 못했어.';
+                this.friendStatus = this.payloadMessage(payload, '팔로우 상태를 바꾸지 못했어.');
                 return;
             }
 
@@ -4443,7 +4642,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}/reactions`, method, { type: reactionType });
             if (!result.success) {
-                this.showToast(result.error?.message || '반응을 저장하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '반응을 저장하지 못했어.'), 'error');
                 return;
             }
             this.applyFeedSocial(run.id, (result.raw as any)?.social || result.data);
@@ -4464,7 +4663,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}/comments`, 'POST', { content });
             if (!result.success) {
-                this.showToast(result.error?.message || '댓글을 저장하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '댓글을 저장하지 못했어.'), 'error');
                 return;
             }
             this.feedCommentDrafts = { ...this.feedCommentDrafts, [run.id]: '' };
@@ -4493,7 +4692,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}/comments`, 'DELETE', { comment_id: comment.id });
             if (!result.success) {
-                this.showToast(result.error?.message || '댓글을 삭제하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '댓글을 삭제하지 못했어.'), 'error');
                 return;
             }
             this.applyFeedSocial(run.id, (result.raw as any)?.social || result.data);
@@ -4537,6 +4736,11 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
+    public toggleCalendarUploadExpanded(): void {
+        this.calendarUploadExpanded = !this.calendarUploadExpanded;
+        this.cdr.detectChanges();
+    }
+
     public async toggleRunPrivacy(run: CalendarRunDetail | RunRecord, event?: Event): Promise<void> {
         event?.preventDefault();
         event?.stopPropagation();
@@ -4549,7 +4753,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}`, 'PATCH', { is_public: nextPublic });
             if (!result.success) {
-                this.showToast(result.error?.message || '공개 설정을 저장하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '공개 설정을 저장하지 못했어.'), 'error');
                 return;
             }
             this.applyRunUpdate((result.raw as any)?.data || result.data);
@@ -4584,19 +4788,20 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(`/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ranking_enabled: nextEnabled })
-            });
-            const payload = await response.json().catch(() => null);
-            if (!response.ok || !payload?.success) {
-                this.rankingStatus = payload?.message || '참여 설정을 저장하지 못했어.';
+            const result = await jsonRequest<any>(
+                `/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`,
+                'PATCH',
+                { ranking_enabled: nextEnabled },
+                { retries: 2, retryDelayMs: 500, timeoutMs: 12000 }
+            );
+            const payload = result.raw as any;
+            if (!result.success) {
+                this.rankingStatus = this.apiMessage(result.error, '참여 설정을 저장하지 못했어.');
                 return;
             }
 
             this.rankingParticipationEnabled = nextEnabled;
-            this.applyRankingPayload(payload.ranking || payload.data || payload);
+            this.applyRankingPayload(payload?.ranking || payload?.data || result.data || payload);
             this.rankingStatus = nextEnabled ? '랭킹 참여 중' : '랭킹에서 숨김';
             this.showToast(nextEnabled ? '랭킹 참여를 켰어.' : '랭킹 참여를 껐어.', 'success');
         } catch {
@@ -4694,7 +4899,7 @@ export class Component implements AfterViewInit, OnDestroy {
             const payload = this.normalizeWizStatusPayload(rawPayload) as { success?: boolean; message?: string; data?: unknown[]; usage?: Partial<AiUsage> } | null;
             this.applyAiUsage(payload?.usage);
             if (!payload?.success) {
-                this.showToast(payload?.message || '대화를 삭제하지 못했어.', 'error');
+                this.showToast(this.payloadMessage(payload, '대화를 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -4831,7 +5036,7 @@ export class Component implements AfterViewInit, OnDestroy {
             if (!result.success) {
                 const message = result.error?.kind === 'parse'
                     ? ''
-                    : result.message || apiErrorMessage(result.error);
+                    : this.apiMessage(result.error, '목표 체중을 저장하지 못했어.');
                 this.weightTargetStatus = message || '목표 체중을 저장하지 못했어.';
                 this.showToast(this.weightTargetStatus, 'error');
                 return;
@@ -4889,7 +5094,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.weightStatus = payload?.message || '체중 기록을 저장하지 못했어.';
+                this.weightStatus = this.payloadMessage(payload, '체중 기록을 저장하지 못했어.');
                 return;
             }
 
@@ -4940,7 +5145,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.showToast(payload?.message || '체중 기록을 삭제하지 못했어.', 'error');
+                this.showToast(this.payloadMessage(payload, '체중 기록을 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -5034,7 +5239,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.appleMusicStatus = payload?.message || '최근 재생곡을 불러오지 못했어.';
+                this.appleMusicStatus = this.payloadMessage(payload, '최근 재생곡을 불러오지 못했어.');
                 this.showToast(this.appleMusicStatus, 'error');
                 return;
             }
@@ -5166,7 +5371,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.runMediaStatus = payload?.message || '사진/영상을 업로드하지 못했어.';
+                this.runMediaStatus = this.payloadMessage(payload, '사진/영상을 업로드하지 못했어.');
                 this.showToast(this.runMediaStatus, 'error');
                 return;
             }
@@ -5200,7 +5405,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.showToast(payload?.message || '첨부 미디어를 삭제하지 못했어.', 'error');
+                this.showToast(this.payloadMessage(payload, '첨부 미디어를 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -5311,7 +5516,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.journalStatusText = payload?.message || '일기를 저장하지 못했어.';
+                this.journalStatusText = this.payloadMessage(payload, '일기를 저장하지 못했어.');
                 this.showToast(this.journalStatusText, 'error');
                 return;
             }
@@ -5381,6 +5586,9 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
         void this.loadGoalsForActiveMonth();
         void this.loadWeatherForActiveMonth();
+        if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
+            void this.loadCycles({ preserveStatus: true });
+        }
     }
 
     public startCalendarSwipe(event: TouchEvent): void {
@@ -5495,7 +5703,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const saved = await this.saveRunRecord(payload);
             if (!saved.saved) {
-                this.uploadStatus = saved.message || `${label} 기록을 저장하지 못했어.`;
+                this.uploadStatus = this.userMessage(saved.message, `${label} 기록을 저장하지 못했어.`);
                 this.showToast(this.uploadStatus, 'error');
                 return;
             }
@@ -5544,7 +5752,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json();
             if (!payload?.success) {
-                this.calendarMemoStatus = payload?.message || '메모를 저장하지 못했어.';
+                this.calendarMemoStatus = this.payloadMessage(payload, '메모를 저장하지 못했어.');
                 return;
             }
 
@@ -5594,7 +5802,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.uploadJournalStatus = payload?.message || '일기를 저장하지 못했어.';
+                this.uploadJournalStatus = this.payloadMessage(payload, '일기를 저장하지 못했어.');
                 this.showToast(this.uploadJournalStatus, 'error');
                 return;
             }
@@ -5750,28 +5958,34 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles'), {
-                method: 'POST',
-                headers: this.cycleRequestHeaders(),
-                body: JSON.stringify({
-                    consent: true,
-                    start_date: logDate,
-                    end_date: logDate,
-                    cycle_phase: 'menstrual',
-                    flow_level: this.selectedCycleFlowLevel,
-                    condition_emoji: this.selectedCycleConditionEmoji,
-                    id: this.selectedCalendarCycleLog?.id || undefined,
-                    note: this.cycleNoteText.trim()
-                })
+            const result = await jsonRequest<any>('/api/cycles', 'POST', {
+                consent: true,
+                start_date: logDate,
+                end_date: logDate,
+                cycle_phase: 'menstrual',
+                flow_level: this.selectedCycleFlowLevel,
+                condition_emoji: this.selectedCycleConditionEmoji,
+                id: this.selectedCalendarCycleLog?.id || undefined,
+                note: this.cycleNoteText.trim()
+            }, {
+                retries: 2,
+                retryDelayMs: 500,
+                timeoutMs: 12000
             });
-            const payload = await response.json().catch(() => null);
-            if (!payload?.success) {
-                this.cycleStatus = payload?.message || '주기 기록을 저장하지 못했어.';
+            const payload = result.raw || result.data;
+            if (!result.success) {
+                this.cycleStatus = this.apiMessage(result.error, '주기 기록을 저장하지 못했어.');
                 return;
             }
 
             const savedNote = this.cycleNoteText.trim();
-            this.setCycles(Array.isArray(payload.cycles) ? payload.cycles : payload.data ? [payload.data] : [], payload.summary);
+            const rows = this.cycleRowsFromPayload(payload, true);
+            if (rows) {
+                this.setCycles(rows, payload?.summary);
+            }
+            if (!rows || !Array.isArray(payload?.cycles)) {
+                await this.loadCycles({ preserveStatus: true });
+            }
             this.cycleNoteText = savedNote;
             this.isCycleNoteEditing = false;
             this.cycleStartDate = logDate;
@@ -5801,18 +6015,26 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles'), {
-                method: 'DELETE',
-                headers: this.cycleRequestHeaders(),
-                body: JSON.stringify({ consent: true, id: log.id })
+            const result = await jsonRequest<any>('/api/cycles', 'DELETE', {
+                consent: true,
+                id: log.id
+            }, {
+                retries: 2,
+                retryDelayMs: 500,
+                timeoutMs: 12000
             });
-            const payload = await response.json().catch(() => null);
-            if (!payload?.success) {
-                this.showToast(payload?.message || '주기 기록을 삭제하지 못했어.', 'error');
+            const payload = result.raw || result.data;
+            if (!result.success) {
+                this.showToast(this.apiMessage(result.error, '주기 기록을 삭제하지 못했어.'), 'error');
                 return;
             }
 
-            this.setCycles(Array.isArray(payload.data) ? payload.data : [], payload.summary);
+            const rows = this.cycleRowsFromPayload(payload);
+            if (rows) {
+                this.setCycles(rows, payload?.summary);
+            } else {
+                await this.loadCycles({ preserveStatus: true });
+            }
             this.showToast('주기 기록을 삭제했어.', 'success');
         } catch {
             this.showToast('주기 삭제 중 오류가 발생했어.', 'error');
@@ -5836,18 +6058,21 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
 
         try {
-            const response = await fetch(resolveApiUrl('/api/cycles'), {
-                method: 'DELETE',
-                headers: this.cycleRequestHeaders(),
-                body: JSON.stringify({ consent: true, all: true })
+            const result = await jsonRequest<any>('/api/cycles', 'DELETE', {
+                consent: true,
+                all: true
+            }, {
+                retries: 2,
+                retryDelayMs: 500,
+                timeoutMs: 12000
             });
-            const payload = await response.json().catch(() => null);
-            if (!payload?.success) {
-                this.cycleStatus = payload?.message || '주기 데이터를 삭제하지 못했어.';
+            const payload = result.raw || result.data;
+            if (!result.success) {
+                this.cycleStatus = this.apiMessage(result.error, '주기 데이터를 삭제하지 못했어.');
                 return;
             }
 
-            this.setCycles([], payload.summary);
+            this.setCycles(this.cycleRowsFromPayload(payload) || [], this.cycleSummaryFromPayload(payload));
             this.cycleStatus = '전체 삭제됨';
             this.showToast('주기 데이터를 모두 삭제했어.', 'success');
         } catch {
@@ -5966,9 +6191,9 @@ export class Component implements AfterViewInit, OnDestroy {
             ? mediaSavedCount
                 ? `${savedCount}개 기록과 사진/영상 ${mediaSavedCount}개를 저장했어.`
                 : `${savedCount}개 항목을 저장했어.`
-            : lastMessage || '저장된 기록이 없어.';
+            : this.userMessage(lastMessage, '저장된 기록이 없어.');
         if (!savedCount && lastMessage) {
-            this.parseErrorMessage = lastMessage;
+            this.parseErrorMessage = this.userMessage(lastMessage, '이미지를 읽지 못했어. 수동으로 입력해줘.');
         }
         if (savedCount) {
             this.resetHydrationInputs();
@@ -5978,6 +6203,257 @@ export class Component implements AfterViewInit, OnDestroy {
         }
         if (input) input.value = '';
         await this.loadRuns();
+    }
+
+    private emptyLiveRunMetrics(): LiveRunMetrics {
+        return {
+            active: false,
+            status: 'idle',
+            distance_km: 0,
+            duration: '00:00:00',
+            duration_seconds: 0,
+            current_pace: '-',
+            avg_pace: '-',
+            calories: 0,
+            heart_rate: null,
+            avg_heart_rate: null,
+            cadence: null,
+            step_count: null,
+            elevation_gain_m: null,
+            heart_rate_available: false,
+            heart_rate_source: null,
+            avg_heart_rate_source: null,
+            watch_connected: false,
+            watch_app_installed: false,
+            metrics_source: null,
+            start_location: null,
+            end_location: null,
+            route_points: []
+        };
+    }
+
+    private installLiveRunListeners(): void {
+        const plugin = this.liveRunPlugin();
+        if (!plugin) {
+            this.liveRunStatus = isNativeLocalOrigin()
+                ? '실시간 러닝 모듈을 찾지 못했어. 최신 앱 빌드가 필요해.'
+                : '실시간 러닝은 iPhone 앱에서 사용할 수 있어.';
+            return;
+        }
+
+        this.addLiveRunListener(plugin, 'liveRunUpdate', (event) => {
+            this.applyLiveRunMetrics(event);
+            if (this.liveRun.status === 'running') {
+                this.liveRunStatus = '러닝 측정 중';
+            }
+        });
+        this.addLiveRunListener(plugin, 'liveRunEnded', (event) => {
+            this.applyLiveRunMetrics(event);
+        });
+        this.addLiveRunListener(plugin, 'liveRunError', (event) => {
+            this.liveRunStatus = this.liveRunErrorMessage(event, '실시간 러닝 측정 중 오류가 발생했어.');
+            this.cdr.detectChanges();
+        });
+
+        if (typeof plugin.getLiveRunSnapshot === 'function') {
+            plugin.getLiveRunSnapshot()
+                .then((snapshot: unknown) => {
+                    const metrics = this.normalizeLiveRunMetrics(snapshot);
+                    if (metrics.active) {
+                        this.liveRun = metrics;
+                        this.liveRunStatus = metrics.status === 'paused' ? '일시정지됨' : '러닝 측정 중';
+                        this.cdr.detectChanges();
+                    }
+                })
+                .catch(() => null);
+        }
+    }
+
+    private installLiveRunCancelFallback(): void {
+        if (typeof window === 'undefined') return;
+
+        const host = this.elementRef.nativeElement;
+        const options: AddEventListenerOptions = { capture: true, passive: false };
+        const listener = (event: Event): void => {
+            const target = event.target instanceof HTMLElement
+                ? event.target.closest('[data-live-run-cancel="true"]')
+                : null;
+            if (!(target instanceof HTMLElement) || !host.contains(target)) return;
+            if (this.activeScreen !== 'live-run' || this.completedLiveRun) return;
+
+            if (event.type === 'click' && Date.now() - this.liveRunCancelTouchStartedAt < 650) {
+                event.preventDefault();
+                event.stopPropagation();
+                (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+                return;
+            }
+
+            if (event.type === 'touchstart' || event.type === 'pointerdown') {
+                this.liveRunCancelTouchStartedAt = Date.now();
+            }
+
+            this.requestDiscardLiveRun(event);
+            this.cdr.detectChanges();
+        };
+
+        ['pointerdown', 'touchstart', 'click'].forEach((eventName) => {
+            host.addEventListener(eventName, listener, options);
+            this.cleanupHandlers.push(() => host.removeEventListener(eventName, listener, options));
+        });
+    }
+
+    private addLiveRunListener(plugin: any, eventName: string, handler: (event: unknown) => void): void {
+        if (typeof plugin.addListener !== 'function') return;
+
+        const listener = plugin.addListener(eventName, handler);
+        if (listener && typeof listener.then === 'function') {
+            listener
+                .then((handle: PluginListenerHandle) => {
+                    if (handle?.remove) this.cleanupHandlers.push(() => { void handle.remove(); });
+                })
+                .catch(() => null);
+            return;
+        }
+        if (listener?.remove) {
+            this.cleanupHandlers.push(() => { void listener.remove(); });
+        }
+    }
+
+    private liveRunPlugin(): any {
+        if (this.liveRunNativePlugin) return this.liveRunNativePlugin;
+        if (typeof window === 'undefined') return null;
+        const capacitor = (window as any).Capacitor;
+        if (!capacitor) return null;
+        if (capacitor.Plugins?.RunningMateHealthKit) {
+            this.liveRunNativePlugin = capacitor.Plugins.RunningMateHealthKit;
+            return this.liveRunNativePlugin;
+        }
+        if (typeof capacitor.registerPlugin === 'function') {
+            this.liveRunNativePlugin = capacitor.registerPlugin('RunningMateHealthKit');
+            return this.liveRunNativePlugin;
+        }
+        return null;
+    }
+
+    private applyLiveRunMetrics(value: unknown): void {
+        const previousBackground = this.dashboardScreenBackground();
+        const previousTextColor = this.dashboardShellTextColor();
+        this.liveRun = this.normalizeLiveRunMetrics(value);
+        if (previousBackground !== this.dashboardScreenBackground() || previousTextColor !== this.dashboardShellTextColor()) {
+            this.syncDashboardChrome();
+        }
+        this.cdr.detectChanges();
+    }
+
+    private normalizeLiveRunMetrics(value: unknown): LiveRunMetrics {
+        const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+        const rawStatus = typeof source['status'] === 'string' ? source['status'] : '';
+        const status: LiveRunMetrics['status'] = rawStatus === 'running' || rawStatus === 'paused' || rawStatus === 'stopped'
+            ? rawStatus
+            : Boolean(source['active']) ? 'running' : 'idle';
+        const distance = this.toNumber(source['distance_km'] ?? source['distanceKm']) || 0;
+        const durationSeconds = this.toNumber(source['duration_seconds'] ?? source['durationSeconds']) || 0;
+        const runType = this.normalizeRunType(source['run_type'] ?? source['runType']);
+        const heartRate = this.toNumber(source['heart_rate'] ?? source['heartRate']);
+        const avgHeartRate = this.toNumber(source['avg_heart_rate'] ?? source['avgHeartRate']);
+        const explicitHeartRateAvailable = source['heart_rate_available'] ?? source['heartRateAvailable'];
+        const heartRateAvailable = typeof explicitHeartRateAvailable === 'boolean'
+            ? explicitHeartRateAvailable
+            : heartRate !== null || avgHeartRate !== null;
+        const routePoints = this.normalizeLiveRunRoutePoints(source['route_points'] ?? source['routePoints']);
+        const startLocation = this.normalizeLiveRunRoutePoint(source['start_location'] ?? source['startLocation'])
+            || routePoints[0]
+            || null;
+        const endLocation = this.normalizeLiveRunRoutePoint(source['end_location'] ?? source['endLocation'])
+            || routePoints[routePoints.length - 1]
+            || null;
+
+        return {
+            active: Boolean(source['active']) && status !== 'stopped',
+            id: typeof source['id'] === 'string' ? source['id'] : undefined,
+            status,
+            reason: typeof source['reason'] === 'string' ? source['reason'] : undefined,
+            run_type: runType,
+            started_at: typeof source['started_at'] === 'string' ? source['started_at'] : typeof source['startedAt'] === 'string' ? source['startedAt'] : undefined,
+            ended_at: typeof source['ended_at'] === 'string' ? source['ended_at'] : typeof source['endedAt'] === 'string' ? source['endedAt'] : undefined,
+            distance_km: this.round2(distance),
+            duration: typeof source['duration'] === 'string' ? source['duration'] : this.durationFromSeconds(durationSeconds),
+            duration_seconds: Math.round(durationSeconds),
+            current_pace: typeof source['current_pace'] === 'string'
+                ? source['current_pace']
+                : typeof source['currentPace'] === 'string'
+                    ? source['currentPace']
+                    : null,
+            avg_pace: typeof source['avg_pace'] === 'string' ? source['avg_pace'] : typeof source['avgPace'] === 'string' ? source['avgPace'] : '-',
+            calories: Math.max(0, Math.round(this.toNumber(source['calories']) || 0)),
+            heart_rate: heartRate,
+            avg_heart_rate: avgHeartRate,
+            cadence: this.toNumber(source['cadence']),
+            step_count: this.toNumber(source['step_count'] ?? source['stepCount']),
+            elevation_gain_m: this.toNumber(source['elevation_gain_m'] ?? source['elevationGainM'] ?? source['elevation_gain']),
+            heart_rate_available: heartRateAvailable,
+            heart_rate_source: typeof source['heart_rate_source'] === 'string'
+                ? source['heart_rate_source']
+                : typeof source['heartRateSource'] === 'string'
+                    ? source['heartRateSource']
+                    : null,
+            avg_heart_rate_source: typeof source['avg_heart_rate_source'] === 'string'
+                ? source['avg_heart_rate_source']
+                : typeof source['avgHeartRateSource'] === 'string'
+                    ? source['avgHeartRateSource']
+                    : null,
+            watch_connected: Boolean(source['watch_connected'] ?? source['watchConnected']),
+            watch_app_installed: Boolean(source['watch_app_installed'] ?? source['watchAppInstalled']),
+            metrics_source: typeof source['metrics_source'] === 'string'
+                ? source['metrics_source']
+                : typeof source['metricsSource'] === 'string'
+                    ? source['metricsSource']
+                    : null,
+            start_location: startLocation,
+            end_location: endLocation,
+            route_points: routePoints
+        };
+    }
+
+    private normalizeLiveRunRoutePoint(value: unknown): LiveRunRoutePoint | null {
+        if (!value || typeof value !== 'object') return null;
+        const source = value as Record<string, unknown>;
+        const lat = this.toNumber(source['lat'] ?? source['latitude']);
+        const lng = this.toNumber(source['lng'] ?? source['lon'] ?? source['longitude']);
+        if (lat === null || lng === null) return null;
+        if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+        return { lat, lng };
+    }
+
+    private normalizeLiveRunRoutePoints(value: unknown): LiveRunRoutePoint[] {
+        if (!Array.isArray(value)) return [];
+        const points = value
+            .map((point) => this.normalizeLiveRunRoutePoint(point))
+            .filter((point): point is LiveRunRoutePoint => Boolean(point));
+        if (points.length <= 80) return points;
+        const step = Math.ceil(points.length / 80);
+        return points.filter((_, index) => index % step === 0 || index === points.length - 1);
+    }
+
+    private durationFromSeconds(seconds: number): string {
+        const total = Math.max(0, Math.round(seconds || 0));
+        const hours = Math.floor(total / 3600);
+        const minutes = Math.floor((total % 3600) / 60);
+        const remain = total % 60;
+        return [hours, minutes, remain].map((part) => String(part).padStart(2, '0')).join(':');
+    }
+
+    private liveRunErrorMessage(error: unknown, fallback: string): string {
+        if (error && typeof error === 'object') {
+            const source = error as Record<string, unknown>;
+            const message = typeof source['message'] === 'string'
+                ? source['message']
+                : typeof source['localizedDescription'] === 'string'
+                    ? source['localizedDescription']
+                    : '';
+            if (message) return this.userMessage(message, fallback);
+        }
+        return fallback;
     }
 
     private emptyManualRunForm(): any {
@@ -6021,6 +6497,7 @@ export class Component implements AfterViewInit, OnDestroy {
         if (targetRunId) this.recordReuploadTargetId = targetRunId;
         this.manualRunForm = this.manualRunFormForRun(targetRunId);
         this.manualEntryVisible = true;
+        if (!targetRunId) this.calendarUploadExpanded = true;
         this.parseErrorMessage = '';
         this.uploadProgress = 0;
         this.uploadStatus = targetRunId
@@ -6036,6 +6513,407 @@ export class Component implements AfterViewInit, OnDestroy {
         this.manualEntryVisible = false;
         this.manualEntryRunId = null;
         this.cdr.detectChanges();
+    }
+
+    public get isLiveRunSupported(): boolean {
+        const plugin = this.liveRunPlugin();
+        return isNativeLocalOrigin() && !!plugin?.startLiveRun;
+    }
+
+    public get isLiveRunActive(): boolean {
+        return this.liveRun.active && (this.liveRun.status === 'running' || this.liveRun.status === 'paused');
+    }
+
+    public get isLiveRunPaused(): boolean {
+        return this.liveRun.status === 'paused';
+    }
+
+    public get homeLiveRunButtonText(): string {
+        if (this.isLiveRunBusy) return '러닝 준비 중';
+        if (this.isLiveRunSaving) return '러닝 저장 중';
+        if (this.isLiveRunPaused) return '일시정지된 러닝 보기';
+        if (this.isLiveRunActive) return '실시간 러닝 보기';
+        return '러닝 시작';
+    }
+
+    public get liveRunDistanceText(): string {
+        return this.distanceText(this.liveRun.distance_km || 0);
+    }
+
+    public get liveRunElapsedText(): string {
+        return this.liveRun.duration || '00:00:00';
+    }
+
+    public get liveRunCurrentPaceText(): string {
+        return this.liveRun.current_pace && this.liveRun.current_pace !== '-'
+            ? this.displayPace(this.liveRun.current_pace)
+            : this.isLiveRunActive ? '측정 중' : '-';
+    }
+
+    public get liveRunPaceText(): string {
+        return this.liveRun.avg_pace && this.liveRun.avg_pace !== '-'
+            ? this.displayPace(this.liveRun.avg_pace)
+            : this.isLiveRunActive ? '측정 중' : '-';
+    }
+
+    public get liveRunHeartRateText(): string {
+        const heartRate = this.toNumber(this.liveRun.heart_rate ?? this.liveRun.avg_heart_rate);
+        if (heartRate !== null && this.liveRun.heart_rate_available !== false) {
+            return `${Math.round(heartRate)} bpm`;
+        }
+        if (!this.isLiveRunActive) return '-';
+        return this.liveRun.watch_app_installed === false ? '워치 앱 필요' : '워치 대기';
+    }
+
+    public get liveRunCadenceText(): string {
+        const cadence = this.toNumber(this.liveRun.cadence);
+        return cadence !== null ? `${Math.round(cadence)} spm` : this.isLiveRunActive ? '측정 중' : '--';
+    }
+
+    public get liveRunCaloriesText(): string {
+        const calories = this.toNumber(this.liveRun.calories);
+        return calories !== null ? `${Math.round(calories)} kcal` : '0 kcal';
+    }
+
+    public get completedLiveRunDistanceText(): string {
+        return this.distanceText(this.completedLiveRun?.distance_km || 0);
+    }
+
+    public get completedLiveRunPaceText(): string {
+        const pace = this.completedLiveRun?.avg_pace;
+        return pace && pace !== '-' ? this.displayPace(pace) : '-';
+    }
+
+    public get completedLiveRunHeartRateText(): string {
+        const metrics = this.completedLiveRun;
+        const heartRate = this.toNumber(metrics?.avg_heart_rate ?? metrics?.heart_rate);
+        return heartRate !== null ? `${Math.round(heartRate)} bpm` : '-';
+    }
+
+    public get completedLiveRunElapsedText(): string {
+        return this.completedLiveRun?.duration || '00:00:00';
+    }
+
+    public get completedLiveRunCadenceText(): string {
+        const cadence = this.toNumber(this.completedLiveRun?.cadence);
+        return cadence !== null ? `${Math.round(cadence)} spm` : '-';
+    }
+
+    public get completedLiveRunDateText(): string {
+        const date = this.completedLiveRunDateKey;
+        return date ? this.displayDate(date, true) : '오늘 러닝';
+    }
+
+    public get completedLiveRunRouteText(): string {
+        const metrics = this.completedLiveRun;
+        if (!metrics) return '러닝 경로';
+        const routePoints = metrics.route_points || [];
+        const start = this.coordinateLabel(metrics.start_location || metrics.route_points?.[0] || null);
+        const end = this.coordinateLabel(metrics.end_location || routePoints[routePoints.length - 1] || null);
+        if (start && end && start !== end) return `${start} → ${end}`;
+        if (start) return `${start} 출발/도착`;
+        return '위치 포인트를 기반으로 경로를 표시했어';
+    }
+
+    public get liveRunRoutePolyline(): string {
+        const points = this.completedLiveRunRoutePoints;
+        if (!points.length) return '12,72 28,55 46,60 63,36 86,28';
+        if (points.length === 1) return '50,50 50,50';
+
+        const lats = points.map((point) => point.lat);
+        const lngs = points.map((point) => point.lng);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const latSpan = Math.max(maxLat - minLat, 0.0001);
+        const lngSpan = Math.max(maxLng - minLng, 0.0001);
+        const padding = 12;
+        const size = 100 - padding * 2;
+
+        return points.map((point) => {
+            const x = padding + ((point.lng - minLng) / lngSpan) * size;
+            const y = padding + (1 - ((point.lat - minLat) / latSpan)) * size;
+            return `${this.round2(x)},${this.round2(y)}`;
+        }).join(' ');
+    }
+
+    private get completedLiveRunDateKey(): string {
+        return this.chatDateKey(this.completedLiveRun?.started_at)
+            || this.selectedCalendarDate
+            || this.todayDateKey;
+    }
+
+    private get completedLiveRunRoutePoints(): LiveRunRoutePoint[] {
+        const metrics = this.completedLiveRun;
+        if (!metrics) return [];
+        const points = metrics.route_points?.length ? [...metrics.route_points] : [];
+        if (!points.length && metrics.start_location) points.push(metrics.start_location);
+        if (metrics.end_location && !points.some((point) => point.lat === metrics.end_location?.lat && point.lng === metrics.end_location?.lng)) {
+            points.push(metrics.end_location);
+        }
+        return points;
+    }
+
+    private coordinateLabel(point: LiveRunRoutePoint | null): string {
+        if (!point) return '';
+        return `${point.lat.toFixed(4)}, ${point.lng.toFixed(4)}`;
+    }
+
+    public requestDiscardLiveRun(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (this.activeScreen !== 'live-run' || this.completedLiveRun || this.isLiveRunDiscarding) return;
+        this.liveRunDiscardConfirmVisible = true;
+        this.cdr.detectChanges();
+    }
+
+    public cancelLiveRunDiscard(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (this.isLiveRunDiscarding) return;
+        this.liveRunDiscardConfirmVisible = false;
+        this.cdr.detectChanges();
+    }
+
+    public confirmLiveRunDiscard(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (this.isLiveRunDiscarding) return;
+        this.liveRunDiscardConfirmVisible = false;
+        void this.discardLiveRun(false);
+    }
+
+    public get liveRunPrimaryText(): string {
+        if (!this.isLiveRunSupported) return 'iPhone 앱 전용';
+        if (this.isLiveRunActive) return this.isLiveRunPaused ? '재개' : '일시정지';
+        return '러닝 시작';
+    }
+
+    public get liveRunPrimaryIcon(): string {
+        if (!this.isLiveRunSupported) return 'fa-mobile-screen-button';
+        if (this.isLiveRunActive) return this.isLiveRunPaused ? 'fa-play' : 'fa-pause';
+        return 'fa-play';
+    }
+
+    public async openLiveRunScreen(): Promise<void> {
+        this.completedLiveRun = null;
+        this.liveRunDiscardConfirmVisible = false;
+        this.setScreen('live-run');
+        if (!this.isLiveRunActive && !this.isLiveRunBusy && !this.isLiveRunSaving) {
+            await this.startLiveRun();
+        }
+    }
+
+    public async startLiveRun(): Promise<void> {
+        if (this.isLiveRunBusy || this.isLiveRunSaving || this.isLiveRunActive) return;
+        this.completedLiveRun = null;
+        this.liveRunDiscardConfirmVisible = false;
+        const plugin = this.liveRunPlugin();
+        if (!this.isLiveRunSupported || !plugin?.startLiveRun) {
+            this.liveRunStatus = '실시간 러닝은 iPhone 앱에서 사용할 수 있어.';
+            this.showToast(this.liveRunStatus, 'error');
+            this.cdr.detectChanges();
+            return;
+        }
+
+        const startSequence = ++this.liveRunStartSequence;
+        this.isLiveRunBusy = true;
+        this.liveRunStatus = 'GPS와 Apple Watch 데이터를 준비하는 중';
+        this.cdr.detectChanges();
+
+        try {
+            const metrics = await plugin.startLiveRun({
+                runType: this.selectedRunType,
+                weightKg: this.currentWeightLog?.weight_kg || 60
+            });
+            if (startSequence !== this.liveRunStartSequence) {
+                await this.discardNativeLiveRun(plugin).catch(() => null);
+                return;
+            }
+            this.applyLiveRunMetrics(metrics);
+            this.liveRunStatus = '러닝 측정 중';
+        } catch (error) {
+            if (startSequence !== this.liveRunStartSequence) return;
+            this.liveRunStatus = this.liveRunErrorMessage(error, '실시간 러닝을 시작하지 못했어.');
+            this.showToast(this.liveRunStatus, 'error');
+        } finally {
+            if (startSequence === this.liveRunStartSequence) {
+                this.isLiveRunBusy = false;
+                this.cdr.detectChanges();
+            }
+        }
+    }
+
+    public async toggleLiveRunPause(): Promise<void> {
+        if (!this.isLiveRunActive || this.isLiveRunBusy || this.isLiveRunSaving) return;
+        const plugin = this.liveRunPlugin();
+        const method = this.isLiveRunPaused ? 'resumeLiveRun' : 'pauseLiveRun';
+        if (!plugin?.[method]) return;
+
+        this.isLiveRunBusy = true;
+        this.liveRunStatus = this.isLiveRunPaused ? '러닝 재개 중' : '러닝 일시정지 중';
+        this.cdr.detectChanges();
+
+        try {
+            const metrics = await plugin[method]();
+            this.applyLiveRunMetrics(metrics);
+            this.liveRunStatus = this.isLiveRunPaused ? '일시정지됨' : '러닝 측정 중';
+        } catch (error) {
+            this.liveRunStatus = this.liveRunErrorMessage(error, '상태를 변경하지 못했어.');
+            this.showToast(this.liveRunStatus, 'error');
+        } finally {
+            this.isLiveRunBusy = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    public async finishLiveRun(): Promise<void> {
+        if (!this.isLiveRunActive || this.isLiveRunSaving) return;
+        const plugin = this.liveRunPlugin();
+        if (!plugin?.stopLiveRun) return;
+
+        this.isLiveRunSaving = true;
+        this.liveRunStatus = '러닝 종료 중';
+        this.cdr.detectChanges();
+
+        try {
+            const metrics = this.normalizeLiveRunMetrics(await plugin.stopLiveRun());
+            this.liveRun = metrics;
+            const distanceKm = this.round2(metrics.distance_km || 0);
+            if (distanceKm <= 0.01) {
+                this.liveRunStatus = '거리 측정값이 너무 짧아 저장하지 않았어.';
+                this.showToast(this.liveRunStatus, 'error');
+                return;
+            }
+
+            const startedDate = this.chatDateKey(metrics.started_at) || this.todayDateKey;
+            const payload: RunRecord = {
+                date: startedDate,
+                distance_km: distanceKm,
+                avg_pace: metrics.avg_pace && metrics.avg_pace !== '-' ? metrics.avg_pace : null,
+                duration: metrics.duration || null,
+                run_type: this.normalizeRunType(metrics.run_type || this.selectedRunType),
+                calories: this.toNumber(metrics.calories),
+                avg_heart_rate: this.toNumber(metrics.avg_heart_rate ?? metrics.heart_rate),
+                cadence: this.toNumber(metrics.cadence),
+                elevation_gain: this.toNumber(metrics.elevation_gain_m),
+                is_public: this.calendarUploadIsPublic
+            };
+            const saved = await this.saveRunRecord(payload);
+            if (!saved.saved) {
+                this.liveRunStatus = this.userMessage(saved.message, '러닝 기록을 저장하지 못했어.');
+                this.showToast(this.liveRunStatus, 'error');
+                return;
+            }
+
+            this.selectedCalendarDate = startedDate;
+            this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
+            this.upsertRunRecord(saved.run || payload, { loadRelatedData: false });
+            this.completedLiveRun = metrics;
+            this.liveRunStatus = '러닝 저장 완료';
+            this.showToast('러닝 기록을 저장했어.', 'success');
+            await this.loadRuns(false, true, true);
+            this.selectedCalendarDate = startedDate;
+            this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
+            this.refreshDerivedState();
+        } catch (error) {
+            this.liveRunStatus = this.liveRunErrorMessage(error, '러닝 기록 저장 중 오류가 발생했어.');
+            this.showToast(this.liveRunStatus, 'error');
+        } finally {
+            this.isLiveRunSaving = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    public closeLiveRunSummaryToCalendar(): void {
+        const date = this.completedLiveRunDateKey;
+        this.completedLiveRun = null;
+        this.liveRunDiscardConfirmVisible = false;
+        this.liveRun = this.emptyLiveRunMetrics();
+        this.liveRunStatus = '러닝 대기 중';
+        this.selectedCalendarDate = date;
+        this.activeYearMonth = this.yearMonthKey(this.parseDate(date) || new Date());
+        this.refreshDerivedState();
+        this.setScreen('calendar');
+        this.cdr.detectChanges();
+    }
+
+    public async discardLiveRun(confirmFirst: boolean = true): Promise<void> {
+        if (this.isLiveRunDiscarding) return;
+
+        try {
+            if (confirmFirst && !(await this.openConfirmDialog('저장하지 않고 러닝을 종료할까요? 현재 측정 기록은 저장되지 않습니다.', {
+                title: '러닝 종료',
+                confirmLabel: '저장 없이 종료',
+                tone: 'danger',
+                iconClass: 'fa-stop'
+            }))) return;
+
+            const plugin = this.liveRunPlugin();
+            this.liveRunStartSequence += 1;
+
+            this.isLiveRunDiscarding = true;
+            this.liveRunDiscardConfirmVisible = false;
+            this.isLiveRunBusy = true;
+            this.isLiveRunSaving = false;
+            this.liveRunStatus = '러닝 측정 취소 중';
+            this.cdr.detectChanges();
+            await this.discardNativeLiveRunWithTimeout(plugin);
+            this.liveRun = this.emptyLiveRunMetrics();
+            this.liveRunStatus = '러닝 측정을 취소했어.';
+            this.showToast('러닝 측정을 저장하지 않고 종료했어.', 'success');
+            this.setScreen('home');
+        } catch {
+            this.liveRunDiscardConfirmVisible = false;
+            this.liveRun = this.emptyLiveRunMetrics();
+            this.liveRunStatus = '러닝 측정을 취소했어.';
+            this.setScreen('home');
+        } finally {
+            this.liveRunDiscardConfirmVisible = false;
+            this.isLiveRunBusy = false;
+            this.isLiveRunSaving = false;
+            this.isLiveRunDiscarding = false;
+            this.cdr.detectChanges();
+        }
+    }
+
+    private async discardNativeLiveRunWithTimeout(plugin: any): Promise<void> {
+        if (typeof window === 'undefined') {
+            await this.discardNativeLiveRun(plugin);
+            return;
+        }
+
+        let timeoutId: number | null = null;
+        try {
+            await Promise.race([
+                this.discardNativeLiveRun(plugin),
+                new Promise<void>((resolve) => {
+                    timeoutId = window.setTimeout(resolve, this.liveRunNativeCancelTimeoutMs);
+                })
+            ]);
+        } finally {
+            if (timeoutId !== null) window.clearTimeout(timeoutId);
+        }
+    }
+
+    private async discardNativeLiveRun(plugin: any): Promise<void> {
+        if (plugin?.discardLiveRun) {
+            await plugin.discardLiveRun();
+            return;
+        }
+        if (plugin?.stopLiveRun) {
+            await plugin.stopLiveRun();
+        }
     }
 
     public async saveManualRun(): Promise<void> {
@@ -6075,7 +6953,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const saved = await this.saveRunRecord(payload, this.manualEntryRunId);
             if (!saved.saved) {
-                this.uploadStatus = saved.message || '수동 기록을 저장하지 못했어.';
+                this.uploadStatus = this.userMessage(saved.message, '수동 기록을 저장하지 못했어.');
                 return;
             }
 
@@ -6136,7 +7014,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.applyAiUsage(payload?.usage, true);
             const reply = payload?.success
                 ? payload?.reply || '답변을 만들지 못했어.'
-                : payload?.message || 'AI 채팅 중 오류가 발생했어.';
+                : this.payloadMessage(payload, 'AI 채팅 중 오류가 발생했어.');
             this.replaceChatMessage(aiMessageIndex, reply, false);
             this.activeChatSessionId = payload?.session_id || payload?.session?.id || this.activeChatSessionId;
             this.upsertChatSession(payload?.session);
@@ -6152,7 +7030,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public async refreshAiConnection(): Promise<void> {
         this.aiLoginRefreshStatus = '연결 상태 확인 중';
         await this.loadAiConnection();
-        this.aiLoginRefreshStatus = this.aiConnection?.message || '연결 상태를 확인했어.';
+        this.aiLoginRefreshStatus = this.userMessage(this.aiConnection?.message, '연결 상태를 확인했어.');
         this.cdr.detectChanges();
     }
 
@@ -6188,7 +7066,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 await this.loadAiConnection();
             }
 
-            this.aiLoginRefreshStatus = payload?.message || (payload?.success ? '로그인 갱신을 요청했어.' : '로그인 갱신에 실패했어.');
+            this.aiLoginRefreshStatus = this.payloadMessage(payload, payload?.success ? '로그인 갱신을 요청했어.' : '로그인 갱신에 실패했어.');
             this.aiLoginDeviceUrl = typeof payload?.auth_url === 'string' ? payload.auth_url : '';
             this.aiLoginDeviceCode = typeof payload?.user_code === 'string' ? payload.user_code : '';
             this.aiLoginDeviceExpiresIn = typeof payload?.expires_in_minutes === 'number' && Number.isFinite(payload.expires_in_minutes)
@@ -6229,6 +7107,8 @@ export class Component implements AfterViewInit, OnDestroy {
     public ngAfterViewInit(): void {
         this.installDashboardViewportSync();
         this.installAgreementLoadingMessageSync();
+        this.installLiveRunListeners();
+        this.installLiveRunCancelFallback();
 
         this.bindNativeClick('[data-screen]', (target) => {
             const screen = target.dataset.screen as ScreenKey | undefined;
@@ -6283,6 +7163,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async loadInitialDashboardData(): Promise<void> {
         this.isInitialLoading = true;
+        this.syncDashboardChrome();
         this.deferredDashboardDataStarted = false;
         this.initialCoreDataLoaded = false;
         this.initialLoadingSteps.clear();
@@ -6325,13 +7206,12 @@ export class Component implements AfterViewInit, OnDestroy {
                 shouldStartDeferredData = !this.initialErrorMessage;
             }
         } catch (error) {
-            this.initialErrorMessage = error instanceof Error && error.message
-                ? error.message
-                : '초기 데이터를 불러오지 못했어. 네트워크를 확인한 뒤 다시 시도해줘';
+            this.initialErrorMessage = this.userMessage(error, '초기 데이터를 불러오지 못했어. 네트워크를 확인한 뒤 다시 시도해줘');
         } finally {
             this.initialLoadingSteps.clear();
             this.initialLoadingDetail = '';
             this.isInitialLoading = false;
+            this.syncDashboardChrome();
             this.cdr.detectChanges();
             if (shouldStartDeferredData) {
                 this.startWeatherAutoRefresh();
@@ -6615,6 +7495,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public rankingRankClass(entry: RankingEntry): string {
+        if (entry.rank_out) return 'ranking-rank outside';
         return entry.medal ? `ranking-rank ${entry.medal}` : 'ranking-rank';
     }
 
@@ -6770,7 +7651,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
             if (!result.success) {
                 if (!silent) {
-                    this.cycleStatus = apiErrorMessage(result.error) || result.message || '생리주기 설정을 저장하지 못했어.';
+                    this.cycleStatus = this.apiMessage(result.error, '생리주기 설정을 저장하지 못했어.');
                 }
                 return false;
             }
@@ -6903,7 +7784,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
             const result = await jsonRequest<UserProfile>('/api/profile', 'PATCH', profilePayload, { retries: 0, timeoutMs: 10000 });
             if (!result.success || !result.data) {
-                this.onboardingStatus = result.error?.message || result.message || (skipGuide ? '온보딩 건너뛰기를 저장하지 못했어.' : '온보딩 완료 정보를 저장하지 못했어.');
+                this.onboardingStatus = this.apiMessage(result.error, skipGuide ? '온보딩 건너뛰기를 저장하지 못했어.' : '온보딩 완료 정보를 저장하지 못했어.');
                 return;
             }
 
@@ -6935,7 +7816,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success) {
-                this.onboardingStatus = payload?.message || '첫 목표를 저장하지 못했어.';
+                this.onboardingStatus = this.payloadMessage(payload, '첫 목표를 저장하지 못했어.');
                 return false;
             }
 
@@ -6973,7 +7854,7 @@ export class Component implements AfterViewInit, OnDestroy {
         );
         if (!result.success) {
             if (result.error?.status === 401) return 'unauthenticated';
-            this.initialErrorMessage = result.error?.message || '초기 데이터를 불러오지 못했어.';
+            this.initialErrorMessage = this.apiMessage(result.error, '초기 데이터를 불러오지 못했어.');
             return 'failed';
         }
 
@@ -7014,7 +7895,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 this.redirectToAccess();
                 return false;
             }
-            this.initialErrorMessage = apiErrorMessage(result.error);
+            this.initialErrorMessage = this.apiMessage(result.error, '초기 데이터를 불러오지 못했어.');
         }
         if (includeTrainingLoad) {
             await this.loadTrainingLoad();
@@ -7059,7 +7940,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private async saveRestDay(date: string, rest: boolean): Promise<boolean> {
         const result = await jsonRequest<any[]>('/api/rest-days', 'POST', { date, rest });
         if (!result.success) {
-            this.showToast(result.error?.message || '휴식일을 저장하지 못했어.', 'error');
+            this.showToast(this.apiMessage(result.error, '휴식일을 저장하지 못했어.'), 'error');
             return false;
         }
 
@@ -7157,7 +8038,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await apiFetch<any>('/api/feed');
             if (!result.success) {
-                this.feedStatus = result.error?.message || '피드를 불러오지 못했어.';
+                this.feedStatus = this.apiMessage(result.error, '피드를 불러오지 못했어.');
                 this.feedItems = [];
                 return;
             }
@@ -7185,7 +8066,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await apiFetch<any>(`/api/runs/${encodeURIComponent(runId)}/reactions`);
             if (!result.success) {
-                this.profileFeedSocialStatus = result.error?.message || '좋아요와 댓글을 불러오지 못했어.';
+                this.profileFeedSocialStatus = this.apiMessage(result.error, '좋아요와 댓글을 불러오지 못했어.');
                 return;
             }
 
@@ -7232,11 +8113,11 @@ export class Component implements AfterViewInit, OnDestroy {
             ]);
 
             if (!followingResult.success) {
-                this.friendStatus = followingResult.error?.message || '팔로잉 목록을 불러오지 못했어.';
+                this.friendStatus = this.apiMessage(followingResult.error, '팔로잉 목록을 불러오지 못했어.');
                 return;
             }
             if (!followersResult.success) {
-                this.friendStatus = followersResult.error?.message || '팔로워 목록을 불러오지 못했어.';
+                this.friendStatus = this.apiMessage(followersResult.error, '팔로워 목록을 불러오지 못했어.');
                 return;
             }
 
@@ -7264,7 +8145,7 @@ export class Component implements AfterViewInit, OnDestroy {
             if (!result.success) {
                 this.viewedProfileStatus = this.viewedProfile?.id === userId
                     ? ''
-                    : result.error?.message || '프로필을 불러오지 못했어.';
+                    : this.apiMessage(result.error, '프로필을 불러오지 못했어.');
                 return;
             }
 
@@ -7290,26 +8171,32 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async loadRanking(): Promise<void> {
-        if (this.isRankingLoading) return;
-
+        const requestSeq = ++this.rankingRequestSeq;
         this.isRankingLoading = true;
         this.rankingStatus = this.rankingEntries.length ? '' : '랭킹 불러오는 중';
         this.cdr.detectChanges();
 
         try {
-            const result = await apiFetch<any>(`/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`);
+            const result = await apiFetch<any>(
+                `/api/ranking/weekly?period=${encodeURIComponent(this.activeRankingPeriod)}&scope=${encodeURIComponent(this.activeRankingScope)}`,
+                { retries: 2, retryDelayMs: 500, timeoutMs: 12000 }
+            );
+            if (requestSeq !== this.rankingRequestSeq) return;
             if (!result.success) {
-                this.rankingStatus = result.error?.message || '랭킹을 불러오지 못했어.';
+                this.rankingStatus = this.apiMessage(result.error, '랭킹을 불러오지 못했어.');
                 return;
             }
 
             this.applyRankingPayload(result.data || result.raw);
             this.rankingStatus = '';
         } catch {
+            if (requestSeq !== this.rankingRequestSeq) return;
             this.rankingStatus = '인터넷 연결을 확인해줘';
         } finally {
-            this.isRankingLoading = false;
-            this.cdr.detectChanges();
+            if (requestSeq === this.rankingRequestSeq) {
+                this.isRankingLoading = false;
+                this.cdr.detectChanges();
+            }
         }
     }
 
@@ -7358,24 +8245,78 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private async loadCycles(): Promise<void> {
+    private async loadCycles(options: { preserveStatus?: boolean } = {}): Promise<void> {
         if (!this.shouldShowCycleFeature || !this.isCycleFeatureEnabled) {
             this.setCycles([], EMPTY_CYCLE_SUMMARY);
             return;
         }
 
-        try {
-            const response = await fetch(resolveApiUrl('/api/cycles?enabled=1'), {
-                headers: this.cycleRequestHeaders()
-            });
-            const payload = await response.json();
-            const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : [];
-            this.setCycles(rows, payload?.summary);
-            this.cycleStatus = rows.length ? '' : '생리 기록 없음';
-        } catch {
-            this.setCycles([], EMPTY_CYCLE_SUMMARY);
-            this.cycleStatus = '주기 데이터를 불러오지 못했어.';
+        const requestSeq = ++this.cycleRequestSeq;
+        const result = await apiFetch<any>('/api/cycles?enabled=1', {
+            retries: 2,
+            retryDelayMs: 500,
+            timeoutMs: 12000
+        });
+        if (requestSeq !== this.cycleRequestSeq) return;
+
+        if (!result.success) {
+            if (!options.preserveStatus) {
+                if (this.cycleLogs.length) {
+                    this.refreshDerivedState();
+                    this.cycleStatus = '기존 주기 기록 표시 중';
+                } else {
+                    this.cycleStatus = this.apiMessage(result.error, '주기 데이터를 불러오지 못했어.');
+                }
+            }
+            return;
         }
+
+        try {
+            const payload = result.raw || result.data;
+            const rows = this.cycleRowsFromPayload(payload) || [];
+            this.setCycles(rows, this.cycleSummaryFromPayload(payload));
+            if (!options.preserveStatus) {
+                this.cycleStatus = rows.length ? '' : '생리 기록 없음';
+            }
+        } catch {
+            if (!options.preserveStatus) {
+                if (this.cycleLogs.length) {
+                    this.refreshDerivedState();
+                    this.cycleStatus = '기존 주기 기록 표시 중';
+                } else {
+                    this.cycleStatus = '주기 데이터를 불러오지 못했어.';
+                }
+            }
+        }
+    }
+
+    private cycleSummaryFromPayload(payload: unknown): unknown {
+        const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+        return source['summary'];
+    }
+
+    private cycleRowsFromPayload(payload: unknown, allowSingleDataUpsert: boolean = false): unknown[] | null {
+        if (Array.isArray(payload)) return payload;
+
+        const source = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+        if (Array.isArray(source['cycles'])) return source['cycles'];
+        if (Array.isArray(source['data'])) return source['data'];
+
+        const singleRow = source['data'];
+        if (!allowSingleDataUpsert || !singleRow || typeof singleRow !== 'object') return null;
+
+        const normalized = this.normalizeCycleLog(singleRow);
+        if (!normalized) return null;
+
+        return [
+            normalized,
+            ...this.cycleLogs.filter((log) => (
+                log.id !== normalized.id &&
+                !(log.cycle_phase === normalized.cycle_phase &&
+                    log.start_date === normalized.start_date &&
+                    log.end_date === normalized.end_date)
+            ))
+        ];
     }
 
     private async loadWeatherForActiveMonth(): Promise<void> {
@@ -7403,7 +8344,7 @@ export class Component implements AfterViewInit, OnDestroy {
             if (!result.success || !result.data) {
                 this.weatherDays = new Map();
                 this.weatherCoverage = null;
-                this.weatherStatus = result.error?.message || '날씨 정보 없음';
+                this.weatherStatus = this.apiMessage(result.error, '날씨 정보 없음');
                 this.weatherLocationText = '';
                 this.weatherUpdatedText = '';
                 this.refreshDerivedState();
@@ -7460,28 +8401,26 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async refreshWeatherPositionIfAlreadyGranted(): Promise<void> {
-        if (typeof navigator === 'undefined' || !navigator.geolocation) return;
-
-        const permissions = (navigator as any).permissions;
-        if (!permissions || typeof permissions.query !== 'function') return;
-
-        try {
-            const status = await permissions.query({ name: 'geolocation' });
-            if (status?.state !== 'granted') return;
-        } catch {
-            return;
-        }
-
-        try {
-            const position = await this.requestCurrentWeatherPosition();
-            this.weatherPosition = position;
-            this.storeWeatherPosition(position);
-        } catch {
-            return;
-        }
+        return;
     }
 
-    private requestCurrentWeatherPosition(): Promise<WeatherPosition> {
+    private canRequestCurrentWeatherPosition(): boolean {
+        const plugin = this.liveRunPlugin();
+        if (plugin && typeof plugin.getCurrentLocation === 'function') return true;
+        return typeof navigator !== 'undefined' && Boolean(navigator.geolocation);
+    }
+
+    private async requestCurrentWeatherPosition(): Promise<WeatherPosition> {
+        const plugin = this.liveRunPlugin();
+        if (plugin && typeof plugin.getCurrentLocation === 'function') {
+            const position = await plugin.getCurrentLocation();
+            return this.normalizeWeatherPosition(position);
+        }
+
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+            throw new Error('이 기기에서는 위치 권한을 사용할 수 없어.');
+        }
+
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -7512,6 +8451,25 @@ export class Component implements AfterViewInit, OnDestroy {
                 }
             );
         });
+    }
+
+    private normalizeWeatherPosition(value: unknown): WeatherPosition {
+        const source = value && typeof value === 'object'
+            ? value as Record<string, unknown>
+            : {};
+        const lat = this.toNumber(source['lat'] ?? source['latitude']);
+        const lon = this.toNumber(source['lon'] ?? source['lng'] ?? source['longitude']);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+            throw new Error('현재 위치를 확인하지 못했어.');
+        }
+        return {
+            lat: Math.round(lat * 100000) / 100000,
+            lon: Math.round(lon * 100000) / 100000
+        };
+    }
+
+    private weatherLocationErrorMessage(error: unknown): string {
+        return this.userMessage(error, '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.');
     }
 
     private readStoredWeatherPosition(): WeatherPosition | null {
@@ -7589,7 +8547,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private aiUsageLimitNotice(usage: AiUsage | null): string {
         if (!usage) return '';
-        if (!usage.allowed && usage.message) return usage.message;
+        if (!usage.allowed && usage.message) return this.userMessage(usage.message, '');
         if (usage.reason === 'monthly_limit' || usage.monthly_remaining === 0) {
             return '이번 달 페이서 AI 한도를 모두 사용했어. 다음 달에 다시 이용해줘.';
         }
@@ -7614,7 +8572,7 @@ export class Component implements AfterViewInit, OnDestroy {
         return {
             allowed: source['allowed'] !== false,
             reason,
-            message: typeof source['message'] === 'string' ? source['message'] : '',
+            message: this.userMessage(source['message'], ''),
             action: typeof source['action'] === 'string' ? source['action'] : 'chat',
             day_key: typeof source['day_key'] === 'string' ? source['day_key'] : '',
             month_key: typeof source['month_key'] === 'string' ? source['month_key'] : '',
@@ -7769,7 +8727,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.appleMusicConnection = {
             configured: Boolean(payload?.configured),
             developer_token: typeof payload?.developer_token === 'string' ? payload.developer_token : '',
-            message: typeof payload?.message === 'string' ? payload.message : '',
+            message: this.userMessage(payload?.message, ''),
             setup_steps: Array.isArray(payload?.setup_steps) ? payload.setup_steps : []
         };
     }
@@ -7784,7 +8742,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 await this.loadAppleMusicConnection();
             }
             if (!this.appleMusicConnection.configured) {
-                this.appleMusicStatus = this.appleMusicConnection.message || 'Apple Music 서버 설정이 필요해.';
+                this.appleMusicStatus = this.userMessage(this.appleMusicConnection.message, 'Apple Music 연결 설정이 필요해.');
                 this.showToast(this.appleMusicStatus, 'error');
                 return;
             }
@@ -7942,13 +8900,13 @@ export class Component implements AfterViewInit, OnDestroy {
             configured: Boolean(payload?.configured),
             provider: typeof payload?.provider === 'string' ? payload.provider : 'OpenAI Responses API',
             model: typeof payload?.model === 'string' ? payload.model : '-',
-            message: typeof payload?.message === 'string' ? payload.message : '',
+            message: this.userMessage(payload?.message, ''),
             setup_steps: Array.isArray(payload?.setup_steps) ? payload.setup_steps : [],
             mode: typeof payload?.mode === 'string' ? payload.mode : '',
             codex_supported: Boolean(payload?.codex_supported),
             codex_authenticated: Boolean(payload?.codex_authenticated),
             codex_status: typeof payload?.codex_status === 'string' ? payload.codex_status : '',
-            codex_status_message: typeof payload?.codex_status_message === 'string' ? payload.codex_status_message : '',
+            codex_status_message: this.userMessage(payload?.codex_status_message, ''),
             login_refresh_supported: Boolean(payload?.login_refresh_supported)
         };
     }
@@ -8036,11 +8994,11 @@ export class Component implements AfterViewInit, OnDestroy {
         if (payload && typeof payload === 'object') {
             const source = payload as Record<string, unknown>;
             const message = typeof source['message'] === 'string' ? source['message'].trim() : '';
-            if (message) return message;
+            if (message) return this.userMessage(message, fallback);
 
             const errorCode = typeof source['error_code'] === 'string' ? source['error_code'] : '';
             if (AI_PARSE_CONFIGURATION_ERROR_CODES.has(errorCode)) {
-                return this.aiConnection?.message || 'AI 이미지 파싱 설정을 확인해야 해. OpenAI API 키, 결제 상태, 모델 설정을 확인해줘.';
+                return this.userMessage(this.aiConnection?.message, 'AI 이미지 파싱 설정을 확인해야 해.');
             }
         }
 
@@ -8057,7 +9015,7 @@ export class Component implements AfterViewInit, OnDestroy {
         });
         const payload = await response.json().catch(() => null);
         if (!payload?.success) {
-            return { saved: false, message: payload?.message || '사진/영상을 업로드하지 못했어.' };
+            return { saved: false, message: this.payloadMessage(payload, '사진/영상을 업로드하지 못했어.') };
         }
 
         const rows = Array.isArray(payload.media) ? payload.media : Array.isArray(payload.data) ? payload.data : [];
@@ -8077,7 +9035,7 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!result.success) {
             return {
                 saved: false,
-                message: result.error?.message || '러닝 기록을 저장하지 못했어.'
+                message: this.apiMessage(result.error, '러닝 기록을 저장하지 못했어.')
             };
         }
         if (payload?.success && payload?.data?.date) {
@@ -8094,7 +9052,7 @@ export class Component implements AfterViewInit, OnDestroy {
         void this.loadChallenges();
         return {
             saved: true,
-            message: payload?.message,
+            message: this.payloadMessage(payload, ''),
             run: payload?.data as RunRecord | undefined,
             newlyEarnedBadges
         };
@@ -8243,7 +9201,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.applyAiUsage(payload?.usage, true);
             const reply = payload?.success
                 ? payload?.reply || '답변을 만들지 못했어.'
-                : payload?.message || 'AI 채팅 중 오류가 발생했어.';
+                : this.payloadMessage(payload, 'AI 채팅 중 오류가 발생했어.');
             this.replaceChatMessage(aiMessageIndex, reply, false);
             return;
         }
@@ -8364,6 +9322,7 @@ export class Component implements AfterViewInit, OnDestroy {
         const monthChanged = this.activeYearMonth !== nextYearMonth;
         this.activeYearMonth = nextYearMonth;
         this.refreshDerivedState();
+        this.syncWidgetRuns();
         this.cdr.detectChanges();
         if (options.loadRelatedData !== false) {
             void this.loadGoalsForActiveMonth();
@@ -8371,6 +9330,58 @@ export class Component implements AfterViewInit, OnDestroy {
                 void this.loadWeatherForActiveMonth();
             }
         }
+    }
+
+    private upsertRunRecord(row: unknown, options: { loadRelatedData?: boolean } = {}): RunRecord | null {
+        const run = this.normalizeRun(row);
+        if (!run) return null;
+
+        this.runs = [
+            run,
+            ...this.runs.filter((item) => this.runIdentityKey(item) !== this.runIdentityKey(run))
+        ].sort((a, b) => b.date.localeCompare(a.date));
+        this.restDays = this.restDays.filter((date) => date !== run.date);
+        this.refreshDerivedState();
+        this.syncWidgetRuns();
+        this.cdr.detectChanges();
+        if (options.loadRelatedData !== false) {
+            void this.loadGoalsForActiveMonth();
+            void this.loadWeatherForActiveMonth();
+        }
+        return run;
+    }
+
+    private runIdentityKey(run: RunRecord): string {
+        if (run.id) return `id:${run.id}`;
+        return [
+            'local',
+            run.date,
+            run.run_type,
+            run.distance_km,
+            run.duration || '',
+            run.created_at || ''
+        ].join(':');
+    }
+
+    private syncWidgetRuns(): void {
+        const plugin = this.liveRunPlugin();
+        if (!isNativeLocalOrigin() || !plugin?.syncWidgetRuns) return;
+
+        const weekStart = this.weekStart(new Date());
+        const weekStartKey = this.dateKey(weekStart);
+        const weekEndKey = this.dateKey(this.addDays(weekStart, 7));
+        const runs = this.runs
+            .filter((run) => this.isRunningRecord(run))
+            .filter((run) => run.date >= weekStartKey && run.date < weekEndKey)
+            .map((run) => ({
+                id: run.id || `${run.date}-${run.distance_km}-${run.duration || ''}`,
+                date: run.date,
+                distance_km: run.distance_km,
+                duration: run.duration || null,
+                duration_seconds: this.durationSeconds(run)
+            }));
+
+        plugin.syncWidgetRuns({ runs, week_start: weekStartKey, week_end: weekEndKey }).catch(() => null);
     }
 
     private setBadges(rows: unknown[]): void {
@@ -8437,6 +9448,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.activeJournalViewer = updated.journal ? updated : null;
         }
         this.refreshDerivedState();
+        this.syncWidgetRuns();
         this.cdr.detectChanges();
         void this.loadTrainingLoad();
     }
@@ -8669,6 +9681,9 @@ export class Component implements AfterViewInit, OnDestroy {
             .filter((row): row is CycleLog => Boolean(row))
             .sort((a, b) => b.start_date.localeCompare(a.start_date));
         this.cycleSummary = this.normalizeCycleSummary(summary);
+        if (!this.isCycleNoteEditing) {
+            this.syncCycleDraftWithSelectedDate();
+        }
         this.refreshDerivedState();
         this.cdr.detectChanges();
     }
@@ -9215,10 +10230,19 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!userId) return null;
 
         const distance = this.round2(this.toNumber(source['distance_km'] ?? source['distanceKm']) || 0);
-        const rank = Math.max(1, Math.round(this.toNumber(source['rank']) || 1));
+        const rankOut = Boolean(source['rank_out'] ?? source['rankOut']) || distance <= 0;
+        const rank = rankOut ? 0 : Math.max(1, Math.round(this.toNumber(source['rank']) || 1));
         const rawMedal = source['medal'];
         const medal: RankingEntry['medal'] = rawMedal === 'gold' || rawMedal === 'silver' || rawMedal === 'bronze'
             ? rawMedal
+            : '';
+        const rawRankTiebreaker = source['rank_tiebreaker'] ?? source['rankTiebreaker'];
+        const rankTiebreaker: RankingEntry['rank_tiebreaker'] = rawRankTiebreaker === 'pace' ? 'pace' : '';
+        const rankStatus = typeof (source['rank_status'] ?? source['rankStatus']) === 'string'
+            ? String(source['rank_status'] ?? source['rankStatus']).trim()
+            : '';
+        const rankLabel = typeof (source['rank_label'] ?? source['rankLabel']) === 'string'
+            ? String(source['rank_label'] ?? source['rankLabel']).trim()
             : '';
 
         return {
@@ -9239,7 +10263,12 @@ export class Component implements AfterViewInit, OnDestroy {
             is_mutual: Boolean(source['is_mutual'] ?? source['isMutual']),
             highlight: Boolean(source['highlight']),
             medal,
-            privacy: source['privacy'] === 'private' ? 'private' : 'public'
+            privacy: source['privacy'] === 'private' ? 'private' : 'public',
+            rank_tied: Boolean(source['rank_tied'] ?? source['rankTied']),
+            rank_tiebreaker: rankTiebreaker,
+            rank_out: rankOut,
+            rank_label: rankLabel || (rankOut ? '순위 밖' : `${rank}위`),
+            rank_status: rankStatus || (rankOut ? '달리지 않아서 순위 밖' : '')
         };
     }
 
@@ -10927,49 +11956,17 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         if (this.galleryTab === 'media') {
+            const owner = this.myFeedUser();
             return this.runs
-                .flatMap((run) => (run.media || []).map((media) => {
-                    const km = this.distanceText(run.distance_km, true);
-                    const date = this.displayDate(run.date, false);
-                    return {
-                        id: media.id,
-                        km,
-                        date,
-                        stats: [
-                            { label: '종류', value: this.mediaTypeLabel(media.media_type) },
-                            { label: '기록', value: km },
-                            { label: '날짜', value: date }
-                        ],
-                        runType: run.run_type,
-                        altText: `${date} ${km} 러닝 첨부 ${this.mediaTypeLabel(media.media_type)}`,
-                        imageUrl: media.media_url,
-                        media,
-                        mediaType: media.media_type
-                    };
-                }))
+                .flatMap((run) => this.mediaGalleryItemsForRun(run, owner))
                 .slice(0, 60);
         }
 
+        const owner = this.myFeedUser();
         return this.runs
-            .filter((run) => Boolean(run.image_url))
-            .slice(0, 8)
-            .map((run) => {
-                const km = this.distanceText(run.distance_km, true);
-                const date = this.displayDate(run.date, false);
-                return {
-                    id: run.id || `${run.date}-${run.image_url}`,
-                    km,
-                    date,
-                    stats: [
-                        { label: this.paceDisplaySettingsText, value: this.paceText(run.avg_pace) },
-                        { label: '시간', value: this.shortDuration(run) },
-                        { label: '칼로리', value: run.calories ?? '-' }
-                    ],
-                    runType: run.run_type,
-                    altText: `${date} ${km} 러닝 기록 캡처`,
-                    imageUrl: run.image_url
-                };
-            });
+            .map((run) => this.captureGalleryItemForRun(run, owner))
+            .filter((item): item is GalleryItem => Boolean(item))
+            .slice(0, 60);
     }
 
     private buildChatMessages(): ChatMessage[] {
@@ -11628,14 +12625,6 @@ export class Component implements AfterViewInit, OnDestroy {
         return `${match[1]}-${String(month).padStart(2, '0')}`;
     }
 
-    private cycleRequestHeaders(): HeadersInit {
-        return {
-            'Content-Type': 'application/json',
-            'X-Cycle-Consent': 'true',
-            ...authHeaderForUrl('/api/cycles')
-        };
-    }
-
     private cloneDefaultSettings(): AppSettings {
         return {
             ...DEFAULT_APP_SETTINGS,
@@ -11760,9 +12749,18 @@ export class Component implements AfterViewInit, OnDestroy {
         this.previousRootBackground = root.style.background;
         this.previousBodyBackground = body?.style.background || '';
         this.previousAppRootBackground = this.dashboardAppRootElement?.style.background || '';
+        this.previousRootBackgroundColor = root.style.backgroundColor;
+        this.previousBodyBackgroundColor = body?.style.backgroundColor || '';
+        this.previousAppRootBackgroundColor = this.dashboardAppRootElement?.style.backgroundColor || '';
         this.previousRootScreenBg = root.style.getPropertyValue(this.dashboardScreenBgProperty);
         this.previousBodyScreenBg = body?.style.getPropertyValue(this.dashboardScreenBgProperty) || '';
         this.previousAppRootScreenBg = this.dashboardAppRootElement?.style.getPropertyValue(this.dashboardScreenBgProperty) || '';
+        this.previousRootShellBg = root.style.getPropertyValue(this.appShellBgProperty);
+        this.previousBodyShellBg = body?.style.getPropertyValue(this.appShellBgProperty) || '';
+        this.previousAppRootShellBg = this.dashboardAppRootElement?.style.getPropertyValue(this.appShellBgProperty) || '';
+        this.previousRootShellText = root.style.getPropertyValue(this.appShellTextProperty);
+        this.previousBodyShellText = body?.style.getPropertyValue(this.appShellTextProperty) || '';
+        this.previousAppRootShellText = this.dashboardAppRootElement?.style.getPropertyValue(this.appShellTextProperty) || '';
 
         root.classList.add(this.dashboardViewportClass);
         body?.classList.add(this.dashboardViewportClass);
@@ -11783,6 +12781,7 @@ export class Component implements AfterViewInit, OnDestroy {
         window.removeEventListener('orientationchange', this.updateDashboardViewportHeight);
         window.visualViewport?.removeEventListener('resize', this.updateDashboardViewportHeight);
         window.visualViewport?.removeEventListener('scroll', this.updateDashboardViewportHeight);
+        this.clearDashboardChromeSyncTimers();
 
         const root = document.documentElement;
         const body = document.body;
@@ -11795,12 +12794,27 @@ export class Component implements AfterViewInit, OnDestroy {
             this.dashboardThemeMeta.setAttribute('content', this.previousDashboardThemeColor);
         }
         root.style.background = this.previousRootBackground;
+        root.style.backgroundColor = this.previousRootBackgroundColor;
         if (body) body.style.background = this.previousBodyBackground;
-        if (this.dashboardAppRootElement) this.dashboardAppRootElement.style.background = this.previousAppRootBackground;
+        if (body) body.style.backgroundColor = this.previousBodyBackgroundColor;
+        if (this.dashboardAppRootElement) {
+            this.dashboardAppRootElement.style.background = this.previousAppRootBackground;
+            this.dashboardAppRootElement.style.backgroundColor = this.previousAppRootBackgroundColor;
+        }
         this.restoreStyleProperty(root, this.dashboardScreenBgProperty, this.previousRootScreenBg);
         if (body) this.restoreStyleProperty(body, this.dashboardScreenBgProperty, this.previousBodyScreenBg);
         if (this.dashboardAppRootElement) {
             this.restoreStyleProperty(this.dashboardAppRootElement, this.dashboardScreenBgProperty, this.previousAppRootScreenBg);
+        }
+        this.restoreStyleProperty(root, this.appShellBgProperty, this.previousRootShellBg);
+        this.restoreStyleProperty(root, this.appShellTextProperty, this.previousRootShellText);
+        if (body) {
+            this.restoreStyleProperty(body, this.appShellBgProperty, this.previousBodyShellBg);
+            this.restoreStyleProperty(body, this.appShellTextProperty, this.previousBodyShellText);
+        }
+        if (this.dashboardAppRootElement) {
+            this.restoreStyleProperty(this.dashboardAppRootElement, this.appShellBgProperty, this.previousAppRootShellBg);
+            this.restoreStyleProperty(this.dashboardAppRootElement, this.appShellTextProperty, this.previousAppRootShellText);
         }
         this.dashboardThemeMeta = null;
         this.dashboardAppRootElement = null;
@@ -11810,20 +12824,52 @@ export class Component implements AfterViewInit, OnDestroy {
         if (typeof document === 'undefined') return;
 
         const color = this.dashboardScreenBackground();
+        const textColor = this.dashboardShellTextColor();
+        this.applyDashboardChrome(color, textColor);
+        this.queueNativeDashboardChromeSync(color);
+    }
+
+    private applyDashboardChrome(color: string, textColor: string): void {
+        if (typeof document === 'undefined') return;
+
         const root = document.documentElement;
         const body = document.body;
-        root.style.setProperty(this.dashboardScreenBgProperty, color);
-        root.style.background = color;
-        if (body) {
-            body.style.setProperty(this.dashboardScreenBgProperty, color);
-            body.style.background = color;
-        }
-        if (this.dashboardAppRootElement) {
-            this.dashboardAppRootElement.style.setProperty(this.dashboardScreenBgProperty, color);
-            this.dashboardAppRootElement.style.background = color;
-        }
+        this.applyDashboardChromeElement(root, color, textColor);
+        if (body) this.applyDashboardChromeElement(body, color, textColor);
+        if (this.dashboardAppRootElement) this.applyDashboardChromeElement(this.dashboardAppRootElement, color, textColor);
         this.dashboardThemeMeta?.setAttribute('content', color);
+    }
+
+    private applyDashboardChromeElement(element: HTMLElement, color: string, textColor: string): void {
+        element.style.setProperty(this.dashboardScreenBgProperty, color);
+        element.style.setProperty(this.appShellBgProperty, color);
+        element.style.setProperty(this.appShellTextProperty, textColor);
+        element.style.background = color;
+        element.style.backgroundColor = color;
+    }
+
+    private queueNativeDashboardChromeSync(color: string): void {
+        this.clearDashboardChromeSyncTimers();
         this.setNativeSafeAreaBackground(color).catch(() => null);
+
+        if (typeof window === 'undefined' || !isNativeLocalOrigin()) return;
+
+        this.dashboardChromeSyncTimers = [120, 480, 1000].map((delay) => window.setTimeout(() => {
+            const nextColor = this.dashboardScreenBackground();
+            const nextTextColor = this.dashboardShellTextColor();
+            this.applyDashboardChrome(nextColor, nextTextColor);
+            this.setNativeSafeAreaBackground(nextColor).catch(() => null);
+        }, delay));
+    }
+
+    private clearDashboardChromeSyncTimers(): void {
+        if (typeof window === 'undefined') {
+            this.dashboardChromeSyncTimers = [];
+            return;
+        }
+
+        this.dashboardChromeSyncTimers.forEach((timer) => window.clearTimeout(timer));
+        this.dashboardChromeSyncTimers = [];
     }
 
     private nativeAuthPlugin(): any {
@@ -11860,7 +12906,25 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardScreenBackground(): string {
-        return this.isDark ? '#12121c' : '#f7f7f9';
+        if (this.isInitialLoading) return this.loadingScreenBackground;
+        if (this.activeScreen === 'live-run') {
+            if (this.isLiveRunPaused) {
+                return this.isDark ? this.liveRunPausedDarkBackground : this.liveRunPausedLightBackground;
+            }
+            return this.isDark ? this.liveRunDarkBackground : this.liveRunLightBackground;
+        }
+        return this.isDark ? this.dashboardDarkBackground : this.dashboardLightBackground;
+    }
+
+    private dashboardShellTextColor(): string {
+        if (this.isInitialLoading) return this.loadingScreenTextColor;
+        if (this.activeScreen === 'live-run') {
+            if (this.isLiveRunPaused) {
+                return this.isDark ? this.liveRunPausedDarkTextColor : this.liveRunPausedLightTextColor;
+            }
+            return this.isDark ? this.liveRunDarkTextColor : this.liveRunLightTextColor;
+        }
+        return this.isDark ? this.dashboardDarkTextColor : this.dashboardLightTextColor;
     }
 
     private restoreStyleProperty(element: HTMLElement, property: string, value: string): void {
@@ -11966,12 +13030,12 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
-    private syncCycleDraftWithSelectedDate(): void {
+    private syncCycleDraftWithSelectedDate(forceSelectedDate: boolean = false): void {
         const date = this.selectedCalendarDate || this.todayDateKey;
-        if (!this.normalizeDateKey(this.cycleStartDate)) {
+        if (forceSelectedDate || !this.normalizeDateKey(this.cycleStartDate)) {
             this.cycleStartDate = date;
         }
-        if (!this.normalizeDateKey(this.cycleEndDate)) {
+        if (forceSelectedDate || !this.normalizeDateKey(this.cycleEndDate) || this.cycleEndDate < this.cycleStartDate) {
             this.cycleEndDate = this.cycleStartDate;
         }
         const log = this.selectedCalendarCycleLog;
@@ -12039,7 +13103,19 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private showToast(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
-        this.toast.show(message, type);
+        this.toast.show(this.userMessage(message, '잠깐 문제가 생겼어. 다시 시도해줘'), type);
+    }
+
+    private userMessage(message: unknown, fallback: string): string {
+        return safeUserMessage(message, fallback);
+    }
+
+    private payloadMessage(payload: unknown, fallback: string): string {
+        return payloadUserMessage(payload, fallback);
+    }
+
+    private apiMessage(error: Parameters<typeof apiErrorMessage>[0], fallback: string): string {
+        return apiErrorMessage(error, fallback);
     }
 
     private yearMonthKey(date: Date): string {
@@ -12055,16 +13131,14 @@ export class Component implements AfterViewInit, OnDestroy {
             this.uploadStatus = '';
             this.calendarMediaDraftFiles = [];
             this.calendarMediaDraftStatus = '';
+            this.calendarUploadExpanded = false;
             this.resetRunRecordEditState();
         }
         this.selectedCalendarDate = date;
         this.syncSelectedCalendarMemo();
         this.syncUploadJournalWithSelectedDate();
         if (this.shouldShowCycleFeature && this.isCycleFeatureEnabled) {
-            this.cycleStartDate = date;
-            if (!this.normalizeDateKey(this.cycleEndDate) || this.cycleEndDate < date) {
-                this.cycleEndDate = date;
-            }
+            this.syncCycleDraftWithSelectedDate(true);
         }
         this.selectedCalendarRuns = this.buildSelectedCalendarRuns();
         this.cdr.detectChanges();

@@ -7,6 +7,7 @@ const DEFAULT_LOADING_TIPS: string[] = [
     '친구 피드와 랭킹을 최신 상태로 맞추고 있어요.',
     'AI 페이서가 최근 흐름을 읽고 있어요.'
 ];
+const LOADING_SCREEN_BACKGROUND = '#000000';
 
 export class Component implements OnInit, OnDestroy {
     constructor(private readonly cdr: ChangeDetectorRef) { }
@@ -73,7 +74,7 @@ export class Component implements OnInit, OnDestroy {
     }
 
     private syncNativeSafeAreaBackground(): void {
-        const color = '#020406';
+        const color = LOADING_SCREEN_BACKGROUND;
         this.setNativeSafeAreaBackground(color).catch(() => null);
         if (typeof window === 'undefined' || !isNativeLocalOrigin()) return;
         window.setTimeout(() => this.setNativeSafeAreaBackground(color).catch(() => null), 120);
