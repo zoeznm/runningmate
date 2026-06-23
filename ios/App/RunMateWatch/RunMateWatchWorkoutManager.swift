@@ -81,7 +81,6 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     func stop() {
         guard let builder = workoutBuilder else {
             cleanupWorkout()
-            sendMetrics(force: true)
             return
         }
 
@@ -224,7 +223,9 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func sendMetrics(force: Bool) {
-        guard WCSession.isSupported(), WCSession.default.activationState == .activated else { return }
+        guard workoutSession != nil,
+              WCSession.isSupported(),
+              WCSession.default.activationState == .activated else { return }
 
         let now = Date()
         if !force && now.timeIntervalSince(lastMetricsSentAt) < 0.75 {
@@ -309,6 +310,16 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject {
         workoutBuilder = nil
         startedAt = nil
         runId = nil
+        latestHeartRate = nil
+        heartRateSum = 0
+        heartRateCount = 0
+        lastHeartRateTimestamp = 0
+        distanceMeters = 0
+        activeEnergyKcal = 0
+        stepCount = 0
+        heartRateText = "-- bpm"
+        distanceText = "0.00 km"
+        paceText = "-- /km"
         statusText = "iPhone에서 러닝을 시작해줘"
         canPause = false
         canResume = false

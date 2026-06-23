@@ -28,7 +28,6 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     private var liveRunSession: LiveRunSession?
     private var pendingLocationAuthorization: ((Bool) -> Void)?
     private var liveRunTimer: Timer?
-    private var liveHeartRateTimer: Timer?
     private var watchConnectivityConfigured = false
 
     override func load() {
@@ -103,12 +102,6 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 let weightKg = call.getDouble("weightKg") ?? 60.0
                 let session = LiveRunSession(runType: runType, weightKg: max(30.0, min(weightKg, 220.0)))
                 self.liveRunSession = session
-                self.requestHealthKitAccess { [weak self, weak session] _, _ in
-                    DispatchQueue.main.async {
-                        guard let self = self, let session = session, self.liveRunSession === session else { return }
-                        self.queryLiveHeartRateSamples(includeRecentFallback: true)
-                    }
-                }
                 self.configureWatchConnectivity()
                 self.startWatchWorkoutApp(runType: runType, runId: session.id, weightKg: session.weightKg, startedAt: session.startDate)
                 self.sendWatchRunCommand("start", extra: [
@@ -311,15 +304,6 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         if let liveRunTimer = liveRunTimer {
             RunLoop.main.add(liveRunTimer, forMode: .common)
         }
-
-        liveHeartRateTimer?.invalidate()
-        liveHeartRateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.queryLiveHeartRateSamples(includeRecentFallback: true)
-        }
-        if let liveHeartRateTimer = liveHeartRateTimer {
-            RunLoop.main.add(liveHeartRateTimer, forMode: .common)
-        }
-        queryLiveHeartRateSamples(includeRecentFallback: true)
     }
 
     private func stopLiveRunSensors() {
@@ -327,8 +311,6 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         pedometer.stopUpdates()
         liveRunTimer?.invalidate()
         liveRunTimer = nil
-        liveHeartRateTimer?.invalidate()
-        liveHeartRateTimer = nil
     }
 
     private func queryLivePedometerSnapshot() {
@@ -389,6 +371,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         let averagePaceSecondsPerKm = distanceMeters >= 1.0 && elapsedSeconds > 0 ? elapsedSeconds / max(distanceKm, 0.001) : nil
         let currentPaceSecondsPerKm = session.instantPaceSecondsPerKm ?? averagePaceSecondsPerKm
         let watchConnected = session.hasRecentWatchMetrics || watchSessionIsReachable()
+        let hasWatchHeartRate = session.latestHeartRate != nil
         var payload: [String: Any] = [
             "active": !ended && session.status != .stopped,
             "id": session.id,
@@ -404,10 +387,10 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             "calories": Int(round(calories)),
             "step_count": Int(round(steps)),
             "elevation_gain_m": Int(round(session.elevationGainMeters)),
-            "heart_rate_available": session.latestHeartRate != nil,
+            "heart_rate_available": hasWatchHeartRate,
             "watch_connected": watchConnected,
             "watch_app_installed": watchAppInstalled(),
-            "metrics_source": watchConnected ? "apple_watch" : "iphone"
+            "metrics_source": session.hasRecentWatchMetrics ? "apple_watch_workout" : "iphone"
         ]
 
         if let cadence = cadence, cadence.isFinite {
@@ -415,9 +398,11 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         }
         if let latestHeartRate = session.latestHeartRate {
             payload["heart_rate"] = Int(round(latestHeartRate))
+            payload["heart_rate_source"] = "apple_watch_workout"
         }
         if session.heartRateSampleCount > 0 {
             payload["avg_heart_rate"] = Int(round(session.heartRateSum / Double(session.heartRateSampleCount)))
+            payload["avg_heart_rate_source"] = "apple_watch_workout"
         }
         if let startLocation = session.routeLocations.first {
             payload["start_location"] = liveRunLocationPayload(startLocation)
@@ -553,7 +538,8 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     private func handleWatchRunMetrics(_ message: [String: Any]) {
         DispatchQueue.main.async {
             guard let session = self.liveRunSession else { return }
-            if let runId = message["runId"] as? String, !runId.isEmpty, runId != session.id {
+            guard session.status == .running || session.status == .paused else { return }
+            guard let runId = message["runId"] as? String, !runId.isEmpty, runId == session.id else {
                 return
             }
 
@@ -630,94 +616,6 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         let minutes = max(0, elapsedSeconds / 60.0)
         let joggingMet = 8.3
         return max(0, joggingMet * 3.5 * weightKg / 200.0 * minutes)
-    }
-
-    private func queryLiveHeartRateSamples(includeRecentFallback: Bool = false) {
-        guard let session = liveRunSession,
-              session.status == .running,
-              HKHealthStore.isHealthDataAvailable(),
-              let quantityType = HKObjectType.quantityType(forIdentifier: .heartRate) else {
-            return
-        }
-
-        let predicate = HKQuery.predicateForSamples(
-            withStart: session.startDate,
-            end: Date(),
-            options: [.strictStartDate]
-        )
-        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        let query = HKSampleQuery(
-            sampleType: quantityType,
-            predicate: predicate,
-            limit: 12,
-            sortDescriptors: [sort]
-        ) { [weak self, weak session] _, samples, _ in
-            guard let self = self, let session = session else { return }
-
-            let unit = HKUnit.count().unitDivided(by: HKUnit.minute())
-            let heartRateSamples = (samples as? [HKQuantitySample]) ?? []
-            DispatchQueue.main.async {
-                guard self.liveRunSession === session else { return }
-
-                var didAddSample = false
-                for sample in heartRateSamples {
-                    if session.heartRateSampleIds.contains(sample.uuid) {
-                        continue
-                    }
-                    let value = sample.quantity.doubleValue(for: unit)
-                    guard value.isFinite && value > 0 else { continue }
-                    session.heartRateSampleIds.insert(sample.uuid)
-                    session.latestHeartRate = value
-                    session.heartRateSum += value
-                    session.heartRateSampleCount += 1
-                    didAddSample = true
-                }
-                if !didAddSample && session.latestHeartRate == nil && includeRecentFallback {
-                    self.queryRecentHeartRateFallback(for: session, quantityType: quantityType)
-                    return
-                }
-                self.emitLiveRunUpdate(reason: "heart_rate")
-            }
-        }
-        healthStore.execute(query)
-    }
-
-    private func queryRecentHeartRateFallback(for session: LiveRunSession, quantityType: HKQuantityType) {
-        let fallbackStart = session.startDate.addingTimeInterval(-10 * 60)
-        let predicate = HKQuery.predicateForSamples(
-            withStart: fallbackStart,
-            end: Date(),
-            options: []
-        )
-        let sort = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
-        let query = HKSampleQuery(
-            sampleType: quantityType,
-            predicate: predicate,
-            limit: 1,
-            sortDescriptors: [sort]
-        ) { [weak self, weak session] _, samples, _ in
-            guard let self = self, let session = session else { return }
-
-            let unit = HKUnit.count().unitDivided(by: HKUnit.minute())
-            let sample = (samples as? [HKQuantitySample])?.first
-            DispatchQueue.main.async {
-                guard self.liveRunSession === session else { return }
-
-                if let sample = sample {
-                    let value = sample.quantity.doubleValue(for: unit)
-                    if value.isFinite && value > 0 {
-                        session.latestHeartRate = value
-                        if !session.heartRateSampleIds.contains(sample.uuid) {
-                            session.heartRateSampleIds.insert(sample.uuid)
-                            session.heartRateSum += value
-                            session.heartRateSampleCount += 1
-                        }
-                    }
-                }
-                self.emitLiveRunUpdate(reason: "heart_rate")
-            }
-        }
-        healthStore.execute(query)
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -1047,7 +945,6 @@ private final class LiveRunSession {
     var heartRateSampleCount: Int = 0
     var lastWatchHeartRateTimestamp: TimeInterval = 0
     var latestWatchMetricsAt: Date?
-    var heartRateSampleIds = Set<UUID>()
 
     init(runType: String, weightKg: Double) {
         self.runType = runType

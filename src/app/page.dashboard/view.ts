@@ -882,6 +882,11 @@ interface LiveRunMetrics {
     step_count?: number | null;
     elevation_gain_m?: number | null;
     heart_rate_available?: boolean;
+    heart_rate_source?: string | null;
+    avg_heart_rate_source?: string | null;
+    watch_connected?: boolean;
+    watch_app_installed?: boolean;
+    metrics_source?: string | null;
     start_location?: LiveRunRoutePoint | null;
     end_location?: LiveRunRoutePoint | null;
     route_points?: LiveRunRoutePoint[];
@@ -6190,6 +6195,11 @@ export class Component implements AfterViewInit, OnDestroy {
             step_count: null,
             elevation_gain_m: null,
             heart_rate_available: false,
+            heart_rate_source: null,
+            avg_heart_rate_source: null,
+            watch_connected: false,
+            watch_app_installed: false,
+            metrics_source: null,
             start_location: null,
             end_location: null,
             route_points: []
@@ -6283,6 +6293,9 @@ export class Component implements AfterViewInit, OnDestroy {
         const heartRate = this.toNumber(source['heart_rate'] ?? source['heartRate']);
         const avgHeartRate = this.toNumber(source['avg_heart_rate'] ?? source['avgHeartRate']);
         const explicitHeartRateAvailable = source['heart_rate_available'] ?? source['heartRateAvailable'];
+        const heartRateAvailable = typeof explicitHeartRateAvailable === 'boolean'
+            ? explicitHeartRateAvailable
+            : heartRate !== null || avgHeartRate !== null;
         const routePoints = this.normalizeLiveRunRoutePoints(source['route_points'] ?? source['routePoints']);
         const startLocation = this.normalizeLiveRunRoutePoint(source['start_location'] ?? source['startLocation'])
             || routePoints[0]
@@ -6314,7 +6327,24 @@ export class Component implements AfterViewInit, OnDestroy {
             cadence: this.toNumber(source['cadence']),
             step_count: this.toNumber(source['step_count'] ?? source['stepCount']),
             elevation_gain_m: this.toNumber(source['elevation_gain_m'] ?? source['elevationGainM'] ?? source['elevation_gain']),
-            heart_rate_available: Boolean(explicitHeartRateAvailable) || heartRate !== null || avgHeartRate !== null,
+            heart_rate_available: heartRateAvailable,
+            heart_rate_source: typeof source['heart_rate_source'] === 'string'
+                ? source['heart_rate_source']
+                : typeof source['heartRateSource'] === 'string'
+                    ? source['heartRateSource']
+                    : null,
+            avg_heart_rate_source: typeof source['avg_heart_rate_source'] === 'string'
+                ? source['avg_heart_rate_source']
+                : typeof source['avgHeartRateSource'] === 'string'
+                    ? source['avgHeartRateSource']
+                    : null,
+            watch_connected: Boolean(source['watch_connected'] ?? source['watchConnected']),
+            watch_app_installed: Boolean(source['watch_app_installed'] ?? source['watchAppInstalled']),
+            metrics_source: typeof source['metrics_source'] === 'string'
+                ? source['metrics_source']
+                : typeof source['metricsSource'] === 'string'
+                    ? source['metricsSource']
+                    : null,
             start_location: startLocation,
             end_location: endLocation,
             route_points: routePoints
@@ -6463,7 +6493,11 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get liveRunHeartRateText(): string {
         const heartRate = this.toNumber(this.liveRun.heart_rate ?? this.liveRun.avg_heart_rate);
-        return heartRate !== null ? `${Math.round(heartRate)} bpm` : '측정 중';
+        if (heartRate !== null && this.liveRun.heart_rate_available !== false) {
+            return `${Math.round(heartRate)} bpm`;
+        }
+        if (!this.isLiveRunActive) return '-';
+        return this.liveRun.watch_app_installed === false ? '워치 앱 필요' : '워치 대기';
     }
 
     public get liveRunCadenceText(): string {
