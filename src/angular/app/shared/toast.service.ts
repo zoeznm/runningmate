@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { safeUserMessage } from 'src/app/shared/api';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -16,9 +17,12 @@ export class ToastService {
 
     public show(message: string, type: ToastType = 'info', durationMs: number = 2800): number {
         const id = this.nextId++;
+        const displayMessage = type === 'error'
+            ? safeUserMessage(message, '잠깐 문제가 생겼어. 다시 시도해줘')
+            : message;
         this.toasts = [
             ...this.toasts,
-            { id, type, message }
+            { id, type, message: displayMessage }
         ];
 
         const timer = window.setTimeout(() => this.dismiss(id), durationMs);

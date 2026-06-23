@@ -1,6 +1,6 @@
 import { AfterViewInit, ChangeDetectorRef, ElementRef, OnDestroy } from '@angular/core';
 import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, refreshAuthTokens } from 'src/app/shared/auth';
-import { apiFetch, apiErrorMessage, jsonRequest, standardApiError } from 'src/app/shared/api';
+import { apiFetch, apiErrorMessage, jsonRequest, payloadUserMessage, safeUserMessage, standardApiError } from 'src/app/shared/api';
 import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
 import { ToastService } from 'src/app/shared/toast.service';
 import { PredictionEngine, type HistoryInput } from 'cyclia';
@@ -3128,7 +3128,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public get appleMusicUploadHelpText(): string {
         if (!this.appleMusicConnection.configured) {
-            return this.appleMusicConnection.message || 'Apple Music Developer Token 설정이 필요해.';
+            return this.userMessage(this.appleMusicConnection.message, 'Apple Music 연결 설정이 필요해.');
         }
         if (!this.appSettings.appleMusicConnected) {
             return 'Apple Music을 연결하면 최근 재생곡 30개에서 고를 수 있어.';
@@ -3427,7 +3427,7 @@ export class Component implements AfterViewInit, OnDestroy {
             }, { retries: 0 });
 
             if (!result.success) {
-                this.profileEditStatus = result.error?.message || '프로필을 저장하지 못했어.';
+                this.profileEditStatus = this.apiMessage(result.error, '프로필을 저장하지 못했어.');
                 this.showToast(this.profileEditStatus, 'error');
                 return;
             }
@@ -3499,7 +3499,7 @@ export class Component implements AfterViewInit, OnDestroy {
             }, { retries: 0 });
 
             if (!result.success) {
-                this.showToast(result.error?.message || '비밀번호 변경에 실패했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '비밀번호 변경에 실패했어.'), 'error');
                 return;
             }
 
@@ -3812,7 +3812,7 @@ export class Component implements AfterViewInit, OnDestroy {
             }, { retries: 0, timeoutMs: 30000 });
 
             if (!result.success) {
-                this.showToast(result.error?.message || result.message || '계정 삭제에 실패했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '계정 삭제에 실패했어.'), 'error');
                 return;
             }
 
@@ -4039,7 +4039,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.goalStatus = payload?.message || '목표를 저장하지 못했어.';
+                this.goalStatus = this.payloadMessage(payload, '목표를 저장하지 못했어.');
                 return;
             }
 
@@ -4073,7 +4073,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.goalStatus = payload?.message || '목표를 삭제하지 못했어.';
+                this.goalStatus = this.payloadMessage(payload, '목표를 삭제하지 못했어.');
                 return;
             }
 
@@ -4171,7 +4171,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.challengeStatus = payload?.message || '챌린지를 만들지 못했어.';
+                this.challengeStatus = this.payloadMessage(payload, '챌린지를 만들지 못했어.');
                 return;
             }
 
@@ -4222,7 +4222,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const result = await response.json().catch(() => null);
             if (!result?.success) {
-                this.challengeStatus = result?.message || '챌린지를 삭제하지 못했어.';
+                this.challengeStatus = this.payloadMessage(result, '챌린지를 삭제하지 못했어.');
                 return;
             }
 
@@ -4368,7 +4368,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success) {
-                this.friendStatus = payload?.message || '친구 검색에 실패했어.';
+                this.friendStatus = this.payloadMessage(payload, '친구 검색에 실패했어.');
                 return;
             }
 
@@ -4399,7 +4399,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await apiFetch<any>('/api/friends/code');
             if (!result.success) {
-                this.friendCodeStatus = result.error?.message || '친구코드를 불러오지 못했어.';
+                this.friendCodeStatus = this.apiMessage(result.error, '친구코드를 불러오지 못했어.');
                 return;
             }
 
@@ -4466,7 +4466,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>('/api/friends/code', 'POST', { code }, { retries: 0 });
             if (!result.success) {
-                this.friendCodeStatus = result.error?.message || '친구코드를 확인하지 못했어.';
+                this.friendCodeStatus = this.apiMessage(result.error, '친구코드를 확인하지 못했어.');
                 return;
             }
 
@@ -4505,7 +4505,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success) {
-                this.friendStatus = payload?.message || '팔로우 상태를 바꾸지 못했어.';
+                this.friendStatus = this.payloadMessage(payload, '팔로우 상태를 바꾸지 못했어.');
                 return;
             }
 
@@ -4642,7 +4642,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}/reactions`, method, { type: reactionType });
             if (!result.success) {
-                this.showToast(result.error?.message || '반응을 저장하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '반응을 저장하지 못했어.'), 'error');
                 return;
             }
             this.applyFeedSocial(run.id, (result.raw as any)?.social || result.data);
@@ -4663,7 +4663,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}/comments`, 'POST', { content });
             if (!result.success) {
-                this.showToast(result.error?.message || '댓글을 저장하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '댓글을 저장하지 못했어.'), 'error');
                 return;
             }
             this.feedCommentDrafts = { ...this.feedCommentDrafts, [run.id]: '' };
@@ -4692,7 +4692,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}/comments`, 'DELETE', { comment_id: comment.id });
             if (!result.success) {
-                this.showToast(result.error?.message || '댓글을 삭제하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '댓글을 삭제하지 못했어.'), 'error');
                 return;
             }
             this.applyFeedSocial(run.id, (result.raw as any)?.social || result.data);
@@ -4753,7 +4753,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await jsonRequest<any>(`/api/runs/${encodeURIComponent(run.id)}`, 'PATCH', { is_public: nextPublic });
             if (!result.success) {
-                this.showToast(result.error?.message || '공개 설정을 저장하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '공개 설정을 저장하지 못했어.'), 'error');
                 return;
             }
             this.applyRunUpdate((result.raw as any)?.data || result.data);
@@ -4796,7 +4796,7 @@ export class Component implements AfterViewInit, OnDestroy {
             );
             const payload = result.raw as any;
             if (!result.success) {
-                this.rankingStatus = result.message || apiErrorMessage(result.error) || '참여 설정을 저장하지 못했어.';
+                this.rankingStatus = this.apiMessage(result.error, '참여 설정을 저장하지 못했어.');
                 return;
             }
 
@@ -4899,7 +4899,7 @@ export class Component implements AfterViewInit, OnDestroy {
             const payload = this.normalizeWizStatusPayload(rawPayload) as { success?: boolean; message?: string; data?: unknown[]; usage?: Partial<AiUsage> } | null;
             this.applyAiUsage(payload?.usage);
             if (!payload?.success) {
-                this.showToast(payload?.message || '대화를 삭제하지 못했어.', 'error');
+                this.showToast(this.payloadMessage(payload, '대화를 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -5036,7 +5036,7 @@ export class Component implements AfterViewInit, OnDestroy {
             if (!result.success) {
                 const message = result.error?.kind === 'parse'
                     ? ''
-                    : result.message || apiErrorMessage(result.error);
+                    : this.apiMessage(result.error, '목표 체중을 저장하지 못했어.');
                 this.weightTargetStatus = message || '목표 체중을 저장하지 못했어.';
                 this.showToast(this.weightTargetStatus, 'error');
                 return;
@@ -5094,7 +5094,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.weightStatus = payload?.message || '체중 기록을 저장하지 못했어.';
+                this.weightStatus = this.payloadMessage(payload, '체중 기록을 저장하지 못했어.');
                 return;
             }
 
@@ -5145,7 +5145,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.showToast(payload?.message || '체중 기록을 삭제하지 못했어.', 'error');
+                this.showToast(this.payloadMessage(payload, '체중 기록을 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -5239,7 +5239,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.appleMusicStatus = payload?.message || '최근 재생곡을 불러오지 못했어.';
+                this.appleMusicStatus = this.payloadMessage(payload, '최근 재생곡을 불러오지 못했어.');
                 this.showToast(this.appleMusicStatus, 'error');
                 return;
             }
@@ -5371,7 +5371,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.runMediaStatus = payload?.message || '사진/영상을 업로드하지 못했어.';
+                this.runMediaStatus = this.payloadMessage(payload, '사진/영상을 업로드하지 못했어.');
                 this.showToast(this.runMediaStatus, 'error');
                 return;
             }
@@ -5405,7 +5405,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.showToast(payload?.message || '첨부 미디어를 삭제하지 못했어.', 'error');
+                this.showToast(this.payloadMessage(payload, '첨부 미디어를 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -5516,7 +5516,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.journalStatusText = payload?.message || '일기를 저장하지 못했어.';
+                this.journalStatusText = this.payloadMessage(payload, '일기를 저장하지 못했어.');
                 this.showToast(this.journalStatusText, 'error');
                 return;
             }
@@ -5703,7 +5703,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const saved = await this.saveRunRecord(payload);
             if (!saved.saved) {
-                this.uploadStatus = saved.message || `${label} 기록을 저장하지 못했어.`;
+                this.uploadStatus = this.userMessage(saved.message, `${label} 기록을 저장하지 못했어.`);
                 this.showToast(this.uploadStatus, 'error');
                 return;
             }
@@ -5752,7 +5752,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json();
             if (!payload?.success) {
-                this.calendarMemoStatus = payload?.message || '메모를 저장하지 못했어.';
+                this.calendarMemoStatus = this.payloadMessage(payload, '메모를 저장하지 못했어.');
                 return;
             }
 
@@ -5802,7 +5802,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!payload?.success) {
-                this.uploadJournalStatus = payload?.message || '일기를 저장하지 못했어.';
+                this.uploadJournalStatus = this.payloadMessage(payload, '일기를 저장하지 못했어.');
                 this.showToast(this.uploadJournalStatus, 'error');
                 return;
             }
@@ -5974,7 +5974,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = result.raw || result.data;
             if (!result.success) {
-                this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 기록을 저장하지 못했어.';
+                this.cycleStatus = this.apiMessage(result.error, '주기 기록을 저장하지 못했어.');
                 return;
             }
 
@@ -6025,7 +6025,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = result.raw || result.data;
             if (!result.success) {
-                this.showToast(result.message || apiErrorMessage(result.error) || '주기 기록을 삭제하지 못했어.', 'error');
+                this.showToast(this.apiMessage(result.error, '주기 기록을 삭제하지 못했어.'), 'error');
                 return;
             }
 
@@ -6068,7 +6068,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = result.raw || result.data;
             if (!result.success) {
-                this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 데이터를 삭제하지 못했어.';
+                this.cycleStatus = this.apiMessage(result.error, '주기 데이터를 삭제하지 못했어.');
                 return;
             }
 
@@ -6191,9 +6191,9 @@ export class Component implements AfterViewInit, OnDestroy {
             ? mediaSavedCount
                 ? `${savedCount}개 기록과 사진/영상 ${mediaSavedCount}개를 저장했어.`
                 : `${savedCount}개 항목을 저장했어.`
-            : lastMessage || '저장된 기록이 없어.';
+            : this.userMessage(lastMessage, '저장된 기록이 없어.');
         if (!savedCount && lastMessage) {
-            this.parseErrorMessage = lastMessage;
+            this.parseErrorMessage = this.userMessage(lastMessage, '이미지를 읽지 못했어. 수동으로 입력해줘.');
         }
         if (savedCount) {
             this.resetHydrationInputs();
@@ -6451,7 +6451,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 : typeof source['localizedDescription'] === 'string'
                     ? source['localizedDescription']
                     : '';
-            if (message) return message;
+            if (message) return this.userMessage(message, fallback);
         }
         return fallback;
     }
@@ -6811,7 +6811,7 @@ export class Component implements AfterViewInit, OnDestroy {
             };
             const saved = await this.saveRunRecord(payload);
             if (!saved.saved) {
-                this.liveRunStatus = saved.message || '러닝 기록을 저장하지 못했어.';
+                this.liveRunStatus = this.userMessage(saved.message, '러닝 기록을 저장하지 못했어.');
                 this.showToast(this.liveRunStatus, 'error');
                 return;
             }
@@ -6953,7 +6953,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const saved = await this.saveRunRecord(payload, this.manualEntryRunId);
             if (!saved.saved) {
-                this.uploadStatus = saved.message || '수동 기록을 저장하지 못했어.';
+                this.uploadStatus = this.userMessage(saved.message, '수동 기록을 저장하지 못했어.');
                 return;
             }
 
@@ -7014,7 +7014,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.applyAiUsage(payload?.usage, true);
             const reply = payload?.success
                 ? payload?.reply || '답변을 만들지 못했어.'
-                : payload?.message || 'AI 채팅 중 오류가 발생했어.';
+                : this.payloadMessage(payload, 'AI 채팅 중 오류가 발생했어.');
             this.replaceChatMessage(aiMessageIndex, reply, false);
             this.activeChatSessionId = payload?.session_id || payload?.session?.id || this.activeChatSessionId;
             this.upsertChatSession(payload?.session);
@@ -7030,7 +7030,7 @@ export class Component implements AfterViewInit, OnDestroy {
     public async refreshAiConnection(): Promise<void> {
         this.aiLoginRefreshStatus = '연결 상태 확인 중';
         await this.loadAiConnection();
-        this.aiLoginRefreshStatus = this.aiConnection?.message || '연결 상태를 확인했어.';
+        this.aiLoginRefreshStatus = this.userMessage(this.aiConnection?.message, '연결 상태를 확인했어.');
         this.cdr.detectChanges();
     }
 
@@ -7066,7 +7066,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 await this.loadAiConnection();
             }
 
-            this.aiLoginRefreshStatus = payload?.message || (payload?.success ? '로그인 갱신을 요청했어.' : '로그인 갱신에 실패했어.');
+            this.aiLoginRefreshStatus = this.payloadMessage(payload, payload?.success ? '로그인 갱신을 요청했어.' : '로그인 갱신에 실패했어.');
             this.aiLoginDeviceUrl = typeof payload?.auth_url === 'string' ? payload.auth_url : '';
             this.aiLoginDeviceCode = typeof payload?.user_code === 'string' ? payload.user_code : '';
             this.aiLoginDeviceExpiresIn = typeof payload?.expires_in_minutes === 'number' && Number.isFinite(payload.expires_in_minutes)
@@ -7206,9 +7206,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 shouldStartDeferredData = !this.initialErrorMessage;
             }
         } catch (error) {
-            this.initialErrorMessage = error instanceof Error && error.message
-                ? error.message
-                : '초기 데이터를 불러오지 못했어. 네트워크를 확인한 뒤 다시 시도해줘';
+            this.initialErrorMessage = this.userMessage(error, '초기 데이터를 불러오지 못했어. 네트워크를 확인한 뒤 다시 시도해줘');
         } finally {
             this.initialLoadingSteps.clear();
             this.initialLoadingDetail = '';
@@ -7653,7 +7651,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
             if (!result.success) {
                 if (!silent) {
-                    this.cycleStatus = apiErrorMessage(result.error) || result.message || '생리주기 설정을 저장하지 못했어.';
+                    this.cycleStatus = this.apiMessage(result.error, '생리주기 설정을 저장하지 못했어.');
                 }
                 return false;
             }
@@ -7786,7 +7784,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
             const result = await jsonRequest<UserProfile>('/api/profile', 'PATCH', profilePayload, { retries: 0, timeoutMs: 10000 });
             if (!result.success || !result.data) {
-                this.onboardingStatus = result.error?.message || result.message || (skipGuide ? '온보딩 건너뛰기를 저장하지 못했어.' : '온보딩 완료 정보를 저장하지 못했어.');
+                this.onboardingStatus = this.apiMessage(result.error, skipGuide ? '온보딩 건너뛰기를 저장하지 못했어.' : '온보딩 완료 정보를 저장하지 못했어.');
                 return;
             }
 
@@ -7818,7 +7816,7 @@ export class Component implements AfterViewInit, OnDestroy {
             });
             const payload = await response.json().catch(() => null);
             if (!response.ok || !payload?.success) {
-                this.onboardingStatus = payload?.message || '첫 목표를 저장하지 못했어.';
+                this.onboardingStatus = this.payloadMessage(payload, '첫 목표를 저장하지 못했어.');
                 return false;
             }
 
@@ -7856,7 +7854,7 @@ export class Component implements AfterViewInit, OnDestroy {
         );
         if (!result.success) {
             if (result.error?.status === 401) return 'unauthenticated';
-            this.initialErrorMessage = result.error?.message || '초기 데이터를 불러오지 못했어.';
+            this.initialErrorMessage = this.apiMessage(result.error, '초기 데이터를 불러오지 못했어.');
             return 'failed';
         }
 
@@ -7897,7 +7895,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 this.redirectToAccess();
                 return false;
             }
-            this.initialErrorMessage = apiErrorMessage(result.error);
+            this.initialErrorMessage = this.apiMessage(result.error, '초기 데이터를 불러오지 못했어.');
         }
         if (includeTrainingLoad) {
             await this.loadTrainingLoad();
@@ -7942,7 +7940,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private async saveRestDay(date: string, rest: boolean): Promise<boolean> {
         const result = await jsonRequest<any[]>('/api/rest-days', 'POST', { date, rest });
         if (!result.success) {
-            this.showToast(result.error?.message || '휴식일을 저장하지 못했어.', 'error');
+            this.showToast(this.apiMessage(result.error, '휴식일을 저장하지 못했어.'), 'error');
             return false;
         }
 
@@ -8040,7 +8038,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await apiFetch<any>('/api/feed');
             if (!result.success) {
-                this.feedStatus = result.error?.message || '피드를 불러오지 못했어.';
+                this.feedStatus = this.apiMessage(result.error, '피드를 불러오지 못했어.');
                 this.feedItems = [];
                 return;
             }
@@ -8068,7 +8066,7 @@ export class Component implements AfterViewInit, OnDestroy {
         try {
             const result = await apiFetch<any>(`/api/runs/${encodeURIComponent(runId)}/reactions`);
             if (!result.success) {
-                this.profileFeedSocialStatus = result.error?.message || '좋아요와 댓글을 불러오지 못했어.';
+                this.profileFeedSocialStatus = this.apiMessage(result.error, '좋아요와 댓글을 불러오지 못했어.');
                 return;
             }
 
@@ -8115,11 +8113,11 @@ export class Component implements AfterViewInit, OnDestroy {
             ]);
 
             if (!followingResult.success) {
-                this.friendStatus = followingResult.error?.message || '팔로잉 목록을 불러오지 못했어.';
+                this.friendStatus = this.apiMessage(followingResult.error, '팔로잉 목록을 불러오지 못했어.');
                 return;
             }
             if (!followersResult.success) {
-                this.friendStatus = followersResult.error?.message || '팔로워 목록을 불러오지 못했어.';
+                this.friendStatus = this.apiMessage(followersResult.error, '팔로워 목록을 불러오지 못했어.');
                 return;
             }
 
@@ -8147,7 +8145,7 @@ export class Component implements AfterViewInit, OnDestroy {
             if (!result.success) {
                 this.viewedProfileStatus = this.viewedProfile?.id === userId
                     ? ''
-                    : result.error?.message || '프로필을 불러오지 못했어.';
+                    : this.apiMessage(result.error, '프로필을 불러오지 못했어.');
                 return;
             }
 
@@ -8185,7 +8183,7 @@ export class Component implements AfterViewInit, OnDestroy {
             );
             if (requestSeq !== this.rankingRequestSeq) return;
             if (!result.success) {
-                this.rankingStatus = result.message || apiErrorMessage(result.error) || '랭킹을 불러오지 못했어.';
+                this.rankingStatus = this.apiMessage(result.error, '랭킹을 불러오지 못했어.');
                 return;
             }
 
@@ -8267,7 +8265,7 @@ export class Component implements AfterViewInit, OnDestroy {
                     this.refreshDerivedState();
                     this.cycleStatus = '기존 주기 기록 표시 중';
                 } else {
-                    this.cycleStatus = result.message || apiErrorMessage(result.error) || '주기 데이터를 불러오지 못했어.';
+                    this.cycleStatus = this.apiMessage(result.error, '주기 데이터를 불러오지 못했어.');
                 }
             }
             return;
@@ -8346,7 +8344,7 @@ export class Component implements AfterViewInit, OnDestroy {
             if (!result.success || !result.data) {
                 this.weatherDays = new Map();
                 this.weatherCoverage = null;
-                this.weatherStatus = result.error?.message || '날씨 정보 없음';
+                this.weatherStatus = this.apiMessage(result.error, '날씨 정보 없음');
                 this.weatherLocationText = '';
                 this.weatherUpdatedText = '';
                 this.refreshDerivedState();
@@ -8471,12 +8469,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private weatherLocationErrorMessage(error: unknown): string {
-        if (error instanceof Error && error.message) return error.message;
-        if (error && typeof error === 'object') {
-            const message = (error as { message?: unknown }).message;
-            if (typeof message === 'string' && message.trim()) return message.trim();
-        }
-        return '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.';
+        return this.userMessage(error, '위치 권한을 허용하면 현재 위치 기준 날씨를 볼 수 있어.');
     }
 
     private readStoredWeatherPosition(): WeatherPosition | null {
@@ -8554,7 +8547,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     private aiUsageLimitNotice(usage: AiUsage | null): string {
         if (!usage) return '';
-        if (!usage.allowed && usage.message) return usage.message;
+        if (!usage.allowed && usage.message) return this.userMessage(usage.message, '');
         if (usage.reason === 'monthly_limit' || usage.monthly_remaining === 0) {
             return '이번 달 페이서 AI 한도를 모두 사용했어. 다음 달에 다시 이용해줘.';
         }
@@ -8579,7 +8572,7 @@ export class Component implements AfterViewInit, OnDestroy {
         return {
             allowed: source['allowed'] !== false,
             reason,
-            message: typeof source['message'] === 'string' ? source['message'] : '',
+            message: this.userMessage(source['message'], ''),
             action: typeof source['action'] === 'string' ? source['action'] : 'chat',
             day_key: typeof source['day_key'] === 'string' ? source['day_key'] : '',
             month_key: typeof source['month_key'] === 'string' ? source['month_key'] : '',
@@ -8734,7 +8727,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.appleMusicConnection = {
             configured: Boolean(payload?.configured),
             developer_token: typeof payload?.developer_token === 'string' ? payload.developer_token : '',
-            message: typeof payload?.message === 'string' ? payload.message : '',
+            message: this.userMessage(payload?.message, ''),
             setup_steps: Array.isArray(payload?.setup_steps) ? payload.setup_steps : []
         };
     }
@@ -8749,7 +8742,7 @@ export class Component implements AfterViewInit, OnDestroy {
                 await this.loadAppleMusicConnection();
             }
             if (!this.appleMusicConnection.configured) {
-                this.appleMusicStatus = this.appleMusicConnection.message || 'Apple Music 서버 설정이 필요해.';
+                this.appleMusicStatus = this.userMessage(this.appleMusicConnection.message, 'Apple Music 연결 설정이 필요해.');
                 this.showToast(this.appleMusicStatus, 'error');
                 return;
             }
@@ -8907,13 +8900,13 @@ export class Component implements AfterViewInit, OnDestroy {
             configured: Boolean(payload?.configured),
             provider: typeof payload?.provider === 'string' ? payload.provider : 'OpenAI Responses API',
             model: typeof payload?.model === 'string' ? payload.model : '-',
-            message: typeof payload?.message === 'string' ? payload.message : '',
+            message: this.userMessage(payload?.message, ''),
             setup_steps: Array.isArray(payload?.setup_steps) ? payload.setup_steps : [],
             mode: typeof payload?.mode === 'string' ? payload.mode : '',
             codex_supported: Boolean(payload?.codex_supported),
             codex_authenticated: Boolean(payload?.codex_authenticated),
             codex_status: typeof payload?.codex_status === 'string' ? payload.codex_status : '',
-            codex_status_message: typeof payload?.codex_status_message === 'string' ? payload.codex_status_message : '',
+            codex_status_message: this.userMessage(payload?.codex_status_message, ''),
             login_refresh_supported: Boolean(payload?.login_refresh_supported)
         };
     }
@@ -9001,11 +8994,11 @@ export class Component implements AfterViewInit, OnDestroy {
         if (payload && typeof payload === 'object') {
             const source = payload as Record<string, unknown>;
             const message = typeof source['message'] === 'string' ? source['message'].trim() : '';
-            if (message) return message;
+            if (message) return this.userMessage(message, fallback);
 
             const errorCode = typeof source['error_code'] === 'string' ? source['error_code'] : '';
             if (AI_PARSE_CONFIGURATION_ERROR_CODES.has(errorCode)) {
-                return this.aiConnection?.message || 'AI 이미지 파싱 설정을 확인해야 해. OpenAI API 키, 결제 상태, 모델 설정을 확인해줘.';
+                return this.userMessage(this.aiConnection?.message, 'AI 이미지 파싱 설정을 확인해야 해.');
             }
         }
 
@@ -9022,7 +9015,7 @@ export class Component implements AfterViewInit, OnDestroy {
         });
         const payload = await response.json().catch(() => null);
         if (!payload?.success) {
-            return { saved: false, message: payload?.message || '사진/영상을 업로드하지 못했어.' };
+            return { saved: false, message: this.payloadMessage(payload, '사진/영상을 업로드하지 못했어.') };
         }
 
         const rows = Array.isArray(payload.media) ? payload.media : Array.isArray(payload.data) ? payload.data : [];
@@ -9042,7 +9035,7 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!result.success) {
             return {
                 saved: false,
-                message: result.error?.message || '러닝 기록을 저장하지 못했어.'
+                message: this.apiMessage(result.error, '러닝 기록을 저장하지 못했어.')
             };
         }
         if (payload?.success && payload?.data?.date) {
@@ -9059,7 +9052,7 @@ export class Component implements AfterViewInit, OnDestroy {
         void this.loadChallenges();
         return {
             saved: true,
-            message: payload?.message,
+            message: this.payloadMessage(payload, ''),
             run: payload?.data as RunRecord | undefined,
             newlyEarnedBadges
         };
@@ -9208,7 +9201,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.applyAiUsage(payload?.usage, true);
             const reply = payload?.success
                 ? payload?.reply || '답변을 만들지 못했어.'
-                : payload?.message || 'AI 채팅 중 오류가 발생했어.';
+                : this.payloadMessage(payload, 'AI 채팅 중 오류가 발생했어.');
             this.replaceChatMessage(aiMessageIndex, reply, false);
             return;
         }
@@ -13110,7 +13103,19 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private showToast(message: string, type: 'success' | 'error' | 'info' = 'info'): void {
-        this.toast.show(message, type);
+        this.toast.show(this.userMessage(message, '잠깐 문제가 생겼어. 다시 시도해줘'), type);
+    }
+
+    private userMessage(message: unknown, fallback: string): string {
+        return safeUserMessage(message, fallback);
+    }
+
+    private payloadMessage(payload: unknown, fallback: string): string {
+        return payloadUserMessage(payload, fallback);
+    }
+
+    private apiMessage(error: Parameters<typeof apiErrorMessage>[0], fallback: string): string {
+        return apiErrorMessage(error, fallback);
     }
 
     private yearMonthKey(date: Date): string {

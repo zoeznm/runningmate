@@ -1,6 +1,6 @@
 import { OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
-import { jsonRequest } from 'src/app/shared/api';
+import { apiErrorMessage, jsonRequest } from 'src/app/shared/api';
 import { authenticatedUser, clearAuthTokens, ensureAuthenticated } from 'src/app/shared/auth';
 
 type StatusKind = 'info' | 'success' | 'error';
@@ -90,7 +90,7 @@ export class Component implements OnInit {
             }, { retries: 0, timeoutMs: 30000 });
 
             if (!result.success) {
-                this.setStatus(result.error?.message || result.message || '계정 삭제에 실패했습니다.', 'error');
+                this.setStatus(apiErrorMessage(result.error, '계정 삭제에 실패했습니다.'), 'error');
                 return;
             }
 
