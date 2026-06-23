@@ -1549,6 +1549,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private weatherCoverage: WeatherCoverage | null = null;
     private liveRunNativePlugin: any = null;
     private liveRunStartSequence: number = 0;
+    private liveRunCancelTouchStartedAt: number = 0;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
     private runMediaLoadPromise: Promise<boolean> | null = null;
@@ -1601,6 +1602,8 @@ export class Component implements AfterViewInit, OnDestroy {
     };
     private readonly weatherRefreshIntervalMs: number = 30 * 60 * 1000;
     private readonly initialDashboardTaskTimeoutMs: number = 9000;
+    private readonly liveRunNativeCancelTimeoutMs: number = 3500;
+    private readonly confirmBackdropIgnoreMs: number = 500;
     private isCyclePreferenceSaving: boolean = false;
     private readonly initialLoadingStepPriority: string[] = [
         'auth',
@@ -1672,6 +1675,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private previousRootShellText: string = '';
     private previousBodyShellText: string = '';
     private previousAppRootShellText: string = '';
+    private confirmDialogOpenedAt: number = 0;
     private readonly updateDashboardViewportHeight = (): void => {
         this.syncDashboardViewportHeight();
     };
@@ -3726,6 +3730,7 @@ export class Component implements AfterViewInit, OnDestroy {
             tone,
             iconClass: options.iconClass || (tone === 'danger' ? 'fa-triangle-exclamation' : 'fa-circle-question')
         };
+        this.confirmDialogOpenedAt = Date.now();
         this.cdr.detectChanges();
 
         return new Promise((resolve) => {
@@ -3733,9 +3738,20 @@ export class Component implements AfterViewInit, OnDestroy {
         });
     }
 
+    public dismissConfirmDialogFromBackdrop(event?: Event): void {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+        }
+        if (Date.now() - this.confirmDialogOpenedAt < this.confirmBackdropIgnoreMs) return;
+        this.resolveConfirmDialog(false);
+    }
+
     public resolveConfirmDialog(confirmed: boolean): void {
         const resolver = this.confirmDialogResolver;
         this.confirmDialogResolver = null;
+        this.confirmDialogOpenedAt = 0;
         this.confirmDialog = {
             ...this.confirmDialog,
             visible: false
@@ -6244,6 +6260,39 @@ export class Component implements AfterViewInit, OnDestroy {
         }
     }
 
+    private installLiveRunCancelFallback(): void {
+        if (typeof window === 'undefined') return;
+
+        const host = this.elementRef.nativeElement;
+        const options: AddEventListenerOptions = { capture: true, passive: false };
+        const listener = (event: Event): void => {
+            const target = event.target instanceof HTMLElement
+                ? event.target.closest('[data-live-run-cancel="true"]')
+                : null;
+            if (!(target instanceof HTMLElement) || !host.contains(target)) return;
+            if (this.activeScreen !== 'live-run' || this.completedLiveRun) return;
+
+            if (event.type === 'click' && Date.now() - this.liveRunCancelTouchStartedAt < 650) {
+                event.preventDefault();
+                event.stopPropagation();
+                (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+                return;
+            }
+
+            if (event.type === 'touchstart' || event.type === 'pointerdown') {
+                this.liveRunCancelTouchStartedAt = Date.now();
+            }
+
+            this.requestDiscardLiveRun(event);
+            this.cdr.detectChanges();
+        };
+
+        ['pointerdown', 'touchstart', 'click'].forEach((eventName) => {
+            host.addEventListener(eventName, listener, options);
+            this.cleanupHandlers.push(() => host.removeEventListener(eventName, listener, options));
+        });
+    }
+
     private addLiveRunListener(plugin: any, eventName: string, handler: (event: unknown) => void): void {
         if (typeof plugin.addListener !== 'function') return;
 
@@ -6600,6 +6649,7 @@ export class Component implements AfterViewInit, OnDestroy {
         if (event) {
             event.preventDefault();
             event.stopPropagation();
+            (event as Event & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
         }
         if (this.isLiveRunDiscarding || this.confirmDialog.visible) return;
         void this.discardLiveRun();
@@ -6777,7 +6827,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.isLiveRunSaving = false;
             this.liveRunStatus = '러닝 측정 취소 중';
             this.cdr.detectChanges();
-            await this.discardNativeLiveRun(plugin);
+            await this.discardNativeLiveRunWithTimeout(plugin);
             this.liveRun = this.emptyLiveRunMetrics();
             this.liveRunStatus = '러닝 측정을 취소했어.';
             this.showToast('러닝 측정을 저장하지 않고 종료했어.', 'success');
@@ -6791,6 +6841,25 @@ export class Component implements AfterViewInit, OnDestroy {
             this.isLiveRunSaving = false;
             this.isLiveRunDiscarding = false;
             this.cdr.detectChanges();
+        }
+    }
+
+    private async discardNativeLiveRunWithTimeout(plugin: any): Promise<void> {
+        if (typeof window === 'undefined') {
+            await this.discardNativeLiveRun(plugin);
+            return;
+        }
+
+        let timeoutId: number | null = null;
+        try {
+            await Promise.race([
+                this.discardNativeLiveRun(plugin),
+                new Promise<void>((resolve) => {
+                    timeoutId = window.setTimeout(resolve, this.liveRunNativeCancelTimeoutMs);
+                })
+            ]);
+        } finally {
+            if (timeoutId !== null) window.clearTimeout(timeoutId);
         }
     }
 
@@ -6996,6 +7065,7 @@ export class Component implements AfterViewInit, OnDestroy {
         this.installDashboardViewportSync();
         this.installAgreementLoadingMessageSync();
         this.installLiveRunListeners();
+        this.installLiveRunCancelFallback();
 
         this.bindNativeClick('[data-screen]', (target) => {
             const screen = target.dataset.screen as ScreenKey | undefined;

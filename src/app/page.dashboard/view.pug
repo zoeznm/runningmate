@@ -76,6 +76,9 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             [disabled]="isLiveRunDiscarding",
                             aria-label="저장하지 않고 러닝 종료",
                             title="저장하지 않고 러닝 종료",
+                            data-live-run-cancel="true",
+                            (pointerdown)="requestDiscardLiveRun($event)",
+                            (touchstart)="requestDiscardLiveRun($event)",
                             (pointerup)="requestDiscardLiveRun($event)",
                             (touchend)="requestDiscardLiveRun($event)",
                             (click)="requestDiscardLiveRun($event)")
@@ -2822,7 +2825,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         button(type="button", class="onboarding-confirm-primary", [disabled]="isOnboardingSaving", (click)="confirmOnboardingSkip()")
                             span {{isOnboardingSaving ? '처리 중' : '건너뛰기'}}
 
-            div(*ngIf="confirmDialog.visible", class="app-confirm-backdrop", role="presentation", (click)="resolveConfirmDialog(false)")
+            div(*ngIf="confirmDialog.visible", class="app-confirm-backdrop", role="presentation", (click)="dismissConfirmDialogFromBackdrop($event)")
                 section(
                     class="app-confirm-dialog",
                     [ngClass]="'app-confirm-dialog-' + confirmDialog.tone",

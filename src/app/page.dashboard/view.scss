@@ -2319,6 +2319,8 @@ button span {
     display: flex;
     align-items: flex-start;
     gap: 12px;
+    min-height: 44px;
+    padding-left: 52px;
 }
 
 .live-run-active-head > div:not(.live-run-active-chip) {
@@ -2330,19 +2332,24 @@ button span {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    position: relative;
-    z-index: 3;
+    position: absolute;
+    top: max(14px, calc(env(safe-area-inset-top, 0px) + 10px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    z-index: 1200;
     flex: 0 0 auto;
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     border: 0;
     border-radius: 999px;
     background: color-mix(in srgb, var(--primary-ink) 10%, transparent);
     color: var(--primary-ink);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 17px;
     pointer-events: auto;
     touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
     -webkit-appearance: none;
     appearance: none;
 }
