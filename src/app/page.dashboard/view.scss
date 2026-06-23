@@ -126,6 +126,8 @@ button span {
 .app-wrapper.live-run-screen-mode {
     --live-run-screen-bg: var(--primary-fill);
     --live-run-screen-ink: var(--primary-ink);
+    --live-run-save-bg: var(--primary-ink);
+    --live-run-save-ink: var(--primary-fill);
     --dashboard-screen-bg: var(--live-run-screen-bg);
     --screen-bg: var(--live-run-screen-bg);
     background: var(--live-run-screen-bg);
@@ -136,6 +138,8 @@ button span {
     --live-run-screen-bg: #000000;
     --live-run-screen-ink: #ffffff;
     --primary-ink: #ffffff;
+    --live-run-save-bg: #ffffff;
+    --live-run-save-ink: #000000;
     --screen-bg: #000000;
     --dashboard-screen-bg: #000000;
 }
@@ -144,6 +148,8 @@ button span {
     --live-run-screen-bg: #ffffff;
     --live-run-screen-ink: #1a1a2e;
     --primary-ink: #1a1a2e;
+    --live-run-save-bg: #000000;
+    --live-run-save-ink: #ffffff;
     --screen-bg: #ffffff;
     --dashboard-screen-bg: #ffffff;
 }
@@ -2510,8 +2516,8 @@ button span {
 }
 
 .live-run-save-action {
-    background: var(--primary-ink);
-    color: var(--primary-fill);
+    background: var(--live-run-save-bg, var(--primary-ink));
+    color: var(--live-run-save-ink, var(--primary-fill));
 }
 
 .live-run-pause-action:disabled,
