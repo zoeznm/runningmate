@@ -81,7 +81,7 @@ private struct RunMateWeeklyGoalView: View {
     private func statusLabel(font: Font) -> some View {
         Text(statusText)
             .font(font)
-            .foregroundStyle(.primary)
+            .foregroundStyle(RunMateWeeklyGoalTheme.foreground)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .multilineTextAlignment(.center)
@@ -90,7 +90,8 @@ private struct RunMateWeeklyGoalView: View {
 
     private var circularView: some View {
         ZStack {
-            AccessoryWidgetBackground()
+            Circle()
+                .fill(RunMateWeeklyGoalTheme.background)
             RunMateGoalCircles(progress: entry.progress, size: 7, checkSize: 4, spacing: 2)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 6)
@@ -143,13 +144,13 @@ private struct RunMateGoalCircle: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(isCompleted ? RunMateWeeklyGoalTheme.accent : Color.primary.opacity(0.08))
+                .fill(isCompleted ? RunMateWeeklyGoalTheme.accent : RunMateWeeklyGoalTheme.foreground.opacity(0.10))
             Circle()
-                .stroke(isCompleted ? RunMateWeeklyGoalTheme.accent : Color.primary.opacity(0.34), lineWidth: 1.2)
+                .stroke(isCompleted ? RunMateWeeklyGoalTheme.accent : RunMateWeeklyGoalTheme.foreground.opacity(0.38), lineWidth: 1.2)
             if isCompleted {
                 Image(systemName: "checkmark")
                     .font(.system(size: checkSize, weight: .black))
-                    .foregroundStyle(.black)
+                    .foregroundStyle(RunMateWeeklyGoalTheme.checkmark)
             }
         }
         .frame(width: size, height: size)
@@ -157,8 +158,10 @@ private struct RunMateGoalCircle: View {
 }
 
 private enum RunMateWeeklyGoalTheme {
-    static let background = Color(red: 0.02, green: 0.055, blue: 0.048)
-    static let accent = Color(red: 0.14, green: 0.84, blue: 0.71)
+    static let background = Color(red: 36 / 255, green: 214 / 255, blue: 181 / 255)
+    static let foreground = Color.black
+    static let accent = Color.black
+    static let checkmark = Color.white
 }
 
 private extension View {
@@ -166,16 +169,10 @@ private extension View {
     func runMateWidgetContainerBackground(for family: WidgetFamily) -> some View {
         if #available(iOSApplicationExtension 17.0, *) {
             containerBackground(for: .widget) {
-                if family == .systemSmall {
-                    RunMateWeeklyGoalTheme.background
-                } else {
-                    Color.clear
-                }
+                RunMateWeeklyGoalTheme.background
             }
-        } else if family == .systemSmall {
-            background(RunMateWeeklyGoalTheme.background)
         } else {
-            self
+            background(RunMateWeeklyGoalTheme.background)
         }
     }
 }
