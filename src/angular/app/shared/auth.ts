@@ -59,9 +59,8 @@ function safeRemove(target: Storage | null, key: string): void {
 function authStorage(): Storage | null {
     const local = storage('local');
     const session = storage('session');
-    if (safeGet(local, AUTO_LOGIN_KEY) === '1' && safeGet(local, ACCESS_TOKEN_KEY)) return local;
-    if (safeGet(session, ACCESS_TOKEN_KEY)) return session;
-    if (safeGet(local, ACCESS_TOKEN_KEY)) return local;
+    if (safeGet(local, AUTO_LOGIN_KEY) === '1' && (safeGet(local, ACCESS_TOKEN_KEY) || safeGet(local, REFRESH_TOKEN_KEY))) return local;
+    if (safeGet(session, ACCESS_TOKEN_KEY) || safeGet(session, REFRESH_TOKEN_KEY)) return session;
     return session || local;
 }
 
@@ -127,6 +126,10 @@ export function getRefreshToken(): string {
     return safeGet(authStorage(), REFRESH_TOKEN_KEY) || memoryRefreshToken || '';
 }
 
+export function hasAuthTokens(): boolean {
+    return Boolean(getAccessToken() || getRefreshToken());
+}
+
 function tokenValue(payload: AuthTokenPayload | null | undefined, key: 'access_token' | 'refresh_token'): string {
     if (!payload) return '';
     const source = payload as Record<string, any>;
@@ -158,9 +161,12 @@ export function saveAuthTokens(payload: AuthTokenPayload | null | undefined, aut
         return safeGet(target, ACCESS_TOKEN_KEY) === accessToken && safeGet(target, REFRESH_TOKEN_KEY) === refreshToken;
     };
 
-    const primary = storage(autoLogin ? 'local' : 'session');
-    const fallback = storage(autoLogin ? 'session' : 'local');
-    return write(primary, autoLogin) || write(fallback, autoLogin) || true;
+    if (autoLogin) {
+        return write(storage('local'), true) || write(storage('session'), true) || true;
+    }
+
+    write(storage('session'), false);
+    return true;
 }
 
 export function clearAuthTokens(): void {
@@ -275,7 +281,7 @@ export function installAuthFetchInterceptor(): void {
     window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => fetchWithAuth(input, init || {})) as typeof window.fetch;
 }
 
-export async function authenticatedUser(): Promise<unknown | null> {
+export async function authenticatedUser(retry: boolean = true): Promise<unknown | null> {
     const fetcher = nativeFetch || window.fetch.bind(window);
     const response = await fetchWithTimeout(fetcher, '/api/auth/me', {
         cache: 'no-store',
@@ -285,7 +291,12 @@ export async function authenticatedUser(): Promise<unknown | null> {
     if (!response) return null;
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-        if (response.status === 401) handleAuthFailure();
+        if (response.status === 401) {
+            if (retry && getRefreshToken() && await refreshAuthTokens()) {
+                return authenticatedUser(false);
+            }
+            handleAuthFailure();
+        }
         return null;
     }
     if (payload?.success) return payload.data || null;

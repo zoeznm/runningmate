@@ -55,11 +55,13 @@
     <key>CFBundleShortVersionString</key>
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <string>5</string>
     <key>NSHealthShareUsageDescription</key>
     <string>러닝 중 심박수, 거리, 칼로리, 걸음 수를 실시간으로 측정하고 러닝 기록을 저장하기 위해 건강 데이터를 사용합니다.</string>
     <key>NSHealthUpdateUsageDescription</key>
     <string>Apple Watch 러닝 운동 세션과 운동 데이터를 건강 앱에 기록하기 위해 건강 데이터를 사용합니다.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Apple Watch만으로 러닝할 때 거리와 경로를 측정하기 위해 위치 정보를 사용합니다.</string>
     <key>WKApplication</key>
     <true/>
     <key>WKBackgroundModes</key>

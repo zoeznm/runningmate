@@ -7,7 +7,8 @@ final class RunningMateLiveActivityController {
 
     private var currentActivity: Activity<RunningMateLiveRunAttributes>?
     private var lastUpdateAt: Date = .distantPast
-    private let minimumUpdateInterval: TimeInterval = 3
+    private var lastContentSignature: String?
+    private let minimumUpdateInterval: TimeInterval = 1
 
     private init() { }
 
@@ -34,6 +35,7 @@ final class RunningMateLiveActivityController {
         do {
             currentActivity = try Activity.request(attributes: attributes, contentState: state, pushType: nil)
             lastUpdateAt = Date()
+            lastContentSignature = contentSignature(for: state)
         } catch {
             currentActivity = nil
         }
@@ -48,13 +50,16 @@ final class RunningMateLiveActivityController {
         guard let activity = currentActivity else { return }
 
         let status = stringValue(payload["status"], defaultValue: "running")
+        let state = contentState(from: payload)
+        let signature = contentSignature(for: state)
         let shouldUpdate = force
             || status != "running"
+            || signature != lastContentSignature
             || Date().timeIntervalSince(lastUpdateAt) >= minimumUpdateInterval
         guard shouldUpdate else { return }
 
         lastUpdateAt = Date()
-        let state = contentState(from: payload)
+        lastContentSignature = signature
         Task {
             await activity.update(using: state)
         }
@@ -67,6 +72,7 @@ final class RunningMateLiveActivityController {
 
         guard let activity = activity else { return }
         let state = contentState(from: payload)
+        lastContentSignature = contentSignature(for: state)
         Task {
             await activity.end(using: state, dismissalPolicy: .default)
         }
@@ -75,8 +81,11 @@ final class RunningMateLiveActivityController {
     private func contentState(from payload: [String: Any]) -> RunningMateLiveRunAttributes.ContentState {
         let status = stringValue(payload["status"], defaultValue: "running")
         let distanceKm = doubleValue(payload["distance_km"])
-        let elapsedText = stringValue(payload["duration"], defaultValue: "00:00:00")
-        let pace = stringValue(payload["avg_pace"], defaultValue: "-")
+        let durationFallback = durationText(intValue(payload["duration_seconds"] ?? payload["durationSeconds"]) ?? 0)
+        let elapsedText = stringValue(payload["duration"], defaultValue: durationFallback)
+        let currentPace = stringValue(payload["current_pace"] ?? payload["currentPace"], defaultValue: "-")
+        let averagePace = stringValue(payload["avg_pace"] ?? payload["avgPace"], defaultValue: "-")
+        let pace = currentPace == "-" ? averagePace : currentPace
         let heartRate = intValue(payload["heart_rate"]) ?? intValue(payload["avg_heart_rate"])
         let cadence = intValue(payload["cadence"])
         let calories = intValue(payload["calories"])
@@ -103,6 +112,19 @@ final class RunningMateLiveActivityController {
         default:
             return "러닝 중"
         }
+    }
+
+    private func contentSignature(for state: RunningMateLiveRunAttributes.ContentState) -> String {
+        [
+            state.status,
+            state.statusText,
+            state.distanceText,
+            state.elapsedText,
+            state.paceText,
+            state.heartRateText,
+            state.cadenceText,
+            state.caloriesText
+        ].joined(separator: "|")
     }
 
     private func runTypeText(_ runType: String) -> String {
@@ -140,6 +162,11 @@ final class RunningMateLiveActivityController {
             return int
         }
         return nil
+    }
+
+    private func durationText(_ seconds: Int) -> String {
+        let total = max(0, seconds)
+        return String(format: "%02d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
     }
 
     private func doubleValue(_ value: Any?) -> Double {
