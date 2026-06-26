@@ -67,7 +67,7 @@ private struct RunMateLiveRunLockView: View {
                     Text("RunMate")
                         .font(.subheadline.weight(.black))
                         .foregroundStyle(.white)
-                    Text("\(context.attributes.runTypeText) · \(context.state.statusText)")
+                    Text(context.state.statusText)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.68))
                 }

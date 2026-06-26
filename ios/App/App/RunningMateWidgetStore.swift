@@ -35,15 +35,6 @@ enum RunningMateWidgetStore {
 
     static func weeklyProgress(referenceDate: Date = Date()) -> RunningMateWeeklyProgress {
         let interval = weekInterval(containing: referenceDate)
-        guard defaults.string(forKey: syncedWeekKey) == weekKey(for: interval.start) else {
-            return RunningMateWeeklyProgress(
-                weekStart: interval.start,
-                weekEnd: interval.end,
-                goalCount: weeklyGoalCount,
-                completedRuns: []
-            )
-        }
-
         let runs = loadCompletedRuns()
             .filter { $0.endDate >= interval.start && $0.endDate < interval.end }
             .sorted { $0.endDate < $1.endDate }
@@ -101,6 +92,7 @@ enum RunningMateWidgetStore {
             durationSeconds: durationSeconds
         ))
         saveCompletedRuns(runs)
+        markSyncedWeek(containing: endDate)
         reloadWeeklyGoalWidget()
     }
 
@@ -121,29 +113,43 @@ enum RunningMateWidgetStore {
 
         guard didChange else { return }
         saveCompletedRuns(runs)
+        markSyncedWeek(containing: Date())
         reloadWeeklyGoalWidget()
     }
 
     @discardableResult
     static func replaceCompletedRuns(from workouts: [[String: Any]]) -> Int {
         let interval = weekInterval(containing: Date())
-        var runs: [RunningMateCompletedRunRecord] = []
-
-        for workout in workouts {
+        let syncedRuns = workouts.compactMap { workout -> RunningMateCompletedRunRecord? in
             guard let parsed = record(from: workout),
                   qualifies(distanceKm: parsed.distanceKm, durationSeconds: parsed.durationSeconds),
                   parsed.endDate >= interval.start,
-                  parsed.endDate < interval.end,
-                  !containsDuplicateRun(in: runs, id: parsed.id, startDate: parsed.startDate, endDate: parsed.endDate) else {
-                continue
+                  parsed.endDate < interval.end else {
+                return nil
             }
-            runs.append(parsed)
+            return parsed
         }
 
-        saveCompletedRuns(runs)
-        defaults.set(weekKey(for: interval.start), forKey: syncedWeekKey)
-        reloadWeeklyGoalWidget()
-        return runs.count
+        guard !syncedRuns.isEmpty else {
+            return weeklyProgress().completedCount
+        }
+
+        var runs = loadCompletedRuns()
+        var didChange = false
+        for run in syncedRuns {
+            guard !containsDuplicateRun(in: runs, id: run.id, startDate: run.startDate, endDate: run.endDate) else {
+                continue
+            }
+            runs.append(run)
+            didChange = true
+        }
+
+        if didChange {
+            saveCompletedRuns(runs)
+            reloadWeeklyGoalWidget()
+        }
+        markSyncedWeek(containing: interval.start)
+        return weeklyProgress().completedCount
     }
 
     private static func record(from workout: [String: Any]) -> RunningMateCompletedRunRecord? {
@@ -209,6 +215,11 @@ enum RunningMateWidgetStore {
         if #available(iOS 14.0, *) {
             WidgetCenter.shared.reloadTimelines(ofKind: weeklyGoalWidgetKind)
         }
+    }
+
+    private static func markSyncedWeek(containing date: Date) {
+        let interval = weekInterval(containing: date)
+        defaults.set(weekKey(for: interval.start), forKey: syncedWeekKey)
     }
 
     private static var defaults: UserDefaults {

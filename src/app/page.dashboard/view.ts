@@ -1494,6 +1494,8 @@ export class Component implements AfterViewInit, OnDestroy {
     public isLiveRunSaving: boolean = false;
     public isLiveRunDiscarding: boolean = false;
     public liveRunDiscardConfirmVisible: boolean = false;
+    public liveRunRouteMapImageUrl: string = '';
+    public isLiveRunRouteMapRendering: boolean = false;
     public aiConnection: AiConnection | null = null;
     public chatText: string = '';
     public isChatSending: boolean = false;
@@ -1552,6 +1554,10 @@ export class Component implements AfterViewInit, OnDestroy {
     private liveRunNativePlugin: any = null;
     private liveRunStartSequence: number = 0;
     private liveRunCancelTouchStartedAt: number = 0;
+    private liveRunRouteMapRenderToken: number = 0;
+    private liveRunSnapshotRefreshInFlight: boolean = false;
+    private lastLiveRunSnapshotRefreshAt: number = 0;
+    private pendingWatchRunSyncing: boolean = false;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
     private runMediaLoadPromise: Promise<boolean> | null = null;
@@ -1665,6 +1671,10 @@ export class Component implements AfterViewInit, OnDestroy {
     private dashboardThemeMeta: HTMLMetaElement | null = null;
     private dashboardAppRootElement: HTMLElement | null = null;
     private dashboardChromeSyncTimers: number[] = [];
+    private pendingLiveRunPauseState: boolean | null = null;
+    private liveRunChromeOverride:
+        | { background: string; textColor: string; expiresAt: number }
+        | null = null;
     private previousDashboardThemeColor: string = '';
     private previousRootBackground: string = '';
     private previousBodyBackground: string = '';
@@ -2548,7 +2558,6 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get calendarMediaDraftButtonText(): string {
-        if (this.isUploading) return '업로드 중';
         return this.calendarMediaDraftFiles.length ? '추가 선택' : '사진/영상 추가';
     }
 
@@ -4736,8 +4745,14 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    public toggleCalendarUploadExpanded(): void {
+    public toggleCalendarUploadExpanded(event?: Event): void {
+        event?.preventDefault();
+        event?.stopPropagation();
+
         this.calendarUploadExpanded = !this.calendarUploadExpanded;
+        if (!this.calendarUploadExpanded && this.manualEntryVisible && !this.manualEntryRunId) {
+            this.manualEntryVisible = false;
+        }
         this.cdr.detectChanges();
     }
 
@@ -5313,7 +5328,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public openRunMediaPicker(run: CalendarRunDetail, input: HTMLInputElement): void {
-        if (!run?.id || this.uploadingMediaRunId) return;
+        if (!run?.id || this.uploadingMediaRunId || this.isUploading || this.isManualRunSaving) return;
 
         this.pendingMediaRunId = run.id;
         input.value = '';
@@ -6243,7 +6258,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
         this.addLiveRunListener(plugin, 'liveRunUpdate', (event) => {
             this.applyLiveRunMetrics(event);
-            if (this.liveRun.status === 'running') {
+            if (this.liveRun.status === 'running' && this.pendingLiveRunPauseState !== true) {
                 this.liveRunStatus = '러닝 측정 중';
             }
         });
@@ -6254,18 +6269,61 @@ export class Component implements AfterViewInit, OnDestroy {
             this.liveRunStatus = this.liveRunErrorMessage(event, '실시간 러닝 측정 중 오류가 발생했어.');
             this.cdr.detectChanges();
         });
+        this.addLiveRunListener(plugin, 'watchStandaloneRunEnded', () => {
+            void this.syncPendingWatchRuns('watch_event');
+        });
 
-        if (typeof plugin.getLiveRunSnapshot === 'function') {
-            plugin.getLiveRunSnapshot()
-                .then((snapshot: unknown) => {
-                    const metrics = this.normalizeLiveRunMetrics(snapshot);
-                    if (metrics.active) {
-                        this.liveRun = metrics;
-                        this.liveRunStatus = metrics.status === 'paused' ? '일시정지됨' : '러닝 측정 중';
-                        this.cdr.detectChanges();
+        void this.refreshLiveRunSnapshot('startup');
+
+        if (typeof window !== 'undefined') {
+            const refreshOnResume = (): void => {
+                void this.refreshLiveRunSnapshot('resume');
+            };
+            window.addEventListener('focus', refreshOnResume);
+            window.addEventListener('pageshow', refreshOnResume);
+            this.cleanupHandlers.push(() => window.removeEventListener('focus', refreshOnResume));
+            this.cleanupHandlers.push(() => window.removeEventListener('pageshow', refreshOnResume));
+            if (typeof document !== 'undefined') {
+                const refreshOnVisible = (): void => {
+                    if (document.visibilityState === 'visible') {
+                        void this.refreshLiveRunSnapshot('visible');
                     }
-                })
-                .catch(() => null);
+                };
+                document.addEventListener('visibilitychange', refreshOnVisible);
+                this.cleanupHandlers.push(() => document.removeEventListener('visibilitychange', refreshOnVisible));
+            }
+        }
+
+        void this.syncPendingWatchRuns('startup');
+    }
+
+    private async refreshLiveRunSnapshot(reason: string): Promise<void> {
+        const plugin = this.liveRunPlugin();
+        if (!plugin || typeof plugin.getLiveRunSnapshot !== 'function') return;
+        const now = Date.now();
+        if (this.liveRunSnapshotRefreshInFlight) return;
+        if (reason !== 'startup' && now - this.lastLiveRunSnapshotRefreshAt < 700) return;
+
+        this.liveRunSnapshotRefreshInFlight = true;
+        this.lastLiveRunSnapshotRefreshAt = now;
+        try {
+            const metrics = this.normalizeLiveRunMetrics(await plugin.getLiveRunSnapshot());
+            if (metrics.active) {
+                this.applyLiveRunMetrics(metrics);
+                this.liveRunStatus = metrics.status === 'paused' ? '일시정지됨' : '러닝 측정 중';
+                return;
+            }
+            if (this.isLiveRunActive) {
+                this.liveRunStatus = '러닝 세션을 다시 확인하는 중';
+                this.cdr.detectChanges();
+            }
+        } catch {
+            if (this.isLiveRunActive) {
+                this.liveRunStatus = '러닝 세션을 다시 확인하는 중';
+                this.cdr.detectChanges();
+            }
+        } finally {
+            this.liveRunSnapshotRefreshInFlight = false;
         }
     }
 
@@ -6339,6 +6397,7 @@ export class Component implements AfterViewInit, OnDestroy {
         const previousBackground = this.dashboardScreenBackground();
         const previousTextColor = this.dashboardShellTextColor();
         this.liveRun = this.normalizeLiveRunMetrics(value);
+        this.liveRunChromeOverride = null;
         if (previousBackground !== this.dashboardScreenBackground() || previousTextColor !== this.dashboardShellTextColor()) {
             this.syncDashboardChrome();
         }
@@ -6413,6 +6472,106 @@ export class Component implements AfterViewInit, OnDestroy {
             end_location: endLocation,
             route_points: routePoints
         };
+    }
+
+    private async syncPendingWatchRuns(reason: 'startup' | 'watch_event' = 'startup'): Promise<void> {
+        if (this.pendingWatchRunSyncing) return;
+        const plugin = this.liveRunPlugin();
+        if (!isNativeLocalOrigin() || !plugin?.getPendingWatchRuns) return;
+
+        this.pendingWatchRunSyncing = true;
+        try {
+            if (!(await ensureAuthenticated())) return;
+
+            const result = await plugin.getPendingWatchRuns();
+            const pendingRuns = Array.isArray(result?.runs) ? result.runs : [];
+            if (!pendingRuns.length) return;
+
+            let savedCount = 0;
+            for (const run of pendingRuns) {
+                if (await this.savePendingWatchRun(run, plugin)) {
+                    savedCount += 1;
+                }
+            }
+
+            if (savedCount > 0) {
+                this.showToast(
+                    savedCount === 1
+                        ? 'Apple Watch 단독 러닝 기록을 저장했어.'
+                        : `Apple Watch 단독 러닝 기록 ${savedCount}개를 저장했어.`,
+                    'success'
+                );
+                await this.loadRuns(false, true, true);
+                this.refreshDerivedState();
+                this.cdr.detectChanges();
+            } else if (reason === 'watch_event') {
+                this.cdr.detectChanges();
+            }
+        } finally {
+            this.pendingWatchRunSyncing = false;
+        }
+    }
+
+    private async savePendingWatchRun(value: unknown, plugin: any): Promise<boolean> {
+        const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+        const metrics = this.normalizeLiveRunMetrics({
+            ...source,
+            status: 'stopped',
+            active: false,
+            metrics_source: source['metrics_source'] || 'apple_watch_standalone'
+        });
+        const watchRunId = typeof source['id'] === 'string' && source['id'] ? source['id'] : metrics.id;
+        const distanceKm = this.round2(metrics.distance_km || 0);
+
+        if (distanceKm <= 0.01) {
+            if (watchRunId && plugin?.ackPendingWatchRun) {
+                try {
+                    await plugin.ackPendingWatchRun({ id: watchRunId });
+                } catch {
+                    return false;
+                }
+            }
+            return false;
+        }
+
+        const startedDate = typeof source['date'] === 'string' && source['date']
+            ? source['date']
+            : this.chatDateKey(metrics.started_at) || this.todayDateKey;
+        const payload: RunRecord & { raw_parsed_json?: Record<string, unknown> } = {
+            id: watchRunId || null,
+            date: startedDate,
+            distance_km: distanceKm,
+            avg_pace: metrics.avg_pace && metrics.avg_pace !== '-' ? metrics.avg_pace : null,
+            duration: metrics.duration || null,
+            run_type: this.normalizeRunType(metrics.run_type || 'jogging'),
+            calories: this.toNumber(metrics.calories),
+            avg_heart_rate: this.toNumber(metrics.avg_heart_rate ?? metrics.heart_rate),
+            cadence: this.toNumber(metrics.cadence),
+            elevation_gain: this.toNumber(metrics.elevation_gain_m),
+            is_public: this.calendarUploadIsPublic,
+            raw_parsed_json: {
+                source: 'apple_watch_standalone',
+                started_at: metrics.started_at || null,
+                ended_at: metrics.ended_at || null,
+                route_points: metrics.route_points || [],
+                start_location: metrics.start_location || null,
+                end_location: metrics.end_location || null,
+                watch_payload: source
+            }
+        };
+
+        const saved = await this.saveRunRecord(payload);
+        if (!saved.saved) return false;
+
+        if (watchRunId && plugin?.ackPendingWatchRun) {
+            try {
+                await plugin.ackPendingWatchRun({ id: watchRunId });
+            } catch {
+                return false;
+            }
+        }
+        this.upsertRunRecord(saved.run || payload, { loadRelatedData: false });
+        return true;
     }
 
     private normalizeLiveRunRoutePoint(value: unknown): LiveRunRoutePoint | null {
@@ -6525,7 +6684,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get isLiveRunPaused(): boolean {
-        return this.liveRun.status === 'paused';
+        return this.pendingLiveRunPauseState ?? this.liveRun.status === 'paused';
     }
 
     public get homeLiveRunButtonText(): string {
@@ -6579,6 +6738,14 @@ export class Component implements AfterViewInit, OnDestroy {
         return this.distanceText(this.completedLiveRun?.distance_km || 0);
     }
 
+    public get completedLiveRunDistanceValueText(): string {
+        return this.formatDistance(this.completedLiveRun?.distance_km || 0);
+    }
+
+    public get completedLiveRunDistanceUnitText(): string {
+        return this.distanceUnitLabel === 'mile' ? '마일' : '킬로미터';
+    }
+
     public get completedLiveRunPaceText(): string {
         const pace = this.completedLiveRun?.avg_pace;
         return pace && pace !== '-' ? this.displayPace(pace) : '-';
@@ -6599,9 +6766,23 @@ export class Component implements AfterViewInit, OnDestroy {
         return cadence !== null ? `${Math.round(cadence)} spm` : '-';
     }
 
+    public get completedLiveRunCaloriesText(): string {
+        const calories = this.toNumber(this.completedLiveRun?.calories);
+        return calories !== null ? `${Math.round(calories)}` : '-';
+    }
+
+    public get completedLiveRunElevationText(): string {
+        const elevation = this.toNumber(this.completedLiveRun?.elevation_gain_m);
+        return elevation !== null ? `${Math.round(elevation)} m` : '-';
+    }
+
     public get completedLiveRunDateText(): string {
         const date = this.completedLiveRunDateKey;
         return date ? this.displayDate(date, true) : '오늘 러닝';
+    }
+
+    public get hasCompletedLiveRunRoute(): boolean {
+        return this.completedLiveRunRoutePoints.length > 0;
     }
 
     public get completedLiveRunRouteText(): string {
@@ -6616,9 +6797,127 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get liveRunRoutePolyline(): string {
-        const points = this.completedLiveRunRoutePoints;
+        const points = this.liveRunRouteViewportPoints();
         if (!points.length) return '12,72 28,55 46,60 63,36 86,28';
         if (points.length === 1) return '50,50 50,50';
+        return points.map((point) => `${point.x},${point.y}`).join(' ');
+    }
+
+    public get liveRunMapFallbackVisible(): boolean {
+        return !this.liveRunRouteMapImageUrl && !this.isLiveRunRouteMapRendering;
+    }
+
+    public get liveRunMapEmbedUrl(): string {
+        const points = this.completedLiveRunRoutePoints;
+        if (!points.length) return '';
+
+        const lats = points.map((point) => point.lat);
+        const lngs = points.map((point) => point.lng);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const latPad = Math.max((maxLat - minLat) * 0.28, 0.002);
+        const lngPad = Math.max((maxLng - minLng) * 0.28, 0.002);
+        const bbox = [
+            minLng - lngPad,
+            minLat - latPad,
+            maxLng + lngPad,
+            maxLat + latPad
+        ].map((value) => value.toFixed(6)).join('%2C');
+        const marker = points[points.length - 1] || points[0];
+
+        return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${marker.lat.toFixed(6)}%2C${marker.lng.toFixed(6)}`;
+    }
+
+    public get liveRunMapStartPinStyle(): Record<string, string> {
+        return this.liveRunMapPinStyle(0);
+    }
+
+    public get liveRunMapEndPinStyle(): Record<string, string> {
+        return this.liveRunMapPinStyle(-1);
+    }
+
+    private get completedLiveRunDateKey(): string {
+        return this.chatDateKey(this.completedLiveRun?.started_at)
+            || this.selectedCalendarDate
+            || this.todayDateKey;
+    }
+
+    private get completedLiveRunRoutePoints(): LiveRunRoutePoint[] {
+        return this.liveRunRoutePointsFor(this.completedLiveRun);
+    }
+
+    private liveRunRoutePointsFor(metrics: LiveRunMetrics | null): LiveRunRoutePoint[] {
+        if (!metrics) return [];
+        const points = metrics.route_points?.length ? [...metrics.route_points] : [];
+        if (!points.length && metrics.start_location) points.push(metrics.start_location);
+        if (metrics.end_location && !points.some((point) => point.lat === metrics.end_location?.lat && point.lng === metrics.end_location?.lng)) {
+            points.push(metrics.end_location);
+        }
+        return points;
+    }
+
+    private clearLiveRunRouteMap(): void {
+        this.liveRunRouteMapRenderToken += 1;
+        this.liveRunRouteMapImageUrl = '';
+        this.isLiveRunRouteMapRendering = false;
+    }
+
+    private async renderCompletedLiveRunRouteMap(metrics: LiveRunMetrics): Promise<void> {
+        const points = this.liveRunRoutePointsFor(metrics);
+        const token = ++this.liveRunRouteMapRenderToken;
+        this.liveRunRouteMapImageUrl = '';
+        this.isLiveRunRouteMapRendering = points.length > 0;
+        this.cdr.detectChanges();
+
+        if (!points.length) {
+            this.isLiveRunRouteMapRendering = false;
+            this.cdr.detectChanges();
+            return;
+        }
+
+        const plugin = this.liveRunPlugin();
+        if (!isNativeLocalOrigin() || !plugin?.renderRunRouteMap) {
+            this.isLiveRunRouteMapRendering = false;
+            this.cdr.detectChanges();
+            return;
+        }
+
+        try {
+            const width = this.liveRunRouteMapSnapshotWidth();
+            const result = await plugin.renderRunRouteMap({
+                routePoints: points,
+                distanceKm: metrics.distance_km || 0,
+                width,
+                height: Math.round(width * 0.82),
+                scale: Math.min(Math.max(window.devicePixelRatio || 2, 1), 3),
+                includeLocationLabel: true
+            });
+            if (token !== this.liveRunRouteMapRenderToken) return;
+            const imageDataUrl = typeof result?.imageDataUrl === 'string' ? result.imageDataUrl : '';
+            this.liveRunRouteMapImageUrl = imageDataUrl.startsWith('data:image/png;base64,') ? imageDataUrl : '';
+        } catch {
+            if (token !== this.liveRunRouteMapRenderToken) return;
+            this.liveRunRouteMapImageUrl = '';
+        } finally {
+            if (token === this.liveRunRouteMapRenderToken) {
+                this.isLiveRunRouteMapRendering = false;
+                this.cdr.detectChanges();
+            }
+        }
+    }
+
+    private liveRunRouteMapSnapshotWidth(): number {
+        if (typeof window === 'undefined') return 680;
+        const viewportWidth = Math.max(320, Math.round(window.innerWidth || 390));
+        return Math.max(320, Math.min(900, viewportWidth - 32));
+    }
+
+    private liveRunRouteViewportPoints(): Array<{ x: number; y: number }> {
+        const points = this.completedLiveRunRoutePoints;
+        if (!points.length) return [];
+        if (points.length === 1) return [{ x: 50, y: 50 }];
 
         const lats = points.map((point) => point.lat);
         const lngs = points.map((point) => point.lng);
@@ -6631,28 +6930,20 @@ export class Component implements AfterViewInit, OnDestroy {
         const padding = 12;
         const size = 100 - padding * 2;
 
-        return points.map((point) => {
-            const x = padding + ((point.lng - minLng) / lngSpan) * size;
-            const y = padding + (1 - ((point.lat - minLat) / latSpan)) * size;
-            return `${this.round2(x)},${this.round2(y)}`;
-        }).join(' ');
+        return points.map((point) => ({
+            x: this.round2(padding + ((point.lng - minLng) / lngSpan) * size),
+            y: this.round2(padding + (1 - ((point.lat - minLat) / latSpan)) * size)
+        }));
     }
 
-    private get completedLiveRunDateKey(): string {
-        return this.chatDateKey(this.completedLiveRun?.started_at)
-            || this.selectedCalendarDate
-            || this.todayDateKey;
-    }
-
-    private get completedLiveRunRoutePoints(): LiveRunRoutePoint[] {
-        const metrics = this.completedLiveRun;
-        if (!metrics) return [];
-        const points = metrics.route_points?.length ? [...metrics.route_points] : [];
-        if (!points.length && metrics.start_location) points.push(metrics.start_location);
-        if (metrics.end_location && !points.some((point) => point.lat === metrics.end_location?.lat && point.lng === metrics.end_location?.lng)) {
-            points.push(metrics.end_location);
-        }
-        return points;
+    private liveRunMapPinStyle(index: number): Record<string, string> {
+        const points = this.liveRunRouteViewportPoints();
+        if (!points.length) return {};
+        const point = index < 0 ? points[points.length - 1] : points[index] || points[0];
+        return {
+            left: `${point.x}%`,
+            top: `${point.y}%`
+        };
     }
 
     private coordinateLabel(point: LiveRunRoutePoint | null): string {
@@ -6706,6 +6997,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public async openLiveRunScreen(): Promise<void> {
+        this.clearLiveRunRouteMap();
         this.completedLiveRun = null;
         this.liveRunDiscardConfirmVisible = false;
         this.setScreen('live-run');
@@ -6716,6 +7008,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public async startLiveRun(): Promise<void> {
         if (this.isLiveRunBusy || this.isLiveRunSaving || this.isLiveRunActive) return;
+        this.clearLiveRunRouteMap();
         this.completedLiveRun = null;
         this.liveRunDiscardConfirmVisible = false;
         const plugin = this.liveRunPlugin();
@@ -6757,18 +7050,25 @@ export class Component implements AfterViewInit, OnDestroy {
     public async toggleLiveRunPause(): Promise<void> {
         if (!this.isLiveRunActive || this.isLiveRunBusy || this.isLiveRunSaving) return;
         const plugin = this.liveRunPlugin();
-        const method = this.isLiveRunPaused ? 'resumeLiveRun' : 'pauseLiveRun';
+        const wasPaused = this.isLiveRunPaused;
+        const method = wasPaused ? 'resumeLiveRun' : 'pauseLiveRun';
         if (!plugin?.[method]) return;
 
         this.isLiveRunBusy = true;
-        this.liveRunStatus = this.isLiveRunPaused ? '러닝 재개 중' : '러닝 일시정지 중';
+        this.liveRunStatus = wasPaused ? '러닝 재개 중' : '러닝 일시정지 중';
+        this.pendingLiveRunPauseState = !wasPaused;
+        this.primeLiveRunChromeForPauseState(!wasPaused);
         this.cdr.detectChanges();
 
         try {
             const metrics = await plugin[method]();
             this.applyLiveRunMetrics(metrics);
+            this.pendingLiveRunPauseState = null;
             this.liveRunStatus = this.isLiveRunPaused ? '일시정지됨' : '러닝 측정 중';
         } catch (error) {
+            this.pendingLiveRunPauseState = null;
+            this.liveRunChromeOverride = null;
+            this.syncDashboardChrome();
             this.liveRunStatus = this.liveRunErrorMessage(error, '상태를 변경하지 못했어.');
             this.showToast(this.liveRunStatus, 'error');
         } finally {
@@ -6820,6 +7120,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
             this.upsertRunRecord(saved.run || payload, { loadRelatedData: false });
             this.completedLiveRun = metrics;
+            void this.renderCompletedLiveRunRouteMap(metrics);
             this.liveRunStatus = '러닝 저장 완료';
             this.showToast('러닝 기록을 저장했어.', 'success');
             await this.loadRuns(false, true, true);
@@ -6837,6 +7138,7 @@ export class Component implements AfterViewInit, OnDestroy {
 
     public closeLiveRunSummaryToCalendar(): void {
         const date = this.completedLiveRunDateKey;
+        this.clearLiveRunRouteMap();
         this.completedLiveRun = null;
         this.liveRunDiscardConfirmVisible = false;
         this.liveRun = this.emptyLiveRunMetrics();
@@ -12829,6 +13131,23 @@ export class Component implements AfterViewInit, OnDestroy {
         this.queueNativeDashboardChromeSync(color);
     }
 
+    private primeLiveRunChromeForPauseState(paused: boolean): void {
+        const background = paused
+            ? this.isDark ? this.liveRunPausedDarkBackground : this.liveRunPausedLightBackground
+            : this.isDark ? this.liveRunDarkBackground : this.liveRunLightBackground;
+        const textColor = paused
+            ? this.isDark ? this.liveRunPausedDarkTextColor : this.liveRunPausedLightTextColor
+            : this.isDark ? this.liveRunDarkTextColor : this.liveRunLightTextColor;
+
+        this.liveRunChromeOverride = {
+            background,
+            textColor,
+            expiresAt: Date.now() + 1800
+        };
+        this.applyDashboardChrome(background, textColor);
+        this.queueNativeDashboardChromeSync(background, true);
+    }
+
     private applyDashboardChrome(color: string, textColor: string): void {
         if (typeof document === 'undefined') return;
 
@@ -12848,13 +13167,14 @@ export class Component implements AfterViewInit, OnDestroy {
         element.style.backgroundColor = color;
     }
 
-    private queueNativeDashboardChromeSync(color: string): void {
+    private queueNativeDashboardChromeSync(color: string, aggressive: boolean = false): void {
         this.clearDashboardChromeSyncTimers();
         this.setNativeSafeAreaBackground(color).catch(() => null);
 
         if (typeof window === 'undefined' || !isNativeLocalOrigin()) return;
 
-        this.dashboardChromeSyncTimers = [120, 480, 1000].map((delay) => window.setTimeout(() => {
+        const delays = aggressive ? [0, 16, 48, 120, 260, 520] : [80, 240, 700];
+        this.dashboardChromeSyncTimers = delays.map((delay) => window.setTimeout(() => {
             const nextColor = this.dashboardScreenBackground();
             const nextTextColor = this.dashboardShellTextColor();
             this.applyDashboardChrome(nextColor, nextTextColor);
@@ -12906,6 +13226,8 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardScreenBackground(): string {
+        const override = this.activeLiveRunChromeOverride();
+        if (override) return override.background;
         if (this.isInitialLoading) return this.loadingScreenBackground;
         if (this.activeScreen === 'live-run') {
             if (this.isLiveRunPaused) {
@@ -12917,6 +13239,8 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardShellTextColor(): string {
+        const override = this.activeLiveRunChromeOverride();
+        if (override) return override.textColor;
         if (this.isInitialLoading) return this.loadingScreenTextColor;
         if (this.activeScreen === 'live-run') {
             if (this.isLiveRunPaused) {
@@ -12925,6 +13249,17 @@ export class Component implements AfterViewInit, OnDestroy {
             return this.isDark ? this.liveRunDarkTextColor : this.liveRunLightTextColor;
         }
         return this.isDark ? this.dashboardDarkTextColor : this.dashboardLightTextColor;
+    }
+
+    private activeLiveRunChromeOverride():
+        | { background: string; textColor: string; expiresAt: number }
+        | null {
+        if (!this.liveRunChromeOverride) return null;
+        if (Date.now() <= this.liveRunChromeOverride.expiresAt) {
+            return this.liveRunChromeOverride;
+        }
+        this.liveRunChromeOverride = null;
+        return null;
     }
 
     private restoreStyleProperty(element: HTMLElement, property: string, value: string): void {
@@ -13142,7 +13477,9 @@ export class Component implements AfterViewInit, OnDestroy {
         }
         this.selectedCalendarRuns = this.buildSelectedCalendarRuns();
         this.cdr.detectChanges();
-        this.revealSelectedCalendarRecords();
+        if (this.selectedCalendarRuns.length) {
+            this.revealSelectedCalendarRecords();
+        }
     }
 
     private revealSelectedCalendarRecords(): void {

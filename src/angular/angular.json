@@ -54,6 +54,16 @@
                                 "output": "/assets"
                             },
                             {
+                                "glob": "view.html",
+                                "input": "src/app/page.dashboard",
+                                "output": "/"
+                            },
+                            {
+                                "glob": "view.scss",
+                                "input": "src/app/page.dashboard",
+                                "output": "/"
+                            },
+                            {
                                 "glob": "**/error.html",
                                 "input": "src/assets",
                                 "output": "/"

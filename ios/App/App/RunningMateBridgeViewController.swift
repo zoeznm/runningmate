@@ -70,6 +70,7 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
         webView?.isOpaque = false
         webView?.backgroundColor = appBackgroundColor
         webView?.scrollView.backgroundColor = appBackgroundColor
+        webView?.scrollView.subviews.forEach { $0.backgroundColor = .clear }
     }
 
     func setAppBackgroundColor(_ hexString: String) {
@@ -81,6 +82,10 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
             appBackgroundPrefersDarkStatusBarText = traitCollection.userInterfaceStyle == .light
         }
         applyAppBackground()
+        view.setNeedsLayout()
+        view.layoutIfNeeded()
+        webView?.setNeedsLayout()
+        webView?.layoutIfNeeded()
         setNeedsStatusBarAppearanceUpdate()
     }
 

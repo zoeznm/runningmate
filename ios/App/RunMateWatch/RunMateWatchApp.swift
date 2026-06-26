@@ -107,7 +107,7 @@ struct RunMateWatchContentView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(RunMateWatchTheme.accent)
 
-                Text("기록 저장은 iPhone에서 러닝을 시작하면 자동으로 연결돼요.")
+                Text("iPhone이 없어도 측정하고, 나중에 iPhone 앱을 열면 기록이 동기화돼요.")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.58))
                     .multilineTextAlignment(.leading)

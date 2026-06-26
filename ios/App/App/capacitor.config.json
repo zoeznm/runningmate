@@ -1,8 +1,9 @@
 {
-  "appId": "com.myrunningmate.run",
-  "appName": "RunMate",
-  "webDir": "bundle/www",
-  "ios": {
-    "contentInset": "automatic"
-  }
+	"appId": "com.myrunningmate.run",
+	"appName": "RunMate",
+	"webDir": "bundle/www",
+	"ios": {
+		"contentInset": "automatic"
+	},
+	"packageClassList": []
 }

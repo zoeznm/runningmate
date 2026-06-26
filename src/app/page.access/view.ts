@@ -2,7 +2,7 @@ import { ChangeDetectorRef, OnDestroy, OnInit } from '@angular/core';
 import { Service } from '@wiz/libs/portal/season/service';
 import { apiErrorMessage, apiFetch, jsonRequest, safeUserMessage } from 'src/app/shared/api';
 import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
-import { authenticatedUser, clearAuthTokens, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
+import { authenticatedUser, clearAuthTokens, hasAuthTokens, refreshAuthTokens, saveAuthTokens } from 'src/app/shared/auth';
 
 export class Component implements OnInit, OnDestroy {
     constructor(public service: Service, public ref: ChangeDetectorRef) { }
@@ -359,7 +359,7 @@ export class Component implements OnInit, OnDestroy {
 
         const refreshed = await this.withTimeout(refreshAuthTokens(), this.sessionBootstrapTimeoutMs).catch(() => false);
         if (!refreshed) {
-            clearAuthTokens();
+            if (!hasAuthTokens()) clearAuthTokens();
             return false;
         }
 
@@ -372,7 +372,7 @@ export class Component implements OnInit, OnDestroy {
             return true;
         }
 
-        clearAuthTokens();
+        if (!hasAuthTokens()) clearAuthTokens();
         return false;
     }
 
@@ -471,7 +471,8 @@ export class Component implements OnInit, OnDestroy {
             refresh_token: refreshToken,
             token_type: params.get('oauth_token_type') || 'Bearer',
             expires_in: Number(params.get('oauth_expires_in') || 0) || undefined,
-            refresh_expires_in: Number(params.get('oauth_refresh_expires_in') || 0) || undefined
+            refresh_expires_in: Number(params.get('oauth_refresh_expires_in') || 0) || undefined,
+            provider: (params.get('oauth_provider') || '').trim().toLowerCase()
         };
     }
 
@@ -507,7 +508,7 @@ export class Component implements OnInit, OnDestroy {
             return;
         }
 
-        const authReady = await this.confirmAuthSession(payload, true);
+        const authReady = await this.confirmAuthSession(payload, this.shouldPersistOAuthLogin(payload));
         if (authReady) {
             this.goDashboard();
             return;
@@ -520,6 +521,11 @@ export class Component implements OnInit, OnDestroy {
         await this.alert('소셜 로그인 세션을 앱에 연결하지 못했습니다. 다시 시도해주세요.', 'error');
         await this.loadPolicies().catch(() => null);
         await this.safeRender();
+    }
+
+    private shouldPersistOAuthLogin(payload: any): boolean {
+        const provider = String(payload?.provider || payload?.oauth_provider || '').trim().toLowerCase();
+        return provider === 'apple';
     }
 
     public socialErrorFromUrl() {
