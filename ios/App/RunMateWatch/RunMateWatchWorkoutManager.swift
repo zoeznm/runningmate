@@ -13,6 +13,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
     @Published var distanceText = "0.00 km"
     @Published var paceText = "-- /km"
     @Published var elapsedText = "00:00"
+    @Published var cadenceText = "-- spm"
     @Published var caloriesText = "0 kcal"
     @Published var canPause = false
     @Published var canResume = false
@@ -31,6 +32,8 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
     private var isStoppingWorkout = false
     private var isStandaloneRun = false
     private var currentRunType = "jogging"
+    private var pausedAt: Date?
+    private var pausedDuration: TimeInterval = 0
     private var locationManager: CLLocationManager?
 
     private var latestHeartRate: Double?
@@ -90,13 +93,14 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             return
         }
 
-        guard session.state == .running else {
-            syncWorkoutControls(for: session.state)
+        guard workoutState == .running else {
+            syncWorkoutControls(for: workoutState)
             sendMetrics(force: true)
             return
         }
 
         workoutState = .paused
+        pausedAt = Date()
         syncWorkoutControls(for: .paused)
         session.pause()
         sendMetrics(force: true)
@@ -108,12 +112,16 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             return
         }
 
-        guard session.state == .paused else {
-            syncWorkoutControls(for: session.state)
+        guard workoutState == .paused else {
+            syncWorkoutControls(for: workoutState)
             sendMetrics(force: true)
             return
         }
 
+        if let pausedAt = pausedAt {
+            pausedDuration += max(0, Date().timeIntervalSince(pausedAt))
+        }
+        pausedAt = nil
         workoutState = .running
         syncWorkoutControls(for: .running)
         session.resume()
@@ -130,6 +138,11 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             return
         }
 
+        let endedAt = Date()
+        if workoutState == .paused, let pausedAt = pausedAt {
+            pausedDuration += max(0, endedAt.timeIntervalSince(pausedAt))
+        }
+        pausedAt = nil
         isStoppingWorkout = true
         workoutState = .ended
         metricsTimer?.invalidate()
@@ -141,7 +154,6 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
         sendMetrics(force: true)
         stopRouteTracking()
 
-        let endedAt = Date()
         builder.endCollection(withEnd: endedAt) { [weak self] _, _ in
             builder.finishWorkout { workout, _ in
                 DispatchQueue.main.async {
@@ -170,6 +182,8 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             self.isStandaloneRun = standalone || runId?.isEmpty != false
             self.workoutState = .notStarted
             self.isStoppingWorkout = false
+            self.pausedAt = nil
+            self.pausedDuration = 0
             self.latestHeartRate = nil
             self.heartRateSum = 0
             self.heartRateCount = 0
@@ -183,6 +197,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             self.lastRouteLocation = nil
             self.lastAltitude = nil
             self.elapsedText = "00:00"
+            self.cadenceText = "-- spm"
             self.caloriesText = "0 kcal"
             self.syncWorkoutControls(for: .running)
             self.isWorkoutActive = true
@@ -251,6 +266,10 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
 
     private func updateStatistics(for quantityType: HKQuantityType) {
         guard let statistics = workoutBuilder?.statistics(for: quantityType) else { return }
+        guard workoutState == .running else {
+            updateDisplayMetrics()
+            return
+        }
 
         switch quantityType.identifier {
         case HKQuantityTypeIdentifier.heartRate.rawValue:
@@ -291,6 +310,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
 
     private func updateDisplayMetrics() {
         elapsedText = formattedElapsed()
+        cadenceText = formattedCadence()
         caloriesText = "\(Int(round(activeEnergyKcal))) kcal"
     }
 
@@ -354,12 +374,14 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
 
     private func standaloneRunPayload(workout: HKWorkout?, endedAt: Date) -> [String: Any] {
         let startDate = startedAt ?? workout?.startDate ?? Date()
-        let durationSeconds = max(0, workout?.duration ?? endedAt.timeIntervalSince(startDate))
+        let measuredDurationSeconds = elapsedSeconds(at: endedAt)
+        let durationSeconds = measuredDurationSeconds > 0 ? measuredDurationSeconds : max(0, workout?.duration ?? endedAt.timeIntervalSince(startDate))
         let workoutDistanceMeters = workout?.totalDistance?.doubleValue(for: .meter()) ?? 0
         let distance = max(distanceMeters, routeDistanceMeters, workoutDistanceMeters)
         let distanceKm = distance / 1000.0
         let workoutCalories = workout?.totalEnergyBurned?.doubleValue(for: .kilocalorie()) ?? 0
-        let calories = max(activeEnergyKcal, workoutCalories)
+        let estimatedCalories = estimatedCalories(distanceKm: distanceKm, elapsedSeconds: durationSeconds, weightKg: 60)
+        let calories = max(activeEnergyKcal, workoutCalories, estimatedCalories)
         let avgHeartRate = heartRateCount > 0 ? heartRateSum / heartRateCount : latestHeartRate
         let cadence = stepCount > 0 && durationSeconds > 0 ? stepCount / max(durationSeconds / 60.0, 0.1) : nil
         let pace = distanceKm > 0.003 && durationSeconds > 0 ? durationSeconds / distanceKm : nil
@@ -444,10 +466,11 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             "type": "liveRunMetrics",
             "runId": runId ?? "",
             "timestamp": now.timeIntervalSince1970,
-            "distance_m": distanceMeters,
+            "distance_m": max(distanceMeters, routeDistanceMeters),
             "active_energy_kcal": activeEnergyKcal,
             "calories": activeEnergyKcal,
             "step_count": stepCount,
+            "elevation_gain_m": elevationGainMeters,
             "elapsed_seconds": elapsedSeconds(),
             "status": currentStatus()
         ]
@@ -488,9 +511,14 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
         }
     }
 
-    private func elapsedSeconds() -> TimeInterval {
+    private func elapsedSeconds(at date: Date) -> TimeInterval {
         guard let startedAt = startedAt else { return 0 }
-        return max(0, Date().timeIntervalSince(startedAt))
+        let currentPause = workoutState == .paused ? max(0, date.timeIntervalSince(pausedAt ?? date)) : 0
+        return max(0, date.timeIntervalSince(startedAt) - pausedDuration - currentPause)
+    }
+
+    private func elapsedSeconds() -> TimeInterval {
+        elapsedSeconds(at: Date())
     }
 
     private func paceSecondsPerKm() -> Double? {
@@ -503,6 +531,21 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
     private func formattedPace() -> String {
         guard let pace = paceSecondsPerKm() else { return "-- /km" }
         return "\(formattedPace(secondsPerKm: pace)) /km"
+    }
+
+    private func formattedCadence() -> String {
+        guard stepCount > 0, elapsedSeconds() > 0 else { return "-- spm" }
+        let cadence = stepCount / max(elapsedSeconds() / 60.0, 0.1)
+        guard cadence.isFinite && cadence > 0 else { return "-- spm" }
+        return "\(Int(round(cadence))) spm"
+    }
+
+    private func estimatedCalories(distanceKm: Double, elapsedSeconds: TimeInterval, weightKg: Double) -> Double {
+        if distanceKm > 0.05 {
+            return max(0, distanceKm * weightKg * 1.036)
+        }
+        let minutes = max(0, elapsedSeconds / 60.0)
+        return max(0, 8.3 * 3.5 * weightKg / 200.0 * minutes)
     }
 
     private func formattedPace(secondsPerKm: Double) -> String {
@@ -563,7 +606,7 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
             statusText = isStandaloneRun ? "워치 단독 러닝 중" : "러닝 중"
             canPause = true
             canResume = false
-            canStop = true
+            canStop = false
         case .paused:
             statusText = "일시정지"
             canPause = false
@@ -602,12 +645,15 @@ final class RunMateWatchWorkoutManager: NSObject, ObservableObject, CLLocationMa
         lastAltitude = nil
         workoutState = .notStarted
         isStoppingWorkout = false
+        pausedAt = nil
+        pausedDuration = 0
         isStandaloneRun = false
         currentRunType = "jogging"
         heartRateText = "-- bpm"
         distanceText = "0.00 km"
         paceText = "-- /km"
         elapsedText = "00:00"
+        cadenceText = "-- spm"
         caloriesText = "0 kcal"
         statusText = "워치에서 러닝 시작 가능"
         canPause = false

@@ -28,8 +28,8 @@ struct RunMateWatchContentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 header
-                heartRatePanel
-                metricGrid
+                distancePanel
+                priorityMetricStack
                 controls
             }
             .padding(.horizontal, 10)
@@ -62,18 +62,18 @@ struct RunMateWatchContentView: View {
         }
     }
 
-    private var heartRatePanel: some View {
+    private var distancePanel: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text("심박수")
+            Text("거리")
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(.white.opacity(0.58))
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(workoutManager.heartRateText.replacingOccurrences(of: " bpm", with: ""))
+                Text(workoutManager.distanceText.replacingOccurrences(of: " km", with: ""))
                     .font(.system(size: 36, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
-                Text("bpm")
+                Text("km")
                     .font(.caption.weight(.heavy))
                     .foregroundStyle(RunMateWatchTheme.accent)
             }
@@ -83,15 +83,11 @@ struct RunMateWatchContentView: View {
         .background(RunMateWatchTheme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var metricGrid: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 6),
-            GridItem(.flexible(), spacing: 6)
-        ], spacing: 6) {
-            RunMateWatchMetric(title: "거리", value: workoutManager.distanceText)
-            RunMateWatchMetric(title: "페이스", value: workoutManager.paceText)
-            RunMateWatchMetric(title: "시간", value: workoutManager.elapsedText)
-            RunMateWatchMetric(title: "칼로리", value: workoutManager.caloriesText)
+    private var priorityMetricStack: some View {
+        VStack(spacing: 6) {
+            RunMateWatchMetric(title: "시간", value: workoutManager.elapsedText, prominence: .primary)
+            RunMateWatchMetric(title: "페이스", value: workoutManager.paceText, prominence: .secondary)
+            RunMateWatchMetric(title: "케이던스", value: workoutManager.cadenceText, prominence: .secondary)
         }
     }
 
@@ -114,18 +110,15 @@ struct RunMateWatchContentView: View {
             } else {
                 HStack(spacing: 7) {
                     Button {
-                        workoutManager.resume()
+                        if workoutManager.canResume {
+                            workoutManager.resume()
+                        } else {
+                            workoutManager.pause()
+                        }
                     } label: {
-                        Image(systemName: "play.fill")
+                        Image(systemName: workoutManager.canResume ? "play.fill" : "pause.fill")
                     }
-                    .disabled(!workoutManager.canResume)
-
-                    Button {
-                        workoutManager.pause()
-                    } label: {
-                        Image(systemName: "pause.fill")
-                    }
-                    .disabled(!workoutManager.canPause)
+                    .disabled(!workoutManager.canPause && !workoutManager.canResume)
 
                     Button(role: .destructive) {
                         workoutManager.stop()
@@ -142,23 +135,31 @@ struct RunMateWatchContentView: View {
 }
 
 private struct RunMateWatchMetric: View {
+    enum Prominence {
+        case primary
+        case secondary
+    }
+
     let title: String
     let value: String
+    var prominence: Prominence = .secondary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white.opacity(0.54))
+                .frame(width: 46, alignment: .leading)
             Text(value)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .font(.system(size: prominence == .primary ? 20 : 16, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.58)
+                .minimumScaleFactor(0.55)
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 8)
-        .padding(.horizontal, 8)
+        .padding(.horizontal, 10)
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
