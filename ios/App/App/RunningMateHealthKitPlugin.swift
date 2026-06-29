@@ -996,7 +996,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? steps / (elapsedSeconds / 60.0) : nil)
         let calories = session.watchCalories ?? estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
         let averagePaceSecondsPerKm = distanceMeters >= 1.0 && elapsedSeconds > 0 ? elapsedSeconds / max(distanceKm, 0.001) : nil
-        let currentPaceSecondsPerKm = session.instantPaceSecondsPerKm ?? averagePaceSecondsPerKm
+        let currentPaceSecondsPerKm = session.currentPaceSecondsPerKm() ?? averagePaceSecondsPerKm
         let watchConnected = session.hasRecentWatchMetrics || watchSessionIsReachable()
         let hasWatchHeartRate = session.latestHeartRate != nil
         var payload: [String: Any] = [
@@ -1353,7 +1353,7 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
                 }
             }
             if let pace = self.numericValue(message["pace_seconds_per_km"] ?? message["paceSecondsPerKm"]), pace > 0 {
-                session.instantPaceSecondsPerKm = pace
+                session.updateInstantPace(secondsPerKm: pace)
             }
 
             self.emitLiveRunUpdate(reason: "apple_watch")
@@ -1458,17 +1458,21 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             if let lastLocation = session.lastLocation {
                 let delta = location.distance(from: lastLocation)
                 let timeDelta = location.timestamp.timeIntervalSince(lastLocation.timestamp)
-                if delta >= 1.5 && delta <= 220 {
+                let impliedSpeed = timeDelta > 0 ? delta / timeDelta : 0
+                if timeDelta >= 0.5,
+                   delta >= 1.5,
+                   delta <= 220,
+                   impliedSpeed <= 8.5 {
                     session.distanceMeters += delta
+                    session.recordPaceSample(
+                        at: location.timestamp,
+                        cumulativeDistanceMeters: session.distanceMeters,
+                        horizontalAccuracy: location.horizontalAccuracy
+                    )
                 }
-                session.updateInstantPace(distanceMeters: delta, elapsedSeconds: timeDelta)
             }
             session.appendRouteLocation(location)
             session.lastLocation = location
-            if location.speed > 0.6 {
-                let instantPace = 1000.0 / location.speed
-                session.updateInstantPace(secondsPerKm: instantPace)
-            }
 
             if location.verticalAccuracy >= 0 && location.verticalAccuracy <= 30 {
                 if let lastAltitude = session.lastAltitude {
@@ -1731,6 +1735,11 @@ private final class LiveRunSession {
         case stopped
     }
 
+    private struct PaceSample {
+        let timestamp: Date
+        let cumulativeDistanceMeters: Double
+    }
+
     let id: String
     let startDate: Date
     let runType: String
@@ -1743,6 +1752,7 @@ private final class LiveRunSession {
     var distanceMeters: Double = 0
     var watchDistanceMeters: Double?
     var instantPaceSecondsPerKm: Double?
+    var instantPaceUpdatedAt: Date?
     var elevationGainMeters: Double = 0
     var steps: Double = 0
     var watchSteps: Double?
@@ -1759,6 +1769,7 @@ private final class LiveRunSession {
     var heartRateSampleCount: Int = 0
     var lastWatchHeartRateTimestamp: TimeInterval = 0
     var latestWatchMetricsAt: Date?
+    private var paceSamples: [PaceSample] = []
 
     init(runType: String, weightKg: Double, id: String = UUID().uuidString, startDate: Date = Date()) {
         self.id = id
@@ -1788,6 +1799,7 @@ private final class LiveRunSession {
         session.distanceMeters = max(0, doubleValue(payload["distanceMeters"] ?? payload["distance_meters"]) ?? 0)
         session.watchDistanceMeters = doubleValue(payload["watchDistanceMeters"] ?? payload["watch_distance_meters"])
         session.instantPaceSecondsPerKm = doubleValue(payload["instantPaceSecondsPerKm"] ?? payload["instant_pace_seconds_per_km"])
+        session.instantPaceUpdatedAt = dateValue(payload["instantPaceUpdatedAt"] ?? payload["instant_pace_updated_at"])
         session.elevationGainMeters = max(0, doubleValue(payload["elevationGainMeters"] ?? payload["elevation_gain_meters"]) ?? 0)
         session.steps = max(0, doubleValue(payload["steps"]) ?? 0)
         session.watchSteps = doubleValue(payload["watchSteps"] ?? payload["watch_steps"])
@@ -1850,6 +1862,9 @@ private final class LiveRunSession {
         }
         if let instantPaceSecondsPerKm = instantPaceSecondsPerKm {
             payload["instantPaceSecondsPerKm"] = instantPaceSecondsPerKm
+        }
+        if let instantPaceUpdatedAt = instantPaceUpdatedAt {
+            payload["instantPaceUpdatedAt"] = instantPaceUpdatedAt.timeIntervalSince1970
         }
         if let watchSteps = watchSteps {
             payload["watchSteps"] = watchSteps
@@ -1998,22 +2013,65 @@ private final class LiveRunSession {
         lastLocation = nil
         lastAltitude = nil
         instantPaceSecondsPerKm = nil
+        instantPaceUpdatedAt = nil
+        paceSamples.removeAll()
         cadenceStepsPerMinute = nil
         lastCadenceSampleAt = nil
         lastCadenceSampleSteps = stepOffset
     }
 
-    func updateInstantPace(distanceMeters: Double, elapsedSeconds: TimeInterval) {
-        guard distanceMeters >= 1.0,
-              elapsedSeconds >= 0.75,
-              elapsedSeconds <= 20 else {
+    func currentPaceSecondsPerKm(at date: Date = Date()) -> Double? {
+        guard let instantPaceSecondsPerKm = instantPaceSecondsPerKm,
+              let instantPaceUpdatedAt = instantPaceUpdatedAt,
+              date.timeIntervalSince(instantPaceUpdatedAt) <= 22 else {
+            return nil
+        }
+        return instantPaceSecondsPerKm
+    }
+
+    func recordPaceSample(at date: Date, cumulativeDistanceMeters: Double, horizontalAccuracy: CLLocationAccuracy) {
+        guard cumulativeDistanceMeters.isFinite, cumulativeDistanceMeters >= 0 else { return }
+        if let last = paceSamples.last, date <= last.timestamp {
             return
         }
 
-        updateInstantPace(secondsPerKm: elapsedSeconds / (distanceMeters / 1000.0))
+        paceSamples.append(PaceSample(timestamp: date, cumulativeDistanceMeters: cumulativeDistanceMeters))
+        while paceSamples.count > 2, let second = paceSamples.dropFirst().first, date.timeIntervalSince(second.timestamp) > 35 {
+            paceSamples.removeFirst()
+        }
+
+        guard horizontalAccuracy >= 0, horizontalAccuracy <= 35 else { return }
+
+        var selectedSample: PaceSample?
+        for sample in paceSamples.dropLast().reversed() {
+            let elapsed = date.timeIntervalSince(sample.timestamp)
+            let delta = cumulativeDistanceMeters - sample.cumulativeDistanceMeters
+            if elapsed >= 10, elapsed <= 35, delta >= 18 {
+                selectedSample = sample
+                break
+            }
+            if selectedSample == nil, elapsed >= 6, elapsed <= 35, delta >= 12 {
+                selectedSample = sample
+            }
+        }
+
+        guard let sample = selectedSample else { return }
+        let elapsed = date.timeIntervalSince(sample.timestamp)
+        let delta = cumulativeDistanceMeters - sample.cumulativeDistanceMeters
+        updateInstantPace(distanceMeters: delta, elapsedSeconds: elapsed, at: date)
     }
 
-    func updateInstantPace(secondsPerKm: Double) {
+    func updateInstantPace(distanceMeters: Double, elapsedSeconds: TimeInterval, at date: Date = Date()) {
+        guard distanceMeters >= 1.0,
+              elapsedSeconds >= 0.75,
+              elapsedSeconds <= 45 else {
+            return
+        }
+
+        updateInstantPace(secondsPerKm: elapsedSeconds / (distanceMeters / 1000.0), at: date)
+    }
+
+    func updateInstantPace(secondsPerKm: Double, at date: Date = Date()) {
         guard secondsPerKm.isFinite,
               secondsPerKm >= 90,
               secondsPerKm <= 1800 else {
@@ -2021,10 +2079,11 @@ private final class LiveRunSession {
         }
 
         if let current = instantPaceSecondsPerKm {
-            instantPaceSecondsPerKm = current * 0.65 + secondsPerKm * 0.35
+            instantPaceSecondsPerKm = current * 0.5 + secondsPerKm * 0.5
         } else {
             instantPaceSecondsPerKm = secondsPerKm
         }
+        instantPaceUpdatedAt = date
     }
 
     func updateStepMetrics(segmentSteps: Double, currentCadenceStepsPerSecond: Double?, at date: Date) {
