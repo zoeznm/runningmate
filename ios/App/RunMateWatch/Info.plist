@@ -55,7 +55,7 @@
     <key>CFBundleShortVersionString</key>
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>7</string>
+    <string>8</string>
     <key>NSHealthShareUsageDescription</key>
     <string>러닝 중 심박수, 거리, 칼로리, 걸음 수를 실시간으로 측정하고 러닝 기록을 저장하기 위해 건강 데이터를 사용합니다.</string>
     <key>NSHealthUpdateUsageDescription</key>
