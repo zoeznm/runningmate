@@ -1558,6 +1558,9 @@ export class Component implements AfterViewInit, OnDestroy {
     private liveRunSnapshotRefreshInFlight: boolean = false;
     private lastLiveRunSnapshotRefreshAt: number = 0;
     private pendingWatchRunSyncing: boolean = false;
+    private observedYearMonth: string = this.yearMonthKey(new Date());
+    private monthRolloverTimer: number | null = null;
+    private monthRolloverPromptInFlight: boolean = false;
     private initialRunsTruncated: boolean = false;
     private runMediaLoaded: boolean = false;
     private runMediaLoadPromise: Promise<boolean> | null = null;
@@ -1595,6 +1598,8 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly appleMusicUserTokenStorageKey: string = 'runningmate-apple-music-user-token-v1';
     private readonly weightTargetStorageKey: string = 'runningmate-weight-target-v1';
     private readonly weatherPositionStorageKey: string = 'runningmate-weather-position-v1';
+    private readonly observedMonthStorageKey: string = 'runningmate-observed-month-v1';
+    private readonly monthlyGoalPromptStorageKey: string = 'runningmate-monthly-goal-prompt-v1';
     private readonly agreementModalBodyClass: string = 'runningmate-agreement-modal-visible';
     private readonly agreementModalEventName: string = 'runningmate:agreement-modal';
     private readonly onboardingScreenMap: Partial<Record<OnboardingStepKey, ScreenKey>> = {
@@ -7408,9 +7413,127 @@ export class Component implements AfterViewInit, OnDestroy {
         this.cleanupHandlers.push(() => window.removeEventListener(this.agreementModalEventName, handleAgreementModalState));
     }
 
+    private installMonthRolloverSync(): void {
+        if (typeof window === 'undefined') return;
+
+        const sync = (): void => {
+            void this.handleMonthRollover({ prompt: !this.isInitialLoading });
+        };
+
+        window.addEventListener('focus', sync);
+        window.addEventListener('pageshow', sync);
+        this.cleanupHandlers.push(() => window.removeEventListener('focus', sync));
+        this.cleanupHandlers.push(() => window.removeEventListener('pageshow', sync));
+
+        if (typeof document !== 'undefined') {
+            const syncWhenVisible = (): void => {
+                if (document.visibilityState === 'visible') sync();
+            };
+            document.addEventListener('visibilitychange', syncWhenVisible);
+            this.cleanupHandlers.push(() => document.removeEventListener('visibilitychange', syncWhenVisible));
+        }
+
+        this.monthRolloverTimer = window.setInterval(sync, 60 * 1000);
+    }
+
+    private async handleMonthRollover(options: { prompt?: boolean } = {}): Promise<void> {
+        const currentMonth = this.yearMonthKey(new Date());
+        const previousMonth = this.readObservedYearMonth() || this.observedYearMonth;
+        const monthChanged = Boolean(previousMonth && previousMonth !== currentMonth);
+
+        this.observedYearMonth = currentMonth;
+        this.writeObservedYearMonth(currentMonth);
+
+        if (!monthChanged) return;
+
+        this.activeYearMonth = currentMonth;
+        if (this.selectedCalendarDate && !this.selectedCalendarDate.startsWith(currentMonth)) {
+            this.selectedCalendarDate = this.todayDateKey;
+            this.syncSelectedCalendarMemo();
+            this.selectedCalendarRuns = this.buildSelectedCalendarRuns();
+        }
+        this.uploadProgress = 0;
+        this.uploadStatus = '';
+        this.resetRunRecordEditState();
+        this.refreshDerivedState();
+        this.cdr.detectChanges();
+
+        void this.loadGoalsForActiveMonth();
+        if (this.activeScreen === 'calendar') {
+            void this.loadWeatherForActiveMonth();
+        }
+
+        if (options.prompt) {
+            await this.promptMonthlyGoalReset(currentMonth);
+        }
+    }
+
+    private readObservedYearMonth(): string {
+        if (typeof window === 'undefined' || !window.localStorage) return '';
+        try {
+            return this.normalizeYearMonth(window.localStorage.getItem(this.observedMonthStorageKey)) || '';
+        } catch {
+            return '';
+        }
+    }
+
+    private writeObservedYearMonth(yearMonth: string): void {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            window.localStorage.setItem(this.observedMonthStorageKey, yearMonth);
+        } catch {
+            return;
+        }
+    }
+
+    private monthlyGoalPromptKey(yearMonth: string): string {
+        return `${this.monthlyGoalPromptStorageKey}:${yearMonth}`;
+    }
+
+    private hasSeenMonthlyGoalPrompt(yearMonth: string): boolean {
+        if (typeof window === 'undefined' || !window.localStorage) return false;
+        try {
+            return window.localStorage.getItem(this.monthlyGoalPromptKey(yearMonth)) === '1';
+        } catch {
+            return false;
+        }
+    }
+
+    private markMonthlyGoalPromptSeen(yearMonth: string): void {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        try {
+            window.localStorage.setItem(this.monthlyGoalPromptKey(yearMonth), '1');
+        } catch {
+            return;
+        }
+    }
+
+    private async promptMonthlyGoalReset(yearMonth: string): Promise<void> {
+        if (this.monthRolloverPromptInFlight || this.hasSeenMonthlyGoalPrompt(yearMonth) || this.isOnboardingVisible) return;
+
+        this.monthRolloverPromptInFlight = true;
+        this.markMonthlyGoalPromptSeen(yearMonth);
+        try {
+            const confirmed = await this.openConfirmDialog('새로운 달이 왔습니다. 목표를 재설정해볼까요?', {
+                title: '새로운 달',
+                confirmLabel: '확인',
+                cancelLabel: '나중에',
+                iconClass: 'fa-calendar-plus'
+            });
+            if (!confirmed) return;
+
+            this.activeYearMonth = yearMonth;
+            this.refreshDerivedState();
+            this.setScreen('goals');
+        } finally {
+            this.monthRolloverPromptInFlight = false;
+        }
+    }
+
     public ngAfterViewInit(): void {
         this.installDashboardViewportSync();
         this.installAgreementLoadingMessageSync();
+        this.installMonthRolloverSync();
         this.installLiveRunListeners();
         this.installLiveRunCancelFallback();
 
@@ -7518,6 +7641,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.syncDashboardChrome();
             this.cdr.detectChanges();
             if (shouldStartDeferredData) {
+                void this.handleMonthRollover({ prompt: true });
                 this.startWeatherAutoRefresh();
                 this.scheduleDeferredDashboardData();
             }
@@ -7535,6 +7659,10 @@ export class Component implements AfterViewInit, OnDestroy {
         if (this.weatherRefreshTimer !== null) {
             window.clearInterval(this.weatherRefreshTimer);
             this.weatherRefreshTimer = null;
+        }
+        if (this.monthRolloverTimer !== null) {
+            window.clearInterval(this.monthRolloverTimer);
+            this.monthRolloverTimer = null;
         }
         if (this.accountDeleteRedirectTimer !== null) {
             window.clearTimeout(this.accountDeleteRedirectTimer);
