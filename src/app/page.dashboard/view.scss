@@ -2375,7 +2375,7 @@ button span {
 }
 
 .live-run-page-content.summary-visible {
-    padding: max(12px, env(safe-area-inset-top)) 18px 0;
+    padding: max(4px, calc(env(safe-area-inset-top, 0px) - 2px)) 18px 0;
 }
 
 .live-run-active-stage,
@@ -2701,8 +2701,8 @@ button span {
     align-items: center;
     justify-content: space-between;
     flex: 0 0 auto;
-    min-height: 44px;
-    margin-bottom: 14px;
+    min-height: 38px;
+    margin-bottom: 8px;
 }
 
 .live-run-summary-more {
@@ -2728,7 +2728,7 @@ button span {
         linear-gradient(135deg, rgba(236, 244, 229, 0.92), rgba(243, 246, 238, 0.98)),
         color-mix(in srgb, var(--primary-ink) 8%, transparent);
     box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
-    margin-top: 22px;
+    margin-top: 16px;
 }
 
 .live-run-route-map-image {
@@ -2918,7 +2918,7 @@ button span {
 }
 
 .live-run-summary-distance {
-    margin-top: clamp(28px, 6vh, 56px);
+    margin-top: clamp(18px, 4vh, 38px);
 }
 
 .live-run-summary-distance strong {
@@ -2942,8 +2942,8 @@ button span {
 .live-run-summary-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 24px 18px;
-    margin-top: 36px;
+    gap: 20px 14px;
+    margin-top: 28px;
 }
 
 .live-run-summary-metric {
@@ -2953,15 +2953,15 @@ button span {
 
 .live-run-summary-metric span {
     color: color-mix(in srgb, var(--primary-ink) 48%, transparent);
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 850;
     line-height: 1.1;
 }
 
 .live-run-summary-metric strong {
-    margin-top: 8px;
+    margin-top: 7px;
     color: var(--primary-ink);
-    font-size: clamp(22px, 7vw, 34px);
+    font-size: clamp(17px, 5.2vw, 26px);
     line-height: 1;
 }
 
@@ -12383,6 +12383,11 @@ button span {
             max(20px, calc(var(--dashboard-mobile-safe-bottom) + 14px))
             var(--dashboard-mobile-inline-start);
         scroll-padding-bottom: 0;
+    }
+
+    .live-run-mode .live-run-page-content.summary-visible {
+        padding-top: max(4px, calc(var(--dashboard-mobile-safe-top) - 2px));
+        padding-bottom: 0;
     }
 
     .chart-scroll {
