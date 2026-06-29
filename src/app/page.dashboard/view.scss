@@ -2374,6 +2374,10 @@ button span {
     transition: color 80ms ease;
 }
 
+.live-run-page-content.summary-visible {
+    padding: max(12px, env(safe-area-inset-top)) 18px 0;
+}
+
 .live-run-active-stage,
 .live-run-summary-stage {
     display: flex;
@@ -2384,7 +2388,8 @@ button span {
 
 .live-run-summary-stage {
     overflow-y: auto;
-    padding-bottom: 2px;
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    scroll-padding-bottom: max(14px, env(safe-area-inset-bottom));
     -webkit-overflow-scrolling: touch;
 }
 
@@ -2696,8 +2701,8 @@ button span {
     align-items: center;
     justify-content: space-between;
     flex: 0 0 auto;
-    min-height: 48px;
-    margin-bottom: 20px;
+    min-height: 44px;
+    margin-bottom: 14px;
 }
 
 .live-run-summary-more {
@@ -2714,7 +2719,7 @@ button span {
     position: relative;
     flex: 0 0 auto;
     width: 100%;
-    min-height: 300px;
+    min-height: 268px;
     aspect-ratio: 1.12 / 1;
     overflow: hidden;
     border: 1px solid rgba(15, 23, 42, 0.08);
@@ -2723,7 +2728,7 @@ button span {
         linear-gradient(135deg, rgba(236, 244, 229, 0.92), rgba(243, 246, 238, 0.98)),
         color-mix(in srgb, var(--primary-ink) 8%, transparent);
     box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
-    margin-top: 28px;
+    margin-top: 22px;
 }
 
 .live-run-route-map-image {
@@ -2740,8 +2745,10 @@ button span {
     inset: 0;
     z-index: 2;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     background:
         linear-gradient(90deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.32)),
         repeating-linear-gradient(45deg, rgba(15, 23, 42, 0.045) 0 1px, transparent 1px 16px);
@@ -2750,6 +2757,17 @@ button span {
     font-size: 22px;
     animation: route-map-loading 1.4s linear infinite;
     pointer-events: none;
+}
+
+.live-run-route-map-loading span {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.78);
+    padding: 8px 12px;
+    color: rgba(15, 23, 42, 0.68);
+    font-size: 12px;
+    font-weight: 950;
+    line-height: 1;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.12);
 }
 
 .live-run-summary-map::after {
@@ -2900,7 +2918,7 @@ button span {
 }
 
 .live-run-summary-distance {
-    margin-top: clamp(42px, 8vh, 72px);
+    margin-top: clamp(28px, 6vh, 56px);
 }
 
 .live-run-summary-distance strong {
@@ -2914,7 +2932,7 @@ button span {
 
 .live-run-summary-distance span {
     display: block;
-    margin-top: 22px;
+    margin-top: 16px;
     color: color-mix(in srgb, var(--primary-ink) 48%, transparent);
     font-size: 24px;
     font-weight: 900;
@@ -2924,8 +2942,8 @@ button span {
 .live-run-summary-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 26px 18px;
-    margin-top: 44px;
+    gap: 24px 18px;
+    margin-top: 36px;
 }
 
 .live-run-summary-metric {

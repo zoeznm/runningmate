@@ -7096,6 +7096,8 @@ export class Component implements AfterViewInit, OnDestroy {
                 return;
             }
 
+            void this.renderCompletedLiveRunRouteMap(metrics);
+
             const startedDate = this.chatDateKey(metrics.started_at) || this.todayDateKey;
             const payload: RunRecord = {
                 date: startedDate,
@@ -7111,6 +7113,7 @@ export class Component implements AfterViewInit, OnDestroy {
             };
             const saved = await this.saveRunRecord(payload);
             if (!saved.saved) {
+                this.clearLiveRunRouteMap();
                 this.liveRunStatus = this.userMessage(saved.message, '러닝 기록을 저장하지 못했어.');
                 this.showToast(this.liveRunStatus, 'error');
                 return;
@@ -7120,7 +7123,6 @@ export class Component implements AfterViewInit, OnDestroy {
             this.activeYearMonth = this.yearMonthKey(this.parseDate(startedDate) || new Date());
             this.upsertRunRecord(saved.run || payload, { loadRelatedData: false });
             this.completedLiveRun = metrics;
-            void this.renderCompletedLiveRunRouteMap(metrics);
             this.liveRunStatus = '러닝 저장 완료';
             this.showToast('러닝 기록을 저장했어.', 'success');
             await this.loadRuns(false, true, true);

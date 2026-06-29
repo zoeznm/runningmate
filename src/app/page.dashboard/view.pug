@@ -67,7 +67,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         div(class="home-weight-goal-value") {{weightGoalRemainingText}}
 
         div(class="screen-page", [class.active]="activeScreen === 'live-run'", id="screen-live-run")
-            div(class="live-run-page-content")
+            div(class="live-run-page-content", [class.summary-visible]="completedLiveRun")
                 section(*ngIf="!completedLiveRun", class="live-run-active-stage")
                     div(class="live-run-active-head")
                         button(
@@ -175,6 +175,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             alt="러닝 경로 지도")
                         div(*ngIf="isLiveRunRouteMapRendering", class="live-run-route-map-loading", aria-label="지도 생성 중")
                             i(class="fa-solid fa-spinner fa-spin", aria-hidden="true")
+                            span 지도 불러오는 중
                         ng-container(*ngIf="liveRunMapFallbackVisible")
                             div(class="live-run-map-grid", aria-hidden="true")
                             svg(class="live-run-map-route", viewBox="0 0 100 100", preserveAspectRatio="none", aria-hidden="true")
