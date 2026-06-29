@@ -1,4 +1,4 @@
-import { isRunningMateApiUrl, resolveApiUrl } from 'src/app/shared/api-base';
+import { isNativeLocalOrigin, isRunningMateApiUrl, resolveApiUrl } from 'src/app/shared/api-base';
 
 export interface AuthTokenPayload {
     access_token?: string;
@@ -16,8 +16,24 @@ const AUTO_LOGIN_KEY = 'runningmate.auth.autoLogin';
 const INSTALLED_KEY = '__runningmateAuthFetchInstalled';
 const AUTH_REQUEST_TIMEOUT_MS = 10000;
 
+interface NativeAuthPlugin {
+    saveAuthTokens?: (payload: { accessToken: string; refreshToken: string; autoLogin: boolean }) => Promise<unknown>;
+    loadAuthTokens?: () => Promise<{
+        hasTokens?: boolean;
+        accessToken?: string;
+        refreshToken?: string;
+        access_token?: string;
+        refresh_token?: string;
+        autoLogin?: boolean;
+    }>;
+    clearAuthTokens?: () => Promise<unknown>;
+}
+
 let nativeFetch: typeof window.fetch | null = null;
 let refreshPromise: Promise<boolean> | null = null;
+let nativeAuthPluginCache: NativeAuthPlugin | null | undefined;
+let nativeHydrationPromise: Promise<boolean> | null = null;
+let nativeHydrated = false;
 let memoryAccessToken = '';
 let memoryRefreshToken = '';
 let memoryAutoLogin = false;
@@ -62,6 +78,111 @@ function authStorage(): Storage | null {
     if (safeGet(local, AUTO_LOGIN_KEY) === '1' && (safeGet(local, ACCESS_TOKEN_KEY) || safeGet(local, REFRESH_TOKEN_KEY))) return local;
     if (safeGet(session, ACCESS_TOKEN_KEY) || safeGet(session, REFRESH_TOKEN_KEY)) return session;
     return session || local;
+}
+
+function nativeAuthPlugin(): NativeAuthPlugin | null {
+    if (typeof window === 'undefined' || !isNativeLocalOrigin()) return null;
+    if (nativeAuthPluginCache !== undefined) return nativeAuthPluginCache || null;
+
+    const capacitor = (window as any).Capacitor;
+    if (!capacitor) {
+        return null;
+    }
+
+    if (capacitor.Plugins?.RunningMateAuth) {
+        const plugin = capacitor.Plugins.RunningMateAuth as NativeAuthPlugin;
+        nativeAuthPluginCache = plugin;
+        return plugin;
+    }
+
+    if (typeof capacitor.registerPlugin === 'function') {
+        const plugin = capacitor.registerPlugin('RunningMateAuth') as NativeAuthPlugin;
+        nativeAuthPluginCache = plugin;
+        return plugin;
+    }
+
+    return null;
+}
+
+function nativeString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function writeStoredAuthTokens(accessToken: string, refreshToken: string, autoLogin: boolean): boolean {
+    const write = (target: Storage | null, persist: boolean): boolean => {
+        if (!target) return false;
+        const wroteAccess = safeSet(target, ACCESS_TOKEN_KEY, accessToken);
+        const wroteRefresh = safeSet(target, REFRESH_TOKEN_KEY, refreshToken);
+        const wroteAutoLogin = safeSet(target, AUTO_LOGIN_KEY, persist ? '1' : '0');
+        if (!wroteAccess || !wroteRefresh || !wroteAutoLogin) return false;
+        return safeGet(target, ACCESS_TOKEN_KEY) === accessToken && safeGet(target, REFRESH_TOKEN_KEY) === refreshToken;
+    };
+
+    if (autoLogin) {
+        return write(storage('local'), true) || write(storage('session'), true) || true;
+    }
+
+    write(storage('session'), false);
+    return true;
+}
+
+function persistNativeAuthTokens(accessToken: string, refreshToken: string, autoLogin: boolean): void {
+    const plugin = nativeAuthPlugin();
+    if (!plugin) return;
+
+    if (autoLogin && accessToken && refreshToken && plugin.saveAuthTokens) {
+        plugin.saveAuthTokens({ accessToken, refreshToken, autoLogin: true }).catch(() => null);
+        nativeHydrated = true;
+        return;
+    }
+
+    if (plugin.clearAuthTokens) {
+        plugin.clearAuthTokens().catch(() => null);
+        nativeHydrated = true;
+    }
+}
+
+function clearNativeAuthTokens(): void {
+    nativeHydrated = true;
+    nativeHydrationPromise = null;
+    const plugin = nativeAuthPlugin();
+    if (!plugin?.clearAuthTokens) return;
+    plugin.clearAuthTokens().catch(() => null);
+}
+
+export async function hydrateNativeAuthTokens(): Promise<boolean> {
+    if (hasAuthTokens()) return true;
+    if (nativeHydrated) return false;
+    if (nativeHydrationPromise) return nativeHydrationPromise;
+
+    const plugin = nativeAuthPlugin();
+    if (!plugin?.loadAuthTokens) {
+        return false;
+    }
+    const loadAuthTokens = plugin.loadAuthTokens.bind(plugin);
+
+    nativeHydrationPromise = (async () => {
+        try {
+            const payload = await loadAuthTokens();
+            const accessToken = nativeString(payload?.accessToken || payload?.access_token);
+            const refreshToken = nativeString(payload?.refreshToken || payload?.refresh_token);
+            const autoLogin = payload?.autoLogin !== false;
+            if (!payload?.hasTokens || !autoLogin || !accessToken || !refreshToken) return false;
+
+            memoryAccessToken = accessToken;
+            memoryRefreshToken = refreshToken;
+            memoryAutoLogin = true;
+            writeStoredAuthTokens(accessToken, refreshToken, true);
+            return true;
+        } catch {
+            return false;
+        } finally {
+            nativeHydrated = true;
+            nativeHydrationPromise = null;
+        }
+    })();
+
+    return nativeHydrationPromise;
 }
 
 function shouldAttachAuth(url: string): boolean {
@@ -133,11 +254,13 @@ export function hasAuthTokens(): boolean {
 function tokenValue(payload: AuthTokenPayload | null | undefined, key: 'access_token' | 'refresh_token'): string {
     if (!payload) return '';
     const source = payload as Record<string, any>;
+    const data = source['data'];
+    const raw = source['raw'];
     return String(
         source[key]
-        || source.data?.[key]
-        || source.raw?.[key]
-        || source.raw?.data?.[key]
+        || data?.[key]
+        || raw?.[key]
+        || raw?.['data']?.[key]
         || ''
     );
 }
@@ -147,29 +270,18 @@ export function saveAuthTokens(payload: AuthTokenPayload | null | undefined, aut
     const refreshToken = tokenValue(payload, 'refresh_token');
     if (!accessToken || !refreshToken) return false;
 
-    clearAuthTokens();
+    clearAuthTokens({ native: false });
     memoryAccessToken = accessToken;
     memoryRefreshToken = refreshToken;
     memoryAutoLogin = autoLogin;
+    nativeHydrated = true;
 
-    const write = (target: Storage | null, persist: boolean): boolean => {
-        if (!target) return false;
-        const wroteAccess = safeSet(target, ACCESS_TOKEN_KEY, accessToken);
-        const wroteRefresh = safeSet(target, REFRESH_TOKEN_KEY, refreshToken);
-        const wroteAutoLogin = safeSet(target, AUTO_LOGIN_KEY, persist ? '1' : '0');
-        if (!wroteAccess || !wroteRefresh || !wroteAutoLogin) return false;
-        return safeGet(target, ACCESS_TOKEN_KEY) === accessToken && safeGet(target, REFRESH_TOKEN_KEY) === refreshToken;
-    };
-
-    if (autoLogin) {
-        return write(storage('local'), true) || write(storage('session'), true) || true;
-    }
-
-    write(storage('session'), false);
-    return true;
+    const saved = writeStoredAuthTokens(accessToken, refreshToken, autoLogin);
+    persistNativeAuthTokens(accessToken, refreshToken, autoLogin);
+    return saved;
 }
 
-export function clearAuthTokens(): void {
+export function clearAuthTokens(options: { native?: boolean } = {}): void {
     for (const target of [storage('local'), storage('session')]) {
         safeRemove(target, ACCESS_TOKEN_KEY);
         safeRemove(target, REFRESH_TOKEN_KEY);
@@ -178,6 +290,7 @@ export function clearAuthTokens(): void {
     memoryAccessToken = '';
     memoryRefreshToken = '';
     memoryAutoLogin = false;
+    if (options.native !== false) clearNativeAuthTokens();
 }
 
 function isAccessPath(): boolean {
@@ -191,8 +304,8 @@ export function redirectToAccess(): void {
     window.location.replace('/access');
 }
 
-export function handleAuthFailure(redirect: boolean = true): void {
-    clearAuthTokens();
+export function handleAuthFailure(redirect: boolean = true, clearStoredTokens: boolean = true): void {
+    if (clearStoredTokens) clearAuthTokens();
     if (redirect) redirectToAccess();
 }
 
@@ -223,7 +336,9 @@ export async function refreshAuthTokens(): Promise<boolean> {
             const payload = await response.json().catch(() => null);
             const success = !!(payload?.success || payload?.data?.success);
             if (!response.ok || !success) {
-                clearAuthTokens();
+                if (response.status === 401 || response.status === 403) {
+                    clearAuthTokens();
+                }
                 return false;
             }
 
@@ -260,14 +375,14 @@ async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}, r
 
     if (response.status !== 401 || !retry || !shouldAttachAuth(url)) {
         if (response.status === 401 && shouldAttachAuth(url)) {
-            handleAuthFailure();
+            handleAuthFailure(true, !getRefreshToken());
         }
         return response;
     }
 
     const refreshed = await refreshAuthTokens();
     if (!refreshed) {
-        handleAuthFailure();
+        handleAuthFailure(true, !getRefreshToken());
         return response;
     }
 
@@ -279,9 +394,14 @@ export function installAuthFetchInterceptor(): void {
     nativeFetch = window.fetch.bind(window);
     (window as any)[INSTALLED_KEY] = true;
     window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => fetchWithAuth(input, init || {})) as typeof window.fetch;
+    hydrateNativeAuthTokens().catch(() => null);
 }
 
 export async function authenticatedUser(retry: boolean = true): Promise<unknown | null> {
+    if (!hasAuthTokens()) {
+        await hydrateNativeAuthTokens().catch(() => false);
+    }
+
     const fetcher = nativeFetch || window.fetch.bind(window);
     const response = await fetchWithTimeout(fetcher, '/api/auth/me', {
         cache: 'no-store',
@@ -295,7 +415,7 @@ export async function authenticatedUser(retry: boolean = true): Promise<unknown 
             if (retry && getRefreshToken() && await refreshAuthTokens()) {
                 return authenticatedUser(false);
             }
-            handleAuthFailure();
+            handleAuthFailure(true, !getRefreshToken());
         }
         return null;
     }
@@ -306,6 +426,7 @@ export async function authenticatedUser(retry: boolean = true): Promise<unknown 
 }
 
 export async function ensureAuthenticated(): Promise<boolean> {
+    await hydrateNativeAuthTokens().catch(() => false);
     const user = await authenticatedUser().catch(() => null);
     if (user) return true;
     if (!getAccessToken() && !getRefreshToken()) return false;

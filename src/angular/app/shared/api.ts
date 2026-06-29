@@ -19,6 +19,7 @@ export interface ApiResult<T = unknown> {
 }
 
 export interface ApiFetchOptions extends RequestInit {
+    authFailureRedirect?: boolean;
     retries?: number;
     retryDelayMs?: number;
     timeoutMs?: number;
@@ -214,8 +215,16 @@ async function fetchOnce<T>(url: string, options: ApiFetchOptions, authRetried: 
     const timeoutMs = options.timeoutMs ?? 20000;
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
-    const { retries, retryDelayMs, timeoutMs: _timeoutMs, signal, ...requestOptions } = options;
+    const {
+        authFailureRedirect,
+        retries,
+        retryDelayMs,
+        timeoutMs: _timeoutMs,
+        signal,
+        ...requestOptions
+    } = options;
     const isProtected = isAuthProtectedUrl(requestUrl);
+    const shouldRedirectAuthFailure = authFailureRedirect !== false;
 
     try {
         const response = await fetch(requestUrl, {
@@ -232,7 +241,7 @@ async function fetchOnce<T>(url: string, options: ApiFetchOptions, authRetried: 
             return fetchOnce<T>(url, options, true);
         }
         if (response.status === 401 && isProtected) {
-            handleAuthFailure();
+            handleAuthFailure(shouldRedirectAuthFailure, !getRefreshToken());
         }
         const payload = await readPayload(response).catch((error) => {
             if (isApiError(error)) throw error;

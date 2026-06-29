@@ -1,6 +1,7 @@
 import Capacitor
 import Foundation
 import AuthenticationServices
+import Security
 import UIKit
 
 @objc(RunningMateAuthPlugin)
@@ -9,10 +10,15 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
     let jsName = "RunningMateAuth"
     let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "openExternalAuth", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveAuthTokens", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "loadAuthTokens", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "clearAuthTokens", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setSafeAreaBackground", returnType: CAPPluginReturnPromise)
     ]
 
     private var authSession: ASWebAuthenticationSession?
+    private let keychainService = "com.myrunningmate.run.auth"
+    private let keychainAccount = "runningmate.auth.tokens"
 
     @objc func openExternalAuth(_ call: CAPPluginCall) {
         guard let rawURL = call.getString("url"),
@@ -86,6 +92,56 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
         }
     }
 
+    @objc func saveAuthTokens(_ call: CAPPluginCall) {
+        guard let accessToken = call.getString("accessToken"), !accessToken.isEmpty,
+              let refreshToken = call.getString("refreshToken"), !refreshToken.isEmpty else {
+            call.reject("저장할 로그인 토큰이 없습니다.", "missing_tokens")
+            return
+        }
+
+        let autoLogin = call.getBool("autoLogin") ?? false
+        if !autoLogin {
+            clearStoredAuthTokens()
+            call.resolve(["saved": false])
+            return
+        }
+
+        let payload: [String: Any] = [
+            "accessToken": accessToken,
+            "refreshToken": refreshToken,
+            "autoLogin": true,
+            "savedAt": Date().timeIntervalSince1970
+        ]
+
+        do {
+            try saveStoredAuthTokens(payload)
+            call.resolve(["saved": true])
+        } catch {
+            call.reject("자동 로그인 정보를 저장하지 못했습니다.", "keychain_save_failed", error)
+        }
+    }
+
+    @objc func loadAuthTokens(_ call: CAPPluginCall) {
+        guard let payload = loadStoredAuthTokens(),
+              let accessToken = payload["accessToken"] as? String, !accessToken.isEmpty,
+              let refreshToken = payload["refreshToken"] as? String, !refreshToken.isEmpty else {
+            call.resolve(["hasTokens": false])
+            return
+        }
+
+        call.resolve([
+            "hasTokens": true,
+            "accessToken": accessToken,
+            "refreshToken": refreshToken,
+            "autoLogin": (payload["autoLogin"] as? Bool) ?? true
+        ])
+    }
+
+    @objc func clearAuthTokens(_ call: CAPPluginCall) {
+        clearStoredAuthTokens()
+        call.resolve(["cleared": true])
+    }
+
     @available(iOS 12.0, *)
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         if let window = bridge?.viewController?.view.window {
@@ -102,5 +158,47 @@ class RunningMateAuthPlugin: CAPPlugin, CAPBridgedPlugin, ASWebAuthenticationPre
         }
 
         return ASPresentationAnchor()
+    }
+
+    private func keychainIdentityQuery() -> [String: Any] {
+        return [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount
+        ]
+    }
+
+    private func saveStoredAuthTokens(_ payload: [String: Any]) throws {
+        let data = try JSONSerialization.data(withJSONObject: payload, options: [])
+        clearStoredAuthTokens()
+
+        var query = keychainIdentityQuery()
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        query[kSecValueData as String] = data
+
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw NSError(domain: "RunningMateAuthPlugin", code: Int(status), userInfo: [
+                NSLocalizedDescriptionKey: "Keychain save failed with status \(status)"
+            ])
+        }
+    }
+
+    private func loadStoredAuthTokens() -> [String: Any]? {
+        var query = keychainIdentityQuery()
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else {
+            return nil
+        }
+
+        return (try? JSONSerialization.jsonObject(with: data, options: [])) as? [String: Any]
+    }
+
+    private func clearStoredAuthTokens() {
+        SecItemDelete(keychainIdentityQuery() as CFDictionary)
     }
 }

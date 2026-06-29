@@ -2,11 +2,14 @@ import json
 
 
 running = wiz.model("runningmate")
+security = wiz.model("security")
 
 try:
     session = wiz.model("portal/season/session").use()
 except Exception:
     session = None
+if session is not None:
+    security.bind_bearer_session(session)
 
 
 def _request_payload():

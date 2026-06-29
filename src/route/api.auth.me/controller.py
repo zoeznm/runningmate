@@ -2,7 +2,9 @@ auth = wiz.model("auth")
 session = wiz.model("portal/season/session").use()
 struct = wiz.model("struct")
 request = wiz.server.package.flask.request
-wiz.model("security").auth_headers()
+security = wiz.model("security")
+security.auth_headers()
+security.bind_bearer_session(session)
 
 if request.method != "GET":
     wiz.response.status(405, success=False, message="지원하지 않는 요청입니다.")

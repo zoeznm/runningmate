@@ -1,5 +1,5 @@
 import { AfterViewInit, ChangeDetectorRef, ElementRef, OnDestroy } from '@angular/core';
-import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, refreshAuthTokens } from 'src/app/shared/auth';
+import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, hasAuthTokens, hydrateNativeAuthTokens, refreshAuthTokens } from 'src/app/shared/auth';
 import { apiFetch, apiErrorMessage, jsonRequest, payloadUserMessage, safeUserMessage, standardApiError } from 'src/app/shared/api';
 import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
 import { ToastService } from 'src/app/shared/toast.service';
@@ -7523,7 +7523,6 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private redirectToAccess(): void {
-        clearAuthTokens();
         window.location.replace('/access');
     }
 
@@ -9331,8 +9330,20 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private async saveRunRecord(data: RunRecord & { raw_parsed_json?: Record<string, unknown> }, updateRunId: string | null = null): Promise<SaveRunResult> {
+        if (!(await this.ensureRunSaveAuthReady())) {
+            return {
+                saved: false,
+                message: '로그인 상태를 다시 연결하지 못했어. 앱을 한 번 다시 열고 시도해줘.'
+            };
+        }
+
         const endpoint = updateRunId ? `/api/runs/${encodeURIComponent(updateRunId)}` : '/api/runs';
-        const result = await jsonRequest<any>(endpoint, updateRunId ? 'PATCH' : 'POST', data);
+        const method = updateRunId ? 'PATCH' : 'POST';
+        const options = { authFailureRedirect: false };
+        let result = await jsonRequest<any>(endpoint, method, data, options);
+        if (!result.success && result.error?.status === 401 && await this.reconnectRunSaveAuth()) {
+            result = await jsonRequest<any>(endpoint, method, data, { ...options, retries: 0 });
+        }
         const payload = result.raw as any;
         if (!result.success) {
             return {
@@ -9358,6 +9369,20 @@ export class Component implements AfterViewInit, OnDestroy {
             run: payload?.data as RunRecord | undefined,
             newlyEarnedBadges
         };
+    }
+
+    private async ensureRunSaveAuthReady(): Promise<boolean> {
+        await hydrateNativeAuthTokens().catch(() => false);
+        if (hasAuthTokens()) return true;
+        if (isNativeLocalOrigin()) return false;
+        return await ensureAuthenticated().catch(() => false);
+    }
+
+    private async reconnectRunSaveAuth(): Promise<boolean> {
+        await hydrateNativeAuthTokens().catch(() => false);
+        if (!hasAuthTokens()) return false;
+        if (await refreshAuthTokens().catch(() => false)) return true;
+        return hasAuthTokens();
     }
 
     private handleNewlyEarnedBadges(badges: Badge[]): void {

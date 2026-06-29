@@ -359,7 +359,11 @@ export class Component implements OnInit, OnDestroy {
 
         const refreshed = await this.withTimeout(refreshAuthTokens(), this.sessionBootstrapTimeoutMs).catch(() => false);
         if (!refreshed) {
-            if (!hasAuthTokens()) clearAuthTokens();
+            if (hasAuthTokens()) {
+                this.goDashboard();
+                return true;
+            }
+            clearAuthTokens();
             return false;
         }
 
@@ -372,7 +376,12 @@ export class Component implements OnInit, OnDestroy {
             return true;
         }
 
-        if (!hasAuthTokens()) clearAuthTokens();
+        if (hasAuthTokens()) {
+            this.goDashboard();
+            return true;
+        }
+
+        clearAuthTokens();
         return false;
     }
 
@@ -386,6 +395,21 @@ export class Component implements OnInit, OnDestroy {
             this.sessionBootstrapTimeoutMs
         ).catch(() => null);
         if (user) return true;
+
+        const refreshed = await this.withTimeout(
+            refreshAuthTokens(),
+            this.sessionBootstrapTimeoutMs
+        ).catch(() => false);
+        if (refreshed) {
+            const refreshedUser = await this.withTimeout(
+                authenticatedUser(),
+                this.sessionBootstrapTimeoutMs
+            ).catch(() => null);
+            if (refreshedUser) return true;
+        }
+
+        if (hasAuthTokens()) return true;
+
         clearAuthTokens();
         return false;
     }
@@ -525,7 +549,7 @@ export class Component implements OnInit, OnDestroy {
 
     private shouldPersistOAuthLogin(payload: any): boolean {
         const provider = String(payload?.provider || payload?.oauth_provider || '').trim().toLowerCase();
-        return provider === 'apple';
+        return ['apple', 'google', 'naver'].includes(provider);
     }
 
     public socialErrorFromUrl() {

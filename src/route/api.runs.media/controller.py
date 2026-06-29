@@ -2,6 +2,7 @@ running = wiz.model("runningmate")
 security = wiz.model("security")
 request = wiz.server.package.flask.request
 session = wiz.model("portal/season/session").use()
+security.bind_bearer_session(session)
 
 
 def _uploaded_files():

@@ -1,8 +1,10 @@
 auth = wiz.model("auth")
 running = wiz.model("runningmate")
 session = wiz.model("portal/season/session").use()
+security = wiz.model("security")
 struct = wiz.model("struct")
 request = wiz.server.package.flask.request
+security.bind_bearer_session(session)
 
 
 INITIAL_RUN_FIELDS = [

@@ -77,6 +77,44 @@ class Security:
         except Exception:
             pass
 
+    def bearer_token(self):
+        try:
+            request = wiz.server.package.flask.request
+            header = str(request.headers.get("Authorization") or "").strip()
+        except Exception:
+            return ""
+
+        if not header.lower().startswith("bearer "):
+            return ""
+        return header.split(" ", 1)[1].strip()
+
+    def bind_bearer_session(self, session=None):
+        try:
+            session = session or wiz.model("portal/season/session").use()
+            if session.get("id"):
+                return session.get("id")
+        except Exception:
+            return ""
+
+        token = self.bearer_token()
+        if not token:
+            return ""
+
+        try:
+            auth = wiz.model("auth")
+            verified, error = auth.verify_token(token, token_type="access")
+            if error or not verified:
+                return ""
+
+            user = verified.get("user")
+            if not user:
+                return ""
+
+            session.set(**auth.session_payload(user))
+            return str(user.get("id") or "")
+        except Exception:
+            return ""
+
     def _sensitive_key(self, key):
         normalized = re.sub(r"[^a-z0-9]+", "_", str(key or "").strip().lower()).strip("_")
         if normalized in self.SENSITIVE_KEYS:

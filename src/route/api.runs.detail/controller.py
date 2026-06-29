@@ -3,6 +3,8 @@ import json
 
 running = wiz.model("runningmate")
 session = wiz.model("portal/season/session").use()
+security = wiz.model("security")
+security.bind_bearer_session(session)
 
 
 def _request_payload():

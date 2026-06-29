@@ -5,6 +5,8 @@ struct = wiz.model("struct")
 running = wiz.model("runningmate")
 session = wiz.model("portal/season/session").use()
 request = wiz.server.package.flask.request
+security = wiz.model("security")
+security.bind_bearer_session(session)
 
 
 def _payload():
