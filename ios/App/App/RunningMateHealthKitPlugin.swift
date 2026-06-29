@@ -993,8 +993,10 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
         let distanceMeters = max(session.distanceMeters, session.watchDistanceMeters ?? 0)
         let distanceKm = distanceMeters / 1000.0
         let steps = max(session.steps, session.watchSteps ?? 0)
-        let cadence = session.cadenceStepsPerMinute ?? (elapsedSeconds > 0 ? steps / (elapsedSeconds / 60.0) : nil)
-        let calories = session.watchCalories ?? estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
+        let averageCadence = elapsedSeconds > 0 ? steps / (elapsedSeconds / 60.0) : nil
+        let cadence = ended ? averageCadence : (session.cadenceStepsPerMinute ?? averageCadence)
+        let estimatedCalories = estimatedCalories(distanceKm: distanceKm, elapsedSeconds: elapsedSeconds, weightKg: session.weightKg)
+        let calories = max(session.watchCalories ?? 0, estimatedCalories)
         let averagePaceSecondsPerKm = distanceMeters >= 1.0 && elapsedSeconds > 0 ? elapsedSeconds / max(distanceKm, 0.001) : nil
         let currentPaceSecondsPerKm = session.currentPaceSecondsPerKm() ?? averagePaceSecondsPerKm
         let watchConnected = session.hasRecentWatchMetrics || watchSessionIsReachable()
@@ -1318,8 +1320,32 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
     private func handleWatchRunMetrics(_ message: [String: Any]) {
         DispatchQueue.main.async {
             guard let session = self.liveRunSession else { return }
-            guard session.status == .running || session.status == .paused else { return }
+            let watchStatus = message["status"] as? String
             guard let runId = message["runId"] as? String, !runId.isEmpty, runId == session.id else {
+                return
+            }
+
+            if watchStatus == "paused" {
+                guard session.status == .running else { return }
+                session.pause()
+                self.persistLiveRunSession(force: true)
+                self.stopLocationUpdates()
+                self.pedometer.stopUpdates()
+                self.emitLiveRunUpdate(reason: "watch_paused")
+                return
+            }
+
+            if watchStatus == "running", session.status == .paused {
+                session.resume()
+                self.persistLiveRunSession(force: true)
+                self.configureLocationTracking()
+                self.startLocationUpdates()
+                self.startPedometerUpdates(from: session.activeSegmentStart)
+                self.startLiveRunTimers()
+            }
+
+            guard session.status == .running else { return }
+            if watchStatus == "stopped" {
                 return
             }
 
@@ -1346,6 +1372,9 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             }
             if let stepCount = self.numericValue(message["step_count"] ?? message["stepCount"]), stepCount >= 0 {
                 session.watchSteps = max(session.watchSteps ?? 0, stepCount)
+            }
+            if let elevationGain = self.numericValue(message["elevation_gain_m"] ?? message["elevationGainM"] ?? message["elevation_gain"]), elevationGain >= 0 {
+                session.elevationGainMeters = max(session.elevationGainMeters, elevationGain)
             }
             if let cadence = self.numericValue(message["cadence"]), cadence > 0 {
                 if session.lastCadenceSampleAt == nil || Date().timeIntervalSince(session.lastCadenceSampleAt ?? Date()) > 2.0 {
@@ -1474,10 +1503,10 @@ class RunningMateHealthKitPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationManager
             session.appendRouteLocation(location)
             session.lastLocation = location
 
-            if location.verticalAccuracy >= 0 && location.verticalAccuracy <= 30 {
+            if location.verticalAccuracy >= 0 && location.verticalAccuracy <= 50 {
                 if let lastAltitude = session.lastAltitude {
                     let altitudeDelta = location.altitude - lastAltitude
-                    if altitudeDelta > 1.5 {
+                    if altitudeDelta > 0.75 && altitudeDelta <= 30 {
                         session.elevationGainMeters += altitudeDelta
                     }
                 }

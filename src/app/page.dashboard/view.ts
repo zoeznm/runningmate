@@ -6262,6 +6262,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
 
         this.addLiveRunListener(plugin, 'liveRunUpdate', (event) => {
+            if (this.completedLiveRun) return;
             this.applyLiveRunMetrics(event);
             if (this.liveRun.status === 'running' && this.pendingLiveRunPauseState !== true) {
                 this.liveRunStatus = '러닝 측정 중';
