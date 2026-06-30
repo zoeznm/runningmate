@@ -1666,6 +1666,9 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly liveRunLightBackground: string = '#0e7490';
     private readonly liveRunPausedDarkBackground: string = '#000000';
     private readonly liveRunPausedLightBackground: string = '#ffffff';
+    private readonly liveRunDiscardDarkBackground: string = '#136f5e';
+    private readonly liveRunDiscardLightBackground: string = '#0e5a74';
+    private readonly liveRunDiscardPausedLightBackground: string = '#d0d5dd';
     private readonly dashboardDarkTextColor: string = '#e8e8f0';
     private readonly dashboardLightTextColor: string = '#1a1a2e';
     private readonly loadingScreenTextColor: string = '#ffffff';
@@ -6970,6 +6973,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
         if (this.activeScreen !== 'live-run' || this.completedLiveRun || this.isLiveRunDiscarding) return;
         this.liveRunDiscardConfirmVisible = true;
+        this.syncDashboardChrome();
         this.cdr.detectChanges();
     }
 
@@ -6981,6 +6985,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
         if (this.isLiveRunDiscarding) return;
         this.liveRunDiscardConfirmVisible = false;
+        this.syncDashboardChrome();
         this.cdr.detectChanges();
     }
 
@@ -6992,6 +6997,7 @@ export class Component implements AfterViewInit, OnDestroy {
         }
         if (this.isLiveRunDiscarding) return;
         this.liveRunDiscardConfirmVisible = false;
+        this.syncDashboardChrome();
         void this.discardLiveRun(false);
     }
 
@@ -13399,6 +13405,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardScreenBackground(): string {
+        if (this.isLiveRunDiscardBackdropVisible()) return this.liveRunDiscardBackdropBackground();
         const override = this.activeLiveRunChromeOverride();
         if (override) return override.background;
         if (this.isInitialLoading) return this.loadingScreenBackground;
@@ -13412,6 +13419,7 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     private dashboardShellTextColor(): string {
+        if (this.isLiveRunDiscardBackdropVisible()) return '#ffffff';
         const override = this.activeLiveRunChromeOverride();
         if (override) return override.textColor;
         if (this.isInitialLoading) return this.loadingScreenTextColor;
@@ -13422,6 +13430,19 @@ export class Component implements AfterViewInit, OnDestroy {
             return this.isDark ? this.liveRunDarkTextColor : this.liveRunLightTextColor;
         }
         return this.isDark ? this.dashboardDarkTextColor : this.dashboardLightTextColor;
+    }
+
+    private isLiveRunDiscardBackdropVisible(): boolean {
+        return this.liveRunDiscardConfirmVisible
+            && this.activeScreen === 'live-run'
+            && !this.completedLiveRun;
+    }
+
+    private liveRunDiscardBackdropBackground(): string {
+        if (this.isLiveRunPaused) {
+            return this.isDark ? this.liveRunPausedDarkBackground : this.liveRunDiscardPausedLightBackground;
+        }
+        return this.isDark ? this.liveRunDiscardDarkBackground : this.liveRunDiscardLightBackground;
     }
 
     private activeLiveRunChromeOverride():

@@ -3,7 +3,7 @@ import Capacitor
 import UIKit
 
 class RunningMateBridgeViewController: CAPBridgeViewController {
-    private var appBackgroundOverride: UIColor? = UIColor(red: 7.0 / 255.0, green: 17.0 / 255.0, blue: 15.0 / 255.0, alpha: 1.0)
+    private var appBackgroundOverride: UIColor? = UIColor.black
     private var appBackgroundPrefersDarkStatusBarText: Bool = false
     private var appBackgroundColor: UIColor {
         if let appBackgroundOverride = appBackgroundOverride {
@@ -115,7 +115,7 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.setAppBackgroundColor("#07110f")
+            self.setAppBackgroundColor("#000000")
             self.webView?.evaluateJavaScript("window.location.replace('\(escapedPath)')") { [weak self] _, error in
                 guard let self = self, error != nil else { return }
 
