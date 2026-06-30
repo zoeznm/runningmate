@@ -16,7 +16,8 @@ struct RunningMateWeeklyProgress: Hashable {
     let completedRuns: [RunningMateCompletedRunRecord]
 
     var completedCount: Int {
-        min(completedRuns.count, goalCount)
+        let completedDays = Set(completedRuns.map { Calendar.current.startOfDay(for: $0.endDate) })
+        return min(completedDays.count, goalCount)
     }
 
     var latestRunDate: Date? {
