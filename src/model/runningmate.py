@@ -5128,8 +5128,8 @@ class RunningMateData:
         if me.get("rank") == 1:
             runner_up = next((row for row in entries if row.get("rank") != 1 and row.get("distance_km")), None)
             if runner_up and runner_up.get("distance_km"):
-                gap = round((me.get("distance_km") or 0) - (runner_up.get("distance_km") or 0), 2)
-                return f"{runner_up.get('name')}를 {gap:.2f}km 차로 앞서고 있어."
+                gap = max(0, round((me.get("distance_km") or 0) - (runner_up.get("distance_km") or 0), 2))
+                return f"현재 1위야. 2위와 {gap:.2f}km 차이를 유지하고 있어."
             return "현재 1위야. 이번 기간 페이스를 유지해보자."
 
         try:
@@ -5145,10 +5145,10 @@ class RunningMateData:
                     break
 
         if ahead:
-            gap = round((ahead.get("distance_km") or 0) - (me.get("distance_km") or 0), 2)
+            gap = max(0, round((ahead.get("distance_km") or 0) - (me.get("distance_km") or 0), 2))
             if gap <= 0 and me.get("rank_tiebreaker") == "pace":
                 return f"{period_text} 거리는 동률이라 평균 페이스로 순위가 갈리고 있어."
-            return f"{period_text} {ahead.get('name')}를 {gap:.2f}km 차로 추격 중!"
+            return f"{period_text} {gap:.2f}km만 더 뛰면 순위를 올릴 수 있어."
         return "조금만 더 뛰면 순위를 올릴 수 있어."
 
     def _remember_weekly_winner(self, social, period_info, winner):

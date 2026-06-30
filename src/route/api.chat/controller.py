@@ -16,6 +16,17 @@ try:
 except Exception:
     session = None
 
+try:
+    security = wiz.model("security")
+except Exception:
+    security = None
+
+if session is not None and security is not None:
+    try:
+        security.bind_bearer_session(session)
+    except Exception:
+        pass
+
 ENV_FILE = os.environ.get("RUNNINGMATE_OPENAI_ENV_FILE", "/opt/app/config/openai.env")
 DEFAULT_CODEX_TIMEOUT = 180
 DEFAULT_CHAT_MODEL = "gpt-5.4-mini"

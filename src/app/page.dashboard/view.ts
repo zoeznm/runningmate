@@ -4903,6 +4903,11 @@ export class Component implements AfterViewInit, OnDestroy {
             iconClass: 'fa-message'
         }))) return;
 
+        if (!(await this.ensureChatAuthReady())) {
+            this.showToast('로그인 상태를 다시 연결하지 못했어. 앱을 한 번 다시 열고 시도해줘.', 'error');
+            return;
+        }
+
         this.deletingChatSessionId = session.id;
         this.cdr.detectChanges();
 
@@ -7288,6 +7293,10 @@ export class Component implements AfterViewInit, OnDestroy {
             this.notifyAiUsageLimit(this.aiUsage);
             return;
         }
+        if (!(await this.ensureChatAuthReady())) {
+            this.showToast('로그인 상태를 다시 연결하지 못했어. 앱을 한 번 다시 열고 시도해줘.', 'error');
+            return;
+        }
 
         const sessionId = this.prepareChatSessionForSend();
         this.chatDayPromptSession = null;
@@ -9038,6 +9047,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private async loadChatHistory(selectLatest: boolean = false): Promise<void> {
         this.isChatHistoryLoading = true;
         try {
+            await hydrateNativeAuthTokens().catch(() => false);
             const response = await fetch('/api/chat', {
                 headers: authHeaderForUrl('/api/chat')
             });
@@ -9514,6 +9524,13 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!hasAuthTokens()) return false;
         if (await refreshAuthTokens().catch(() => false)) return true;
         return hasAuthTokens();
+    }
+
+    private async ensureChatAuthReady(): Promise<boolean> {
+        await hydrateNativeAuthTokens().catch(() => false);
+        if (hasAuthTokens()) return true;
+        if (isNativeLocalOrigin()) return false;
+        return await ensureAuthenticated().catch(() => false);
     }
 
     private handleNewlyEarnedBadges(badges: Badge[]): void {

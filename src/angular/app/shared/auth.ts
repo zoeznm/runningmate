@@ -363,7 +363,7 @@ async function fetchWithAuth(input: RequestInfo | URL, init: RequestInit = {}, r
     const url = requestUrl(resolvedInput);
     const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
     const token = shouldAttachAuth(url) ? getAccessToken() : '';
-    if (token && !headers.has('Authorization')) {
+    if (token) {
         headers.set('Authorization', `Bearer ${token}`);
     }
 
