@@ -34,6 +34,7 @@ type WeekdayId = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 type PacerPersona = 'balanced' | 'coach' | 'gentle' | 'strict';
 type SettingsDetailKey = 'reminder' | 'password' | 'export' | null;
 type SettingsExportFormat = 'json' | 'csv';
+type AiConsentFeature = 'chat' | 'image-parse';
 
 const KM_PER_MILE = 1.609344;
 const AI_PARSE_CONFIGURATION_ERROR_CODES = new Set([
@@ -1504,6 +1505,8 @@ export class Component implements AfterViewInit, OnDestroy {
     public aiLoginDeviceUrl: string = '';
     public aiLoginDeviceCode: string = '';
     public aiLoginDeviceExpiresIn: number | null = null;
+    public aiConsentDialogVisible: boolean = false;
+    public aiConsentFeature: AiConsentFeature = 'chat';
     public runMediaStatus: string = '';
     public uploadingMediaRunId: string | null = null;
     public deletingMediaId: string | null = null;
@@ -1595,6 +1598,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly restBannerDismissStorageKey: string = 'runningmate-rest-banner-dismissed-v1';
     private readonly appSettingsStorageKey: string = 'runningmate-settings-v1';
     private readonly pacerPersonaStorageKey: string = 'runningmate-pacer-persona-v1';
+    private readonly aiConsentStorageKey: string = 'runningmate-ai-third-party-consent-v1';
     private readonly appleMusicUserTokenStorageKey: string = 'runningmate-apple-music-user-token-v1';
     private readonly weightTargetStorageKey: string = 'runningmate-weight-target-v1';
     private readonly weatherPositionStorageKey: string = 'runningmate-weather-position-v1';
@@ -1617,6 +1621,8 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly initialDashboardTaskTimeoutMs: number = 9000;
     private readonly liveRunNativeCancelTimeoutMs: number = 3500;
     private readonly confirmBackdropIgnoreMs: number = 500;
+    private aiConsentDialogResolver: ((confirmed: boolean) => void) | null = null;
+    private aiConsentDialogOpenedAt: number = 0;
     private isCyclePreferenceSaving: boolean = false;
     private readonly initialLoadingStepPriority: string[] = [
         'auth',
@@ -3732,8 +3738,61 @@ export class Component implements AfterViewInit, OnDestroy {
         window.location.href = path;
     }
 
+    public get aiConsentFeatureLabel(): string {
+        return this.aiConsentFeature === 'image-parse' ? '기록 이미지 AI 분석' : 'AI 페이서 대화';
+    }
+
+    public acceptAiConsent(event?: Event): void {
+        event?.preventDefault();
+        event?.stopPropagation();
+        this.storeAiDataConsent();
+        this.resolveAiConsentDialog(true);
+    }
+
+    public declineAiConsent(event?: Event): void {
+        event?.preventDefault();
+        event?.stopPropagation();
+        this.resolveAiConsentDialog(false);
+    }
+
+    public dismissAiConsentFromBackdrop(event?: Event): void {
+        event?.preventDefault();
+        event?.stopPropagation();
+        if (Date.now() - this.aiConsentDialogOpenedAt < this.confirmBackdropIgnoreMs) return;
+        this.resolveAiConsentDialog(false);
+    }
+
     public openFullDataDelete(): void {
         this.openLegalPage('/account/delete');
+    }
+
+    private async ensureAiDataConsent(feature: AiConsentFeature): Promise<boolean> {
+        if (this.hasAiDataConsent()) return true;
+        return await this.openAiConsentDialog(feature);
+    }
+
+    private openAiConsentDialog(feature: AiConsentFeature): Promise<boolean> {
+        if (this.aiConsentDialogResolver) {
+            this.resolveAiConsentDialog(false);
+        }
+
+        this.aiConsentFeature = feature;
+        this.aiConsentDialogVisible = true;
+        this.aiConsentDialogOpenedAt = Date.now();
+        this.cdr.detectChanges();
+
+        return new Promise((resolve) => {
+            this.aiConsentDialogResolver = resolve;
+        });
+    }
+
+    private resolveAiConsentDialog(confirmed: boolean): void {
+        const resolver = this.aiConsentDialogResolver;
+        this.aiConsentDialogResolver = null;
+        this.aiConsentDialogOpenedAt = 0;
+        this.aiConsentDialogVisible = false;
+        this.cdr.detectChanges();
+        if (resolver) resolver(confirmed);
     }
 
     public openConfirmDialog(message: string, options: AppConfirmOptions = {}): Promise<boolean> {
@@ -7303,6 +7362,10 @@ export class Component implements AfterViewInit, OnDestroy {
             this.showToast('로그인 상태를 다시 연결하지 못했어. 앱을 한 번 다시 열고 시도해줘.', 'error');
             return;
         }
+        if (!(await this.ensureAiDataConsent('chat'))) {
+            this.showToast('AI 데이터 전송에 동의해야 페이서를 사용할 수 있어.', 'error');
+            return;
+        }
 
         const sessionId = this.prepareChatSessionForSend();
         this.chatDayPromptSession = null;
@@ -9586,6 +9649,9 @@ export class Component implements AfterViewInit, OnDestroy {
         if (!(await ensureAuthenticated())) {
             throw { message: '로그인이 만료되었습니다. 다시 로그인해주세요.' };
         }
+        if (!(await this.ensureAiDataConsent('image-parse'))) {
+            throw { message: 'AI 데이터 전송에 동의해야 기록 이미지 분석을 사용할 수 있어.' };
+        }
 
         return new Promise((resolve, reject) => {
             const form = new FormData();
@@ -10534,6 +10600,31 @@ export class Component implements AfterViewInit, OnDestroy {
         ]
             .map((value) => typeof value === 'string' ? value.trim() : '')
             .find(Boolean) || '';
+    }
+
+    private aiConsentStorageKeyForCurrentUser(): string {
+        const identity = this.currentUserStorageIdentity();
+        return identity ? `${this.aiConsentStorageKey}:${encodeURIComponent(identity)}` : this.aiConsentStorageKey;
+    }
+
+    private hasAiDataConsent(): boolean {
+        if (typeof window === 'undefined' || !window.localStorage) return false;
+
+        try {
+            return window.localStorage.getItem(this.aiConsentStorageKeyForCurrentUser()) === 'accepted';
+        } catch {
+            return false;
+        }
+    }
+
+    private storeAiDataConsent(): void {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+
+        try {
+            window.localStorage.setItem(this.aiConsentStorageKeyForCurrentUser(), 'accepted');
+        } catch {
+            return;
+        }
     }
 
     private weightTargetStorageKeyForCurrentUser(): string | null {

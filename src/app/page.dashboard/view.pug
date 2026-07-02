@@ -2868,6 +2868,35 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         button(type="button", class="onboarding-confirm-primary", [disabled]="isOnboardingSaving", (click)="confirmOnboardingSkip()")
                             span {{isOnboardingSaving ? '처리 중' : '건너뛰기'}}
 
+            div(*ngIf="aiConsentDialogVisible", class="ai-consent-backdrop", role="presentation", (click)="dismissAiConsentFromBackdrop($event)")
+                section(class="ai-consent-dialog", role="dialog", aria-modal="true", aria-label="AI 데이터 전송 동의", (click)="$event.stopPropagation()")
+                    div(class="ai-consent-icon")
+                        i(class="fa-solid fa-wand-magic-sparkles", aria-hidden="true")
+                    div(class="ai-consent-kicker") {{aiConsentFeatureLabel}}
+                    h3 AI 기능 사용 전 확인해주세요
+                    p(class="ai-consent-lead")
+                        | RunningMate는 AI 페이서 답변과 기록 이미지 분석을 위해 사용자가 요청한 데이터만 OpenAI, L.L.C.로 전송합니다.
+                    div(class="ai-consent-section")
+                        div(class="ai-consent-section-title") 전송될 수 있는 데이터
+                        ul
+                            li 사용자 질문과 AI 대화 내용
+                            li 최근 러닝 기록: 날짜, 거리, 시간, 페이스, 심박수, 케이던스, 칼로리, 고도, 일기
+                            li 목표, 랭킹, 수분 기록, 훈련 부하와 친구 응원 맥락
+                            li 사용자가 생리주기 연동을 켠 경우 주기 관련 운동 컨텍스트
+                            li 기록 이미지 분석을 요청할 때 사용자가 선택한 운동 기록 이미지
+                    div(class="ai-consent-section")
+                        div(class="ai-consent-section-title") 수신자와 목적
+                        p OpenAI, L.L.C.에 전송되며 AI 답변 생성과 러닝 기록 이미지 분석에만 사용됩니다. 광고 추적이나 데이터 브로커 공유 목적으로 사용하지 않습니다.
+                    div(class="ai-consent-note")
+                        i(class="fa-solid fa-circle-info", aria-hidden="true")
+                        span 동의하지 않아도 러닝 기록, 목표, 달력, 커뮤니티 등 AI 외 기능은 계속 사용할 수 있습니다.
+                    button(type="button", class="ai-consent-link", (click)="openLegalPage('/privacy')")
+                        i(class="fa-solid fa-file-shield", aria-hidden="true")
+                        span 개인정보처리방침 보기
+                    div(class="ai-consent-actions")
+                        button(type="button", class="ai-consent-cancel", (click)="declineAiConsent($event)") 취소
+                        button(type="button", class="ai-consent-accept", (click)="acceptAiConsent($event)") 동의하고 사용
+
             div(*ngIf="confirmDialog.visible", class="app-confirm-backdrop", role="presentation", (click)="dismissConfirmDialogFromBackdrop($event)")
                 section(
                     class="app-confirm-dialog",
