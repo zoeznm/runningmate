@@ -1623,6 +1623,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private readonly confirmBackdropIgnoreMs: number = 500;
     private aiConsentDialogResolver: ((confirmed: boolean) => void) | null = null;
     private aiConsentDialogOpenedAt: number = 0;
+    private aiConsentEntryPromptShown: boolean = false;
     private isCyclePreferenceSaving: boolean = false;
     private readonly initialLoadingStepPriority: string[] = [
         'auth',
@@ -3019,16 +3020,21 @@ export class Component implements AfterViewInit, OnDestroy {
     }
 
     public get isChatInputDisabled(): boolean {
-        return this.isChatSending || this.isAiUsageExhausted;
+        return this.isChatSending || this.isAiUsageExhausted || this.requiresAiDataConsent;
     }
 
     public get chatInputPlaceholder(): string {
+        if (this.requiresAiDataConsent) return 'AI 데이터 전송 동의 후 페이서를 사용할 수 있어';
         if (!this.isAiUsageExhausted) return '페이서한테 물어봐...';
         const usage = this.aiUsage;
         if (usage?.reason === 'monthly_limit' || usage?.monthly_remaining === 0) {
             return '이번 달 페이서 AI 한도를 모두 사용했어';
         }
         return '오늘 페이서 AI 한도를 모두 사용했어';
+    }
+
+    public get requiresAiDataConsent(): boolean {
+        return !this.hasAiDataConsent();
     }
 
     public get shouldShowChatDayPrompt(): boolean {
@@ -3319,6 +3325,17 @@ export class Component implements AfterViewInit, OnDestroy {
         if (screen === 'chat' || screen === 'ai-settings') {
             if (!this.aiConnection) {
                 await this.runDeferredDashboardTask(() => this.loadAiConnection());
+            }
+            if (!this.hasAiDataConsent()) {
+                this.activeChatSessionId = null;
+                this.chatDayPromptSession = null;
+                this.isChatHistoryOpen = false;
+                this.chatMessages = this.buildChatMessages();
+                this.cdr.detectChanges();
+                if (screen === 'chat') {
+                    void this.promptAiConsentOnChatEntry();
+                }
+                return;
             }
             if (!this.chatSessions.length) {
                 await this.runDeferredDashboardTask(() => this.loadChatHistory(true));
@@ -3762,6 +3779,19 @@ export class Component implements AfterViewInit, OnDestroy {
         this.resolveAiConsentDialog(false);
     }
 
+    public async requestAiDataConsent(feature: AiConsentFeature = 'chat', event?: Event): Promise<void> {
+        event?.preventDefault();
+        event?.stopPropagation();
+        const accepted = await this.ensureAiDataConsent(feature);
+        if (!accepted) {
+            this.showToast('AI 데이터 전송에 동의해야 페이서를 사용할 수 있어.', 'error');
+            return;
+        }
+        if (feature === 'chat') {
+            await this.loadActiveScreenData(false);
+        }
+    }
+
     public openFullDataDelete(): void {
         this.openLegalPage('/account/delete');
     }
@@ -3769,6 +3799,15 @@ export class Component implements AfterViewInit, OnDestroy {
     private async ensureAiDataConsent(feature: AiConsentFeature): Promise<boolean> {
         if (this.hasAiDataConsent()) return true;
         return await this.openAiConsentDialog(feature);
+    }
+
+    private async promptAiConsentOnChatEntry(): Promise<void> {
+        if (this.hasAiDataConsent() || this.aiConsentEntryPromptShown || this.aiConsentDialogVisible) return;
+        this.aiConsentEntryPromptShown = true;
+        const accepted = await this.openAiConsentDialog('chat');
+        if (accepted) {
+            await this.loadActiveScreenData(false);
+        }
     }
 
     private openAiConsentDialog(feature: AiConsentFeature): Promise<boolean> {

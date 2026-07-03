@@ -9190,6 +9190,65 @@ button span {
     white-space: nowrap;
 }
 
+.chat-consent-banner {
+    display: grid;
+    gap: 12px;
+    border-bottom: 0.5px solid color-mix(in srgb, var(--primary-fill) 35%, var(--line-soft));
+    background: color-mix(in srgb, var(--primary-fill) 14%, var(--surface));
+    padding: 13px 16px;
+}
+
+.chat-consent-main {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    gap: 10px;
+}
+
+.chat-consent-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border-radius: 13px;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+    font-size: 14px;
+}
+
+.chat-consent-title {
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1.3;
+}
+
+.chat-consent-body {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.chat-consent-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    justify-self: stretch;
+    min-height: 38px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--primary-fill);
+    color: var(--primary-ink);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1;
+}
+
 .chat-history-btn,
 .chat-settings-btn,
 .settings-back-btn,
@@ -12121,7 +12180,7 @@ button span {
 .ai-consent-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 3000;
+    z-index: 3600;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -12428,7 +12487,7 @@ button span {
     color: var(--primary-ink);
 }
 
-@media (max-width: 520px), (max-height: 520px) and (hover: none) and (pointer: coarse) {
+@media (max-width: 520px), (hover: none) and (pointer: coarse) {
     :host {
         --dashboard-mobile-safe-top: env(safe-area-inset-top, 0px);
         --dashboard-mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -12592,6 +12651,7 @@ button span {
 
     .chat-header,
     .chat-quota-banner,
+    .chat-consent-banner,
     .chat-messages,
     .chat-input-row {
         padding-right: var(--dashboard-mobile-inline-end);
@@ -12623,6 +12683,51 @@ button span {
         scroll-padding-bottom: var(--dashboard-mobile-content-bottom-padding);
     }
 
+}
+
+@media (hover: none) and (pointer: coarse) and (min-width: 700px) {
+    .home-content,
+    .live-run-page-content,
+    .goals-content,
+    .challenge-content,
+    .friend-content,
+    .ranking-content,
+    .cal-content,
+    .upload-content,
+    .weight-content,
+    .achievement-content,
+    .gallery-content,
+    .profile-content,
+    .settings-content,
+    .chart-scroll,
+    .profile-page-body {
+        width: min(100%, 720px);
+        margin-right: auto;
+        margin-left: auto;
+    }
+
+    .chat-content {
+        width: min(100%, 720px);
+        margin-right: auto;
+        margin-left: auto;
+        border-right: 0.5px solid var(--line-soft);
+        border-left: 0.5px solid var(--line-soft);
+    }
+
+    .nav-bar {
+        justify-content: center;
+    }
+
+    .nav-item {
+        max-width: 120px;
+    }
+
+    .onboarding-panel {
+        width: min(100% - 48px, 620px);
+        border: 0.5px solid var(--line);
+        border-radius: 24px;
+        margin-bottom: max(24px, env(safe-area-inset-bottom));
+    }
 }
 
 @media (max-width: 520px) and (max-height: 700px), (max-height: 460px) and (hover: none) and (pointer: coarse) {

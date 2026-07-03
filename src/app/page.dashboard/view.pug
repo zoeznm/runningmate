@@ -2062,6 +2062,14 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                             div(class="chat-quota-title") 페이서 AI 이용 한도
                             div(class="chat-quota-body") {{aiUsageSummaryText}}
                     div(class="chat-quota-badge") {{aiUsageBadgeText}}
+                div(*ngIf="requiresAiDataConsent", class="chat-consent-banner", role="region", aria-label="AI 데이터 전송 동의 안내")
+                    div(class="chat-consent-main")
+                        div(class="chat-consent-icon")
+                            i(class="fa-solid fa-shield-halved", aria-hidden="true")
+                        div
+                            div(class="chat-consent-title") AI 데이터 전송 동의가 필요해
+                            div(class="chat-consent-body") 페이서 답변 생성을 위해 질문과 러닝 기록 맥락이 OpenAI, L.L.C.로 전송될 수 있어.
+                    button(type="button", class="chat-consent-btn", (click)="requestAiDataConsent('chat', $event)") 동의하고 시작
                 div(*ngIf="isChatHistoryOpen", class="chat-history-backdrop", (click)="closeChatHistory()")
                 aside(*ngIf="isChatHistoryOpen", class="chat-history-panel", role="dialog", aria-modal="true", aria-label="AI 대화 기록", (click)="$event.stopPropagation()")
                     div(class="chat-history-head")
