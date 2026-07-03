@@ -3023,7 +3023,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                         div(class="mini-stat-val") {{stat.value}}
                 div(class="journal-viewer-text") {{activeJournalViewer.journal}}
 
-        nav(class="nav-bar", aria-label="하단 메뉴")
+        nav(*ngIf="!isOnboardingVisible", class="nav-bar", aria-label="하단 메뉴")
             button(
                 *ngFor="let item of navItems; trackBy: trackById",
                 type="button",

@@ -11510,7 +11510,7 @@ button span {
 .onboarding-backdrop {
     position: absolute;
     inset: 0;
-    z-index: 80;
+    z-index: 260;
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -11592,7 +11592,8 @@ button span {
     overflow-y: auto;
     overscroll-behavior: contain;
     padding-right: 2px;
-    padding-bottom: 20px;
+    padding-bottom: 56px;
+    scroll-padding-bottom: 56px;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -12724,9 +12725,15 @@ button span {
 
     .onboarding-panel {
         width: min(100% - 48px, 620px);
+        max-height: min(760px, calc(100% - 96px));
         border: 0.5px solid var(--line);
         border-radius: 24px;
         margin-bottom: max(24px, env(safe-area-inset-bottom));
+    }
+
+    .onboarding-slide-scrollable {
+        padding-bottom: 72px;
+        scroll-padding-bottom: 72px;
     }
 }
 
