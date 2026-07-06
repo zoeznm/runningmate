@@ -1762,7 +1762,7 @@ export class Component implements AfterViewInit, OnDestroy {
     private async runInitialLoadingStep<T>(key: string, detail: string, task: () => Promise<T>): Promise<T> {
         this.setInitialLoadingStep(key, detail);
         try {
-            return await task();
+            return await this.withInitialTaskTimeout(task(), detail);
         } finally {
             this.clearInitialLoadingStep(key);
         }

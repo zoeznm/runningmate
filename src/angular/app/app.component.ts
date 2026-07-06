@@ -63,10 +63,7 @@ export class AppComponent implements OnInit {
             ? true
             : await this.withAppBootstrapTimeout(ensureAuthenticated(), '로그인 상태 확인').catch(() => false);
         if (!isPublicPage && !authenticated) {
-            if (hasAuthTokens()) {
-                return;
-            }
-            handleAuthFailure();
+            handleAuthFailure(true, !hasAuthTokens());
             return;
         }
         if (!isPublicPage) {

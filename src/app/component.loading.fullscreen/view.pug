@@ -2,6 +2,7 @@ div(class="fullscreen-loader", role="status", aria-live="polite", [attr.aria-lab
     div(class="fullscreen-loader-brand")
         img(class="fullscreen-loader-logo", src="/assets/brand/running_logo_main_app.svg?v=rm-main-logo-20260620", alt="", aria-hidden="true")
         div(class="fullscreen-loader-title") RunMate
+        div(class="fullscreen-loader-detail", *ngIf="detail") {{detail}}
     div(class="fullscreen-loader-bottom")
         div(class="fullscreen-loader-tip") {{currentTip}}
         div(class="fullscreen-loader-bar", aria-hidden="true")

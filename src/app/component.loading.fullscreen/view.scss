@@ -63,6 +63,14 @@
     line-height: 1.1;
 }
 
+.fullscreen-loader-detail {
+    max-width: 280px;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1.45;
+}
+
 .fullscreen-loader-bottom {
     width: min(330px, 100%);
     display: flex;

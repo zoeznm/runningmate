@@ -104,9 +104,9 @@ export class Component implements OnInit, OnDestroy {
     private previousAppRootBackground: string = '';
     private readonly mediaAccessNoticeAcceptedKey: string = 'runningmate-media-access-notice-accepted-v1';
     private readonly locationInfoConsentKey: string = 'runningmate-location-info-consent-v1';
-    private readonly sessionBootstrapTimeoutMs: number = 10000;
-    private readonly accessSplashMinimumMs: number = 2000;
-    private readonly accessSplashWatchdogMs: number = 9000;
+    private readonly sessionBootstrapTimeoutMs: number = 6500;
+    private readonly accessSplashMinimumMs: number = 900;
+    private readonly accessSplashWatchdogMs: number = 4500;
     private accessSplashStartedAt: number = Date.now();
     private accessSplashWatchdogTimer: number = 0;
 
