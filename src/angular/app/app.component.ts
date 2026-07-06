@@ -29,6 +29,7 @@ export class AppComponent implements OnInit {
     private readonly agreementModalEventName: string = 'runningmate:agreement-modal';
     private readonly appBootstrapTimeoutMs: number = 8000;
     private readonly appBootstrapFallbackMs: number = 6500;
+    private readonly appShellLoaderSelector: string = '.app-shell-loader';
     private appBootstrapFallbackTimer: number = 0;
 
     constructor(
@@ -93,6 +94,7 @@ export class AppComponent implements OnInit {
         if (!this.service.inited) {
             this.service.inited = true;
         }
+        this.removeStaticShellLoader();
         this.dispatchAppReadyEvent();
         this.safeDetectChanges();
     }
@@ -100,7 +102,24 @@ export class AppComponent implements OnInit {
     private dispatchAppReadyEvent(): void {
         if (typeof window === 'undefined') return;
         try {
-            window.dispatchEvent(new CustomEvent('runningmate:app-ready'));
+            (window as any).__RUNNINGMATE_APP_READY__ = true;
+            const supportsCustomEvent = typeof CustomEvent === 'function';
+            const event = supportsCustomEvent
+                ? new CustomEvent('runningmate:app-ready')
+                : document.createEvent('Event');
+            if (!supportsCustomEvent && 'initEvent' in event) {
+                event.initEvent('runningmate:app-ready', false, false);
+            }
+            window.dispatchEvent(event);
+        } catch { }
+    }
+
+    private removeStaticShellLoader(): void {
+        if (typeof document === 'undefined') return;
+        try {
+            document.querySelectorAll(this.appShellLoaderSelector).forEach((element) => {
+                element.parentElement?.removeChild(element);
+            });
         } catch { }
     }
 
