@@ -7551,6 +7551,7 @@ export class Component implements AfterViewInit, OnDestroy {
             this.cleanupHandlers.push(() => document.removeEventListener('visibilitychange', syncWhenVisible));
         }
 
+        sync();
         this.monthRolloverTimer = window.setInterval(sync, 60 * 1000);
     }
 
@@ -9904,7 +9905,7 @@ export class Component implements AfterViewInit, OnDestroy {
             .filter((row): row is RunRecord => Boolean(row))
             .sort((a, b) => b.date.localeCompare(a.date));
 
-        const nextYearMonth = this.runs[0]?.date.slice(0, 7) || this.yearMonthKey(new Date());
+        const nextYearMonth = this.normalizeYearMonth(this.activeYearMonth) || this.yearMonthKey(new Date());
         const monthChanged = this.activeYearMonth !== nextYearMonth;
         this.activeYearMonth = nextYearMonth;
         this.refreshDerivedState();
