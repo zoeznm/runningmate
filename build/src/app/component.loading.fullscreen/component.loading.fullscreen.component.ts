@@ -1,3 +1,7 @@
+import { Component } from '@angular/core';
+
+import Wiz from 'src/wiz';
+let wiz = new Wiz('/wiz').app('component.loading.fullscreen');
 import { ChangeDetectorRef, Input, OnDestroy, OnInit } from '@angular/core';
 import { isNativeLocalOrigin } from 'src/app/shared/api-base';
 
@@ -9,7 +13,12 @@ const DEFAULT_LOADING_TIPS: string[] = [
 ];
 const LOADING_SCREEN_BACKGROUND = '#12121c';
 
-export class Component implements OnInit, OnDestroy {
+@Component({
+    selector: 'wiz-component-loading-fullscreen',
+    templateUrl: './view.html',
+    styleUrls: ['./view.scss']
+})
+export class ComponentLoadingFullscreenComponent implements OnInit, OnDestroy {
     constructor(private readonly cdr: ChangeDetectorRef) { }
 
     @Input() public message: string = 'RunMate';

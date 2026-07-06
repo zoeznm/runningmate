@@ -115,7 +115,7 @@ class RunningMateBridgeViewController: CAPBridgeViewController {
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.setAppBackgroundColor("#000000")
+            self.setAppBackgroundColor("#12121c")
             self.webView?.evaluateJavaScript("window.location.replace('\(escapedPath)')") { [weak self] _, error in
                 guard let self = self, error != nil else { return }
 

@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectorRef, ElementRef, OnDestroy } from '@angular/core';
+import { AfterViewInit, ChangeDetectorRef, Component, ElementRef, OnDestroy } from '@angular/core';
 import { authHeaderForUrl, clearAuthTokens, ensureAuthenticated, hasAuthTokens, hydrateNativeAuthTokens, refreshAuthTokens } from 'src/app/shared/auth';
 import { apiFetch, apiErrorMessage, jsonRequest, payloadUserMessage, safeUserMessage, standardApiError } from 'src/app/shared/api';
 import { RUNNINGMATE_API_ORIGIN, isNativeLocalOrigin, resolveApiUrl } from 'src/app/shared/api-base';
@@ -1238,7 +1238,12 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     pacerPersona: 'balanced'
 };
 
-export class Component implements AfterViewInit, OnDestroy {
+@Component({
+    selector: 'wiz-page-dashboard',
+    templateUrl: './view.html',
+    styleUrls: ['./view.scss']
+})
+export class PageDashboardComponent implements AfterViewInit, OnDestroy {
     public activeScreen: ScreenKey = 'home';
     public isDark: boolean = true;
     public appSettings: AppSettings = this.cloneDefaultSettings();
