@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef, enableProdMode } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { Service } from '@wiz/libs/portal/season/service';
 import { TranslateService } from '@ngx-translate/core';
@@ -46,7 +46,6 @@ export class AppComponent implements OnInit {
     }
 
     public async ngOnInit() {
-        enableProdMode();
         installAuthFetchInterceptor();
         this.installAppBootstrapFallback();
         try {
@@ -94,7 +93,15 @@ export class AppComponent implements OnInit {
         if (!this.service.inited) {
             this.service.inited = true;
         }
+        this.dispatchAppReadyEvent();
         this.safeDetectChanges();
+    }
+
+    private dispatchAppReadyEvent(): void {
+        if (typeof window === 'undefined') return;
+        try {
+            window.dispatchEvent(new CustomEvent('runningmate:app-ready'));
+        } catch { }
     }
 
     private async withAppBootstrapTimeout<T>(task: Promise<T>, label: string): Promise<T> {

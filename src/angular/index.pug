@@ -144,6 +144,122 @@ html(lang="ko")
                 line-height: 1.1;
             }
 
+            .app-shell-recovery {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                box-sizing: border-box;
+                width: 100%;
+                min-height: 100vh;
+                min-height: calc(100dvh + env(safe-area-inset-bottom, 0px));
+                gap: 14px;
+                padding: 28px 24px calc(28px + env(safe-area-inset-bottom, 0px));
+                background: var(--app-shell-bg, #12121c);
+                color: var(--app-shell-text, #e8e8f0);
+                font-family: SUIT, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                text-align: center;
+            }
+
+            .app-shell-recovery-title {
+                margin: 0;
+                font-size: 22px;
+                font-weight: 900;
+                line-height: 1.25;
+            }
+
+            .app-shell-recovery-text {
+                max-width: 280px;
+                margin: 0;
+                color: rgba(232, 232, 240, 0.72);
+                font-size: 14px;
+                font-weight: 700;
+                line-height: 1.55;
+            }
+
+            .app-shell-recovery-actions {
+                display: flex;
+                width: min(100%, 320px);
+                gap: 10px;
+                margin-top: 6px;
+            }
+
+            .app-shell-recovery-action {
+                flex: 1 1 0;
+                min-height: 48px;
+                border: 0;
+                border-radius: 14px;
+                background: #24d6b5;
+                color: #020406;
+                font: inherit;
+                font-size: 14px;
+                font-weight: 900;
+            }
+
+            .app-shell-recovery-action.secondary {
+                background: rgba(255, 255, 255, 0.12);
+                color: var(--app-shell-text, #e8e8f0);
+            }
+
+        script(type="text/javascript").
+            (function () {
+                var recovered = false;
+
+                window.__RUNNINGMATE_APP_READY__ = false;
+                window.addEventListener("runningmate:app-ready", function () {
+                    window.__RUNNINGMATE_APP_READY__ = true;
+                });
+
+                function stillShowingShellLoader(root) {
+                    return root && root.querySelector && root.querySelector(".app-shell-loader");
+                }
+
+                function recoverShell() {
+                    if (window.__RUNNINGMATE_APP_READY__ || recovered) {
+                        return;
+                    }
+
+                    var root = document.querySelector("app-root");
+                    if (!stillShowingShellLoader(root)) {
+                        return;
+                    }
+
+                    recovered = true;
+                    root.innerHTML = [
+                        '<div class="app-shell-recovery" role="alert">',
+                        '<img class="app-shell-loader-mark" src="/assets/brand/running_logo_main_app.svg?v=rm-main-logo-20260620" alt="" aria-hidden="true">',
+                        '<h1 class="app-shell-recovery-title">앱을 다시 열어주세요</h1>',
+                        '<p class="app-shell-recovery-text">초기 화면을 불러오는 중 문제가 생겼습니다. 다시 시도하면 로그인 화면으로 이동합니다.</p>',
+                        '<div class="app-shell-recovery-actions">',
+                        '<button class="app-shell-recovery-action secondary" type="button" data-runningmate-reload>다시 열기</button>',
+                        '<button class="app-shell-recovery-action" type="button" data-runningmate-access>로그인 화면</button>',
+                        '</div>',
+                        '</div>'
+                    ].join("");
+
+                    var reload = root.querySelector("[data-runningmate-reload]");
+                    var access = root.querySelector("[data-runningmate-access]");
+                    if (reload) {
+                        reload.addEventListener("click", function () {
+                            window.location.reload();
+                        });
+                    }
+                    if (access) {
+                        access.addEventListener("click", function () {
+                            window.location.replace("/access");
+                        });
+                    }
+                }
+
+                window.addEventListener("error", function () {
+                    window.setTimeout(recoverShell, 500);
+                });
+                window.addEventListener("unhandledrejection", function () {
+                    window.setTimeout(recoverShell, 500);
+                });
+                window.setTimeout(recoverShell, 12000);
+            })();
+
         script(type="text/javascript").
             if ("serviceWorker" in navigator) {
                 const refreshVersion = "rm-watch-standalone-20260626";

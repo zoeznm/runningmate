@@ -106,46 +106,52 @@ export class Component implements OnInit, OnDestroy {
     private readonly locationInfoConsentKey: string = 'runningmate-location-info-consent-v1';
     private readonly sessionBootstrapTimeoutMs: number = 10000;
     private readonly accessSplashMinimumMs: number = 2000;
+    private readonly accessSplashWatchdogMs: number = 9000;
     private accessSplashStartedAt: number = Date.now();
+    private accessSplashWatchdogTimer: number = 0;
 
     public async ngOnInit() {
         this.installAccessViewportSync();
+        this.installAccessSplashWatchdog();
         this.normalizeLoginFields();
-        const nativeOAuthReturn = this.nativeOAuthReturnFromUrl();
-        if (nativeOAuthReturn) {
+        try {
+            const nativeOAuthReturn = this.nativeOAuthReturnFromUrl();
+            if (nativeOAuthReturn) {
+                await this.withTimeout(this.service.init(null as any), this.sessionBootstrapTimeoutMs).catch(() => null);
+                await this.consumeNativeOAuthReturn(nativeOAuthReturn);
+                return;
+            }
+
+            const resetToken = this.resetTokenFromUrl();
+            const socialError = this.socialErrorFromUrl();
+            if (resetToken) {
+                this.resetData.token = resetToken;
+                this.view = 'reset';
+                this.hideAccessSplash();
+                this.syncAccessSafeAreaBackground();
+            }
+            if (!resetToken && this.forwardOAuthReturn()) return;
+
             await this.withTimeout(this.service.init(null as any), this.sessionBootstrapTimeoutMs).catch(() => null);
-            await this.consumeNativeOAuthReturn(nativeOAuthReturn);
-            return;
+            if (!resetToken) {
+                if (await this.resumeAuthenticatedSession()) return;
+                await this.waitForAccessSplashMinimum();
+                this.hideAccessSplash();
+                this.syncAccessSafeAreaBackground();
+                await this.safeRender();
+            }
+            if (socialError && !resetToken) {
+                await this.alert(this.socialErrorMessage(socialError), 'error');
+                this.clearSocialErrorFromUrl();
+            }
+            await this.loadPolicies().catch(() => null);
+        } catch {
+            await this.showAccessFallback();
         }
-
-        const resetToken = this.resetTokenFromUrl();
-        const socialError = this.socialErrorFromUrl();
-        if (resetToken) {
-            this.resetData.token = resetToken;
-            this.view = 'reset';
-            this.isSessionChecking = false;
-            this.showAccessSplash = false;
-            this.syncAccessSafeAreaBackground();
-        }
-        if (!resetToken && this.forwardOAuthReturn()) return;
-
-        await this.withTimeout(this.service.init(null as any), this.sessionBootstrapTimeoutMs).catch(() => null);
-        if (!resetToken) {
-            if (await this.resumeAuthenticatedSession()) return;
-            await this.waitForAccessSplashMinimum();
-            this.showAccessSplash = false;
-            this.isSessionChecking = false;
-            this.syncAccessSafeAreaBackground();
-            await this.safeRender();
-        }
-        if (socialError && !resetToken) {
-            await this.alert(this.socialErrorMessage(socialError), 'error');
-            this.clearSocialErrorFromUrl();
-        }
-        await this.loadPolicies().catch(() => null);
     }
 
     public ngOnDestroy() {
+        this.clearAccessSplashWatchdog();
         this.uninstallAccessViewportSync();
     }
 
@@ -339,6 +345,34 @@ export class Component implements OnInit, OnDestroy {
         this.scheduleAccessScrollReset();
     }
 
+    private installAccessSplashWatchdog(): void {
+        if (typeof window === 'undefined') return;
+        this.clearAccessSplashWatchdog();
+        this.accessSplashWatchdogTimer = window.setTimeout(() => {
+            if (!this.showAccessSplash) return;
+            void this.showAccessFallback();
+        }, this.accessSplashWatchdogMs);
+    }
+
+    private clearAccessSplashWatchdog(): void {
+        if (!this.accessSplashWatchdogTimer || typeof window === 'undefined') return;
+        window.clearTimeout(this.accessSplashWatchdogTimer);
+        this.accessSplashWatchdogTimer = 0;
+    }
+
+    private hideAccessSplash(): void {
+        this.showAccessSplash = false;
+        this.isSessionChecking = false;
+        this.clearAccessSplashWatchdog();
+    }
+
+    private async showAccessFallback(): Promise<void> {
+        this.hideAccessSplash();
+        this.view = 'landing';
+        this.syncAccessSafeAreaBackground();
+        await this.safeRender();
+    }
+
     private async waitForAccessSplashMinimum(): Promise<void> {
         if (typeof window === 'undefined') return;
         const elapsed = Date.now() - this.accessSplashStartedAt;
@@ -415,11 +449,45 @@ export class Component implements OnInit, OnDestroy {
     }
 
     public goDashboard() {
+        this.hideAccessSplash();
+        this.syncAccessSafeAreaBackground();
+        void this.safeRender();
+
+        const fallbackTimer = window.setTimeout(() => {
+            if (this.isDashboardPath()) return;
+            location.replace('/dashboard');
+        }, 900);
+
         try {
-            this.service.href("/dashboard");
+            const app = this.service?.app as any;
+            const router = app?.router;
+            if (router?.navigateByUrl) {
+                router.navigateByUrl('/dashboard')
+                    .then((success: boolean) => {
+                        window.clearTimeout(fallbackTimer);
+                        if (!success && !this.isDashboardPath()) {
+                            location.replace('/dashboard');
+                        }
+                    })
+                    .catch(() => {
+                        window.clearTimeout(fallbackTimer);
+                        if (!this.isDashboardPath()) {
+                            location.replace('/dashboard');
+                        }
+                    });
+                return;
+            }
+
+            this.service.href('/dashboard');
         } catch {
-            location.replace("/dashboard");
+            window.clearTimeout(fallbackTimer);
+            location.replace('/dashboard');
         }
+    }
+
+    private isDashboardPath(): boolean {
+        const path = location.pathname.replace(/\/+$/, '') || '/';
+        return path === '/dashboard';
     }
 
     public normalizeUsername(value: any) {
