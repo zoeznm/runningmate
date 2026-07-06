@@ -27,6 +27,9 @@ export class AppComponent implements OnInit {
     private readonly requiredReconsentKeys: string[] = ['terms', 'privacy', 'age'];
     private readonly agreementModalBodyClass: string = 'runningmate-agreement-modal-visible';
     private readonly agreementModalEventName: string = 'runningmate:agreement-modal';
+    private readonly appBootstrapTimeoutMs: number = 8000;
+    private readonly appBootstrapFallbackMs: number = 6500;
+    private appBootstrapFallbackTimer: number = 0;
 
     constructor(
         public service: Service,
@@ -45,9 +48,21 @@ export class AppComponent implements OnInit {
     public async ngOnInit() {
         enableProdMode();
         installAuthFetchInterceptor();
-        await this.service.init(this);
+        this.installAppBootstrapFallback();
+        try {
+            await this.withAppBootstrapTimeout(this.service.init(this), '앱 초기화');
+        } catch {
+            this.markAppShellReady();
+        } finally {
+            this.clearAppBootstrapFallback();
+            this.markAppShellReady();
+        }
+
         const isPublicPage = this.isPublicPage();
-        if (!isPublicPage && !(await ensureAuthenticated())) {
+        const authenticated = isPublicPage
+            ? true
+            : await this.withAppBootstrapTimeout(ensureAuthenticated(), '로그인 상태 확인').catch(() => false);
+        if (!isPublicPage && !authenticated) {
             if (hasAuthTokens()) {
                 return;
             }
@@ -55,7 +70,61 @@ export class AppComponent implements OnInit {
             return;
         }
         if (!isPublicPage) {
-            await this.checkAgreementRequirement();
+            void this.withAppBootstrapTimeout(this.checkAgreementRequirement(), '약관 확인').catch(() => {
+                this.setAgreementModalVisible(false);
+            });
+        }
+    }
+
+    private installAppBootstrapFallback(): void {
+        if (typeof window === 'undefined') return;
+        this.clearAppBootstrapFallback();
+        this.appBootstrapFallbackTimer = window.setTimeout(() => {
+            this.markAppShellReady();
+        }, this.appBootstrapFallbackMs);
+    }
+
+    private clearAppBootstrapFallback(): void {
+        if (!this.appBootstrapFallbackTimer || typeof window === 'undefined') return;
+        window.clearTimeout(this.appBootstrapFallbackTimer);
+        this.appBootstrapFallbackTimer = 0;
+    }
+
+    private markAppShellReady(): void {
+        if (!this.service.inited) {
+            this.service.inited = true;
+        }
+        this.safeDetectChanges();
+    }
+
+    private async withAppBootstrapTimeout<T>(task: Promise<T>, label: string): Promise<T> {
+        if (typeof window === 'undefined') return task;
+
+        let timeoutId: number | null = null;
+        const timeout = new Promise<T>((_, reject) => {
+            timeoutId = window.setTimeout(() => {
+                reject(new Error(`${label} timed out`));
+            }, this.appBootstrapTimeoutMs);
+        });
+
+        try {
+            return await Promise.race([task, timeout]);
+        } finally {
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
+        }
+    }
+
+    private safeDetectChanges(): void {
+        try {
+            this.ref.detectChanges();
+        } catch {
+            window.setTimeout(() => {
+                try {
+                    this.ref.detectChanges();
+                } catch { }
+            }, 0);
         }
     }
 

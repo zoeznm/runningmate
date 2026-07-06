@@ -15,6 +15,7 @@ const REFRESH_TOKEN_KEY = 'runningmate.auth.refreshToken';
 const AUTO_LOGIN_KEY = 'runningmate.auth.autoLogin';
 const INSTALLED_KEY = '__runningmateAuthFetchInstalled';
 const AUTH_REQUEST_TIMEOUT_MS = 10000;
+const NATIVE_AUTH_TIMEOUT_MS = 5000;
 
 interface NativeAuthPlugin {
     saveAuthTokens?: (payload: { accessToken: string; refreshToken: string; autoLogin: boolean }) => Promise<unknown>;
@@ -108,6 +109,19 @@ function nativeString(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';
 }
 
+function withTimeout<T>(task: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+    if (typeof window === 'undefined') return task;
+
+    let timeoutId: number | null = null;
+    const timeout = new Promise<T>((resolve) => {
+        timeoutId = window.setTimeout(() => resolve(fallback), timeoutMs);
+    });
+
+    return Promise.race([task, timeout]).finally(() => {
+        if (timeoutId !== null) window.clearTimeout(timeoutId);
+    });
+}
+
 function writeStoredAuthTokens(accessToken: string, refreshToken: string, autoLogin: boolean): boolean {
     const write = (target: Storage | null, persist: boolean): boolean => {
         if (!target) return false;
@@ -163,7 +177,7 @@ export async function hydrateNativeAuthTokens(): Promise<boolean> {
 
     nativeHydrationPromise = (async () => {
         try {
-            const payload = await loadAuthTokens();
+            const payload = await withTimeout(loadAuthTokens(), NATIVE_AUTH_TIMEOUT_MS, null);
             const accessToken = nativeString(payload?.accessToken || payload?.access_token);
             const refreshToken = nativeString(payload?.refreshToken || payload?.refresh_token);
             const autoLogin = payload?.autoLogin !== false;
