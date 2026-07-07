@@ -219,7 +219,7 @@ div.access-page
                                         (click)="selectSignupGender(option.id)",
                                         [ngClass]="signupData.gender === option.id ? 'is-selected' : ''") {{option.label}}
 
-                            label.auth-field.auth-field--password
+                            label.auth-field.auth-field--password.auth-field--full
                                 span.field-label 비밀번호
                                 div.password-input-wrap
                                     input.field-input(
@@ -232,7 +232,7 @@ div.access-page
                                         i(*ngIf="passwordVisibility.signup", class="fa-solid fa-eye", aria-hidden="true")
                                 span.field-hint([ngClass]="signupData.password && signupData.password.length < 8 ? 'is-danger' : ''") 8자 이상 입력해주세요.
 
-                            label.auth-field.auth-field--password
+                            label.auth-field.auth-field--password.auth-field--full
                                 span.field-label 비밀번호 확인
                                 div.password-input-wrap
                                     input.field-input(
