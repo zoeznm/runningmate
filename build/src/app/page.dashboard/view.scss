@@ -11539,6 +11539,11 @@ button span {
     pointer-events: none;
 }
 
+.onboarding-panel-profile {
+    max-height: min(760px, calc(100% - 28px));
+    padding: 14px 18px 16px;
+}
+
 .onboarding-top {
     flex: 0 0 auto;
 }
@@ -11574,6 +11579,7 @@ button span {
 .onboarding-track {
     display: flex;
     height: 100%;
+    min-height: 0;
     transition: transform 260ms ease;
     will-change: transform;
 }
@@ -11583,7 +11589,9 @@ button span {
     flex: 0 0 100%;
     flex-direction: column;
     justify-content: flex-start;
+    height: 100%;
     min-width: 0;
+    min-height: 0;
     overflow: hidden;
     padding: 12px 0 8px;
 }
@@ -11595,6 +11603,36 @@ button span {
     padding-bottom: 56px;
     scroll-padding-bottom: 56px;
     -webkit-overflow-scrolling: touch;
+}
+
+.onboarding-panel-profile .onboarding-slide {
+    padding-top: 10px;
+    padding-bottom: 4px;
+}
+
+.onboarding-panel-profile .onboarding-slide-scrollable {
+    padding-bottom: 12px;
+    scroll-padding-bottom: 12px;
+}
+
+.onboarding-panel-profile .onboarding-icon {
+    width: 44px;
+    height: 44px;
+    margin-bottom: 10px;
+    border-radius: 15px;
+    font-size: 19px;
+}
+
+.onboarding-panel-profile .onboarding-title {
+    margin-top: 6px;
+    font-size: 20px;
+    line-height: 1.16;
+}
+
+.onboarding-panel-profile .onboarding-body {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.4;
 }
 
 .onboarding-icon {
@@ -11812,6 +11850,11 @@ button span {
     gap: 11px;
 }
 
+.onboarding-panel-profile .onboarding-form {
+    gap: 8px;
+    margin-top: 14px;
+}
+
 .onboarding-photo-picker {
     display: flex;
     align-items: center;
@@ -11820,6 +11863,11 @@ button span {
     color: var(--text);
     font-size: 13px;
     font-weight: 800;
+}
+
+.onboarding-panel-profile .onboarding-photo-picker {
+    gap: 10px;
+    min-height: 48px;
 }
 
 .onboarding-photo {
@@ -11833,6 +11881,11 @@ button span {
     border-radius: 50%;
     background: var(--surface);
     color: var(--primary);
+}
+
+.onboarding-panel-profile .onboarding-photo {
+    width: 48px;
+    height: 48px;
 }
 
 .onboarding-photo img {
@@ -11870,6 +11923,15 @@ button span {
     font-size: 14px;
 }
 
+.onboarding-panel-profile .onboarding-field {
+    gap: 5px;
+}
+
+.onboarding-panel-profile .onboarding-field input {
+    min-height: 40px;
+    border-radius: 13px;
+}
+
 .onboarding-gender-note {
     display: flex;
     align-items: center;
@@ -11884,6 +11946,12 @@ button span {
     line-height: 1.35;
 }
 
+.onboarding-panel-profile .onboarding-gender-note {
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: 11px;
+}
+
 .onboarding-gender-note i {
     display: inline-flex;
     align-items: center;
@@ -11896,10 +11964,21 @@ button span {
     color: var(--primary-fill);
 }
 
+.onboarding-panel-profile .onboarding-gender-note i {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+    border-radius: 9px;
+}
+
 .onboarding-gender-options {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 7px;
+}
+
+.onboarding-panel-profile .onboarding-gender-options {
+    gap: 6px;
 }
 
 .onboarding-gender-option {
@@ -11912,6 +11991,13 @@ button span {
     font-size: 12px;
     font-weight: 800;
     white-space: nowrap;
+}
+
+.onboarding-panel-profile .onboarding-gender-option {
+    min-height: 38px;
+    border-radius: 13px;
+    padding: 0 6px;
+    font-size: 11.5px;
 }
 
 .onboarding-gender-option.active {
@@ -12037,6 +12123,10 @@ button span {
     justify-content: center;
     gap: 5px;
     margin: 6px 0 14px;
+}
+
+.onboarding-panel-profile .onboarding-dots {
+    margin: 4px 0 10px;
 }
 
 .onboarding-dots span {

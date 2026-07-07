@@ -2717,6 +2717,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
             section(
                 class="onboarding-panel",
                 [class.saving]="isOnboardingSaving",
+                [class.onboarding-panel-profile]="currentOnboardingStep?.id === 'profile'",
                 (touchstart)="startOnboardingSwipe($event)",
                 (touchend)="endOnboardingSwipe($event)")
                 div(class="onboarding-top")
@@ -2826,7 +2827,7 @@ main(class="app-wrapper", [class.dark-screen]="isDark", [class.light-screen]="!i
                                         input(type="date", [max]="todayDateKey", [(ngModel)]="onboardingProfile.running_start_date")
                                     div(class="onboarding-gender-note")
                                         i(class="fa-solid fa-venus-mars", aria-hidden="true")
-                                        span 생리주기와 맞춤 기록 기능을 위해 성별을 선택해주세요.
+                                        span 성별을 선택하면 생리주기와 맞춤 기록 기능을 더 정확하게 사용할 수 있어요.
                                     div(class="onboarding-gender-options", role="radiogroup", aria-label="성별 선택")
                                         button(
                                             *ngFor="let option of onboardingGenderOptions",

@@ -1282,7 +1282,7 @@ export class Component implements AfterViewInit, OnDestroy {
         name: '',
         running_start_date: this.dateKey(new Date()),
         profile_image: '',
-        gender: ''
+        gender: 'unspecified'
     };
     public readonly onboardingGenderOptions: GenderOption[] = [
         { id: 'male', label: '남성' },
@@ -8241,7 +8241,7 @@ export class Component implements AfterViewInit, OnDestroy {
             name: profile.name || '',
             running_start_date: profile.running_start_date || this.dateKey(new Date()),
             profile_image: profile.profile_image || '',
-            gender: this.normalizeGender(profile.gender)
+            gender: this.normalizeGender(profile.gender) || 'unspecified'
         };
         this.onboardingGoalKm = 30;
         this.onboardingIndex = 0;
@@ -8276,7 +8276,7 @@ export class Component implements AfterViewInit, OnDestroy {
             const name = this.onboardingProfile.name.trim();
             const startDate = this.normalizeDateKey(this.onboardingProfile.running_start_date);
             const genderChoice = String(this.onboardingProfile.gender || '').trim();
-            const gender = genderChoice === 'unspecified' ? 'unspecified' : this.normalizeGender(genderChoice);
+            const gender = genderChoice === 'unspecified' ? 'unspecified' : this.normalizeGender(genderChoice) || 'unspecified';
             if (!name) {
                 this.onboardingStatus = '닉네임을 입력해줘.';
                 return false;
@@ -8287,10 +8287,6 @@ export class Component implements AfterViewInit, OnDestroy {
             }
             if (startDate > this.todayDateKey) {
                 this.onboardingStatus = '러닝 시작일은 오늘 이전 날짜로 선택해줘.';
-                return false;
-            }
-            if (!gender) {
-                this.onboardingStatus = '생리주기와 맞춤 기능을 위해 성별을 선택해줘.';
                 return false;
             }
             this.onboardingProfile.name = name;
